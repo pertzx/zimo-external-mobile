@@ -21,3 +21,10 @@ Release/
 *.VC.db
 *.VC.opendb
 .vs/
+
+
+build/
+.gradle/
+*.so, 
+*.apk
+
