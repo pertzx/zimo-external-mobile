@@ -23,7 +23,10 @@
 // #define IMGUI_DEFINE_MATH_OPERATORS
 
 // ImGui
+// Em Shared/Includes.hpp (linha ~26)
+#ifndef DAEMON_BUILD
 #include <imgui.h>
+#endif
 #include <imgui_impl_android.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>

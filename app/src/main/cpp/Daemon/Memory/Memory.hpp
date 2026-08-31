@@ -2,7 +2,11 @@
 #include <string>
 #include <vector>
 #include <Utils/Utils.hpp>
-#include "../Offsets/Offsets.hpp"
+// ❌ Antes
+// #include "../Offsets/Offsets.hpp"
+
+// ✅ Depois
+#include "../../Shared/Offsets/Offsets.hpp"
 
 // PORTAR ANDROID
 #include <sys/types.h>

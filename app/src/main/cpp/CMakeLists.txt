@@ -130,3 +130,4 @@ target_link_libraries(daemon
     ${log-lib}
     ${android-lib}
 )
+target_compile_definitions(daemon PRIVATE DAEMON_BUILD)

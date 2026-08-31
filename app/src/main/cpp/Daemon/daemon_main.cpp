@@ -1,4 +1,5 @@
 #include "DaemonApp.hpp"
+#include "../../Shared/Global.hpp"
 #include <android/log.h>
 #include <jni.h>
 #include <signal.h>

@@ -1,10 +1,11 @@
 #include "Custom.hpp"
 #include <imgui_internal.h>
-#include <Render/Fonts/Fonts.hpp>
-#include <Utils/Utils.hpp>
-#include <Render/Fonts/Bytes/IconsFontAwesome6.h>
+// #include <Render/Fonts/Fonts.hpp>
+#include "../../Fonts/Fonts.hpp"
+#include "../../../cpp/Shared/Utils/Utils.hpp"
+#include "../../Fonts/Bytes/IconsFontAwesome6.h"
 #include <map>
-#include <Render/Overlay/Overlay.hpp>
+#include "../../Overlay/Overlay.hpp"
 using namespace ImGui;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -921,6 +922,7 @@ namespace Custom {
     // KEYBIND - with animated width on key change
     // ═══════════════════════════════════════════════════════════════════════════
 
+    #ifdef _WIN32
     const char* GetKeyNameFromSystem(int vkCode) {
         switch (vkCode) {
             case 0: return "None";
@@ -947,6 +949,12 @@ namespace Custom {
 
         return "???";
     }
+#else
+const char* GetKeyName(int vkCode) {
+    (void)vkCode;
+    return "Key";
+}
+#endif
 
     bool KeyBind(const char* label, int* Key, bool IsBlockMouse) {
         struct KeyBindAnim {
@@ -994,7 +1002,14 @@ namespace Custom {
         }
 
         // Get key text and calculate target width
-        const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
+        // const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
+
+        // ✅ Depois
+#ifdef _WIN32
+const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
+#else
+const char* keyText = it->listening ? "..." : "Key";
+#endif
         ImGui::PushFont(Fonts::InterMedium);
         ImVec2 keySize = CalcTextSize(keyText);
         ImGui::PopFont();
@@ -1049,39 +1064,31 @@ namespace Custom {
                 it->mouseWasReleased = true;
             }
             
-            // ESC cancela
+            #ifdef _WIN32
             if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
                 it->listening = false;
-                activeKeyBind = 0;
+                *Key = 0;
+                return true;
             }
-            else {
-                // Verificar todas as teclas
-                for (int vk = 1; vk < 255; vk++) {
-                    // Skip ESC (já tratado)
-                    if (vk == VK_ESCAPE) continue;
-                    
-                    // Bloquear mouse se necessário
-                    if (IsBlockMouse) {
-                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
-                        if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
-                    }
-                    
-                    // Para botões do mouse, só aceitar depois que o mouse foi solto uma vez
-                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                        vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-                        if (!it->mouseWasReleased) continue;
-                    }
 
-                    // Verificar se tecla está pressionada
-                    if (GetAsyncKeyState(vk) & 0x8000) {
-                        *Key = vk;
-                        it->listening = false;
-                        activeKeyBind = 0;
-                        changed = true;
-                        break;
-                    }
+            for (int vk = 0x08; vk <= 0xFE; vk++) {
+                if (vk == VK_ESCAPE) continue;
+                if (vk >= VK_LBUTTON && vk <= VK_XBUTTON2) {
+                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+                    if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
+                }
+
+                if (GetAsyncKeyState(vk) & 0x8000) {
+                    *Key = vk;
+                    it->listening = false;
+                    return true;
                 }
             }
+#else
+            // Android: não captura teclas físicas via GetAsyncKeyState
+            // Se precisar de keybind no Android, implemente via AndroidInput.cpp
+            (void)Key;
+#endif
         }
 
         ImDrawList* dl = window->DrawList;

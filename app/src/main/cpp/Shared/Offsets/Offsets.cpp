@@ -1,3 +1,5 @@
+
+#include <cinttypes>
 #include "Offsets.hpp"
 #include "../../Daemon/Memory/Memory.hpp"
 // #include <Main/Memory/Memory.hpp>   // <-- REVERTER para isso
@@ -236,14 +238,14 @@ uintptr_t Offsets::GetPosWorld::BoundsCenter_3 = 0;
 template <bool N32, typename TValue>
 uintptr_t Offsets::UnityList<N32, TValue>::GetItems()
 {
-	uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x10) + 0x20;
+	uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uintptr_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uintptr_t)this + 0x10) + 0x20;
 	return ArrayBase;
 }
 
 template <bool N32, typename TValue>
 int Offsets::UnityList<N32, TValue>::GetSize()
 {
-	int Size = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0xC) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x18);
+	int Size = N32 ? g_FreeFireMemory.Read<int>((uintptr_t)this + 0xC) : g_FreeFireMemory.Read<int>((uintptr_t)this + 0x18);
 	return (Size >= 0 && Size <= 500) ? Size : 0;
 }
 
@@ -264,11 +266,11 @@ uintptr_t Offsets::UnityDictionary<N32, V31, TValue>::GetValues()
 {
 	if constexpr (V31)
 	{
-		return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0xC) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x18) + 0x20;
+		return N32 ? g_FreeFireMemory.Read<uint32_t>((uintptr_t)this + 0xC) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uintptr_t)this + 0x18) + 0x20;
 	}
 	else
 	{
-		return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x28) + 0x20;
+		return N32 ? g_FreeFireMemory.Read<uint32_t>((uintptr_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uintptr_t)this + 0x28) + 0x20;
 	}
 }
 
@@ -278,11 +280,11 @@ int Offsets::UnityDictionary<N32, V31, TValue>::GetNumValues()
 	int Count;
 	if constexpr (V31)
 	{
-		Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x10) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x20);
+		Count = N32 ? g_FreeFireMemory.Read<int>((uintptr_t)this + 0x10) : g_FreeFireMemory.Read<int>((uintptr_t)this + 0x20);
 	}
 	else
 	{
-		Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x18) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x30);
+		Count = N32 ? g_FreeFireMemory.Read<int>((uintptr_t)this + 0x18) : g_FreeFireMemory.Read<int>((uintptr_t)this + 0x30);
 	}
 	return (Count >= 1 && Count <= 500) ? Count : 0;
 }
@@ -315,7 +317,14 @@ void Offsets::GameConfig()
 	for (uintptr_t candidate : LibIl2CppCandidates)
 	{
 		LibIl2Cpp = candidate;
-		printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uint64_t)candidate);
+
+		// ❌ Antes (linhas ~319 e ~347)
+// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uintptr_t)candidate);
+
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+
+// ✅ Depois — opção 2: forçar cast (mais simples)
+// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (unsigned long long)candidate);
 		// ==================== FF TH v7a 75 32-bit, OB54) ====================
 		{
 			uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + 0xABFF3B8);
@@ -343,7 +352,14 @@ void Offsets::GameConfig()
 		}
 
 		LibIl2Cpp = candidate;
-		printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uint64_t)candidate);
+		// ❌ Antes (linhas ~319 e ~347)
+// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uintptr_t)candidate);
+
+
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+
+// ✅ Depois — opção 2: forçar cast (mais simples)
+// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (unsigned long long)candidate);
 		// ==================== FF TH v7a 76 32-bit, OB54) ====================
 		{
 			uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + 0xABFF6D8);

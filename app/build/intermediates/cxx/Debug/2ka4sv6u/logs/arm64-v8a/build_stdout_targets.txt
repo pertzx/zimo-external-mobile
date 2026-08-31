@@ -1,152 +1,89 @@
 ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
 [1/50] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
-[2/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
-[3/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
-[4/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[2/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[4/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
 [5/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
-[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
-[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
-[8/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
-[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
-FAILED: CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o -MF CMakeFiles\panel.dir\Shared\Offsets\Offsets.cpp.o.d -o CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp"
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/../../Daemon/Memory/Memory.hpp:5:
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/../../Daemon/Memory/../Offsets/Offsets.hpp:6:7: error: redefinition of 'Offsets'
-class Offsets
-      ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.hpp:6:7: note: previous definition is here
-class Offsets
-      ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:239:62: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x10) + 0x20;
-                                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:257:25: note: in instantiation of member function 'Offsets::UnityList<true, unsigned int>::GetItems' requested here
-template class Offsets::UnityList<true, uint32_t>;
+[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[8/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+[10/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector3.cpp.o
+[11/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
+[12/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
+[13/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+[14/50] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
+[15/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+[16/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[17/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
+[18/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
+[19/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_freetype.cpp.o
+[20/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[21/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[22/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+FAILED: CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o -MF CMakeFiles\panel.dir\C_\Users\M�rcio_Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\External\ImGui\Custom.cpp.o.d -o CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1005:55: error: use of undeclared identifier 'GetKeyNameFromSystem'
+        const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
+                                                      ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1061:34: error: use of undeclared identifier 'VK_ESCAPE'
+            if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1069:31: error: use of undeclared identifier 'VK_ESCAPE'
+                    if (vk == VK_ESCAPE) continue;
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:35: error: use of undeclared identifier 'VK_LBUTTON'
+                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:55: error: use of undeclared identifier 'VK_RBUTTON'
+                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+                                                      ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:75: error: use of undeclared identifier 'VK_MBUTTON'
+                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
+                                                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1074:35: error: use of undeclared identifier 'VK_XBUTTON1'
+                        if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1074:56: error: use of undeclared identifier 'VK_XBUTTON2'
+                        if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
+                                                       ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:31: error: use of undeclared identifier 'VK_LBUTTON'
+                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:51: error: use of undeclared identifier 'VK_RBUTTON'
+                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
+                                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:71: error: use of undeclared identifier 'VK_MBUTTON'
+                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
+                                                                      ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1079:31: error: use of undeclared identifier 'VK_XBUTTON1'
+                        vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1079:52: error: use of undeclared identifier 'VK_XBUTTON2'
+                        vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
+                                                   ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1084:25: error: use of undeclared identifier 'GetAsyncKeyState'
+                    if (GetAsyncKeyState(vk) & 0x8000) {
                         ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:246:46: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        int Size = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0xC) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x18);
-                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:257:25: note: in instantiation of member function 'Offsets::UnityList<true, unsigned int>::GetSize' requested here
-template class Offsets::UnityList<true, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:239:62: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x10) + 0x20;
-                                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:258:25: note: in instantiation of member function 'Offsets::UnityList<true, unsigned long>::GetItems' requested here
-template class Offsets::UnityList<true, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:246:46: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        int Size = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0xC) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x18);
-                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:258:25: note: in instantiation of member function 'Offsets::UnityList<true, unsigned long>::GetSize' requested here
-template class Offsets::UnityList<true, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:239:62: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x10) + 0x20;
-                                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:259:25: note: in instantiation of member function 'Offsets::UnityList<false, unsigned int>::GetItems' requested here
-template class Offsets::UnityList<false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:246:46: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        int Size = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0xC) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x18);
-                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:259:25: note: in instantiation of member function 'Offsets::UnityList<false, unsigned int>::GetSize' requested here
-template class Offsets::UnityList<false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:239:62: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        uintptr_t ArrayBase = N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x8) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x10) + 0x20;
-                                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:260:25: note: in instantiation of member function 'Offsets::UnityList<false, unsigned long>::GetItems' requested here
-template class Offsets::UnityList<false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:246:46: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-        int Size = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0xC) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x18);
-                                                    ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:260:25: note: in instantiation of member function 'Offsets::UnityList<false, unsigned long>::GetSize' requested here
-template class Offsets::UnityList<false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:271:48: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x28) + 0x20;
-                                                             ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:304:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, false, unsigned int>::GetValues' requested here
-template class Offsets::UnityDictionary<true, false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:285:44: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x18) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x30);
-                                                         ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:304:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, false, unsigned int>::GetNumValues' requested here
-template class Offsets::UnityDictionary<true, false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:271:48: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x28) + 0x20;
-                                                             ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:305:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, false, unsigned long>::GetValues' requested here
-template class Offsets::UnityDictionary<true, false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:285:44: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x18) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x30);
-                                                         ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:305:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, false, unsigned long>::GetNumValues' requested here
-template class Offsets::UnityDictionary<true, false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:271:48: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x28) + 0x20;
-                                                             ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:306:25: note: in instantiation of member function 'Offsets::UnityDictionary<false, false, unsigned int>::GetValues' requested here
-template class Offsets::UnityDictionary<false, false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:285:44: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x18) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x30);
-                                                         ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:306:25: note: in instantiation of member function 'Offsets::UnityDictionary<false, false, unsigned int>::GetNumValues' requested here
-template class Offsets::UnityDictionary<false, false, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:271:48: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0x14) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x28) + 0x20;
-                                                             ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:307:25: note: in instantiation of member function 'Offsets::UnityDictionary<false, false, unsigned long>::GetValues' requested here
-template class Offsets::UnityDictionary<false, false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:285:44: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x18) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x30);
-                                                         ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:307:25: note: in instantiation of member function 'Offsets::UnityDictionary<false, false, unsigned long>::GetNumValues' requested here
-template class Offsets::UnityDictionary<false, false, uint64_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:267:48: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                return N32 ? g_FreeFireMemory.Read<uint32_t>((uint32_t)this + 0xC) + 0x10 : g_FreeFireMemory.Read<uint64_t>((uint64_t)this + 0x18) + 0x20;
-                                                             ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:308:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, true, unsigned int>::GetValues' requested here
-template class Offsets::UnityDictionary<true, true, uint32_t>;
-                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:281:44: error: cast from pointer to smaller type 'uint32_t' (aka 'unsigned int') loses information
-                Count = N32 ? g_FreeFireMemory.Read<int>((uint32_t)this + 0x10) : g_FreeFireMemory.Read<int>((uint64_t)this + 0x20);
-                                                         ^~~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:308:25: note: in instantiation of member function 'Offsets::UnityDictionary<true, true, unsigned int>::GetNumValues' requested here
-template class Offsets::UnityDictionary<true, true, uint32_t>;
-                        ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-20 errors generated.
-[10/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
-[11/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
-[12/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:9:
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/Notify/Notify.hpp:5:9: warning: 'IMGUI_DEFINE_MATH_OPERATORS' macro redefined [-Wmacro-redefined]
-#define IMGUI_DEFINE_MATH_OPERATORS
-        ^
-<command line>:1:9: note: previous definition is here
-#define IMGUI_DEFINE_MATH_OPERATORS 1
-        ^
-1 warning generated.
-[13/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:3:
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/Notify/Notify.hpp:5:9: warning: 'IMGUI_DEFINE_MATH_OPERATORS' macro redefined [-Wmacro-redefined]
-#define IMGUI_DEFINE_MATH_OPERATORS
-        ^
-<command line>:1:9: note: previous definition is here
-#define IMGUI_DEFINE_MATH_OPERATORS 1
-        ^
-1 warning generated.
-[14/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+14 errors generated.
+[23/50] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
+FAILED: CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Ddaemon_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o -MF CMakeFiles\daemon.dir\Daemon\daemon_main.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/daemon_main.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/daemon_main.cpp:25:5: error: use of undeclared identifier 'g_Globals'
+    g_Globals.General.ShutDown = true;
+    ^
+1 error generated.
+[24/50] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
+FAILED: CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Ddaemon_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -MF CMakeFiles\daemon.dir\Daemon\DaemonApp.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp:3:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:4:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:26:10: fatal error: 'imgui.h' file not found
+#include <imgui.h>
+         ^~~~~~~~~
+1 error generated.
+[25/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[26/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[27/50] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
 ninja: build stopped: subcommand failed.

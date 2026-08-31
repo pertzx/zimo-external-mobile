@@ -1,8 +1,14 @@
 #pragma once
 #include <vector>
 #include <chrono>
-// ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
+// ❌ Antes
+// #define IMGUI_DEFINE_MATH_OPERATORS
+
+// ✅ Depois
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
+#endif
+
 #include <imgui.h>
 #include <Utils/Utils.hpp>
 #include <Fonts/Fonts.hpp>

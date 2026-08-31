@@ -118,8 +118,14 @@ static const ImU64          IM_U64_MAX = ULLONG_MAX; // (0xFFFFFFFFFFFFFFFFull);
 static const ImU64          IM_U64_MAX = (2ULL * 9223372036854775807LL + 1);
 #endif
 
+// ❌ Antes (linha ~121)
+// #include <Windows.h>
+
+// ✅ Depois
+#ifdef _WIN32
 #include <Windows.h>
-#include <Render/Fonts/Fonts.hpp>
+#endif
+#include "../../Fonts/Fonts.hpp"
 
 //-------------------------------------------------------------------------
 // [SECTION] Forward Declarations
