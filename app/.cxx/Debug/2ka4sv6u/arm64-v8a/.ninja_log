@@ -4,3 +4,8 @@
 0	519	0	clean	1ec1a960d8b71768
 999	19237	8098511949964231	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
 1885	19328	8098511950464272	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+1	415	0	clean	1ec1a960d8b71768
+538	8833	8098523023744003	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+2174	9295	8098523023254018	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
+3381	10110	8098523038350731	CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o	f7016507386c6e07
+9297	10772	8098523044053580	CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o	91c0fab315273c0d

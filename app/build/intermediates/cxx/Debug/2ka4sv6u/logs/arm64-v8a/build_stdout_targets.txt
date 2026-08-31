@@ -1,361 +1,116 @@
 ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
-[1/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
-FAILED: CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o -MF CMakeFiles\panel.dir\Panel\IPC\IPCClient.cpp.o.d -o CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp"
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:154:5: error: unknown type name 'ImDrawList'
-    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:154:28: error: use of undeclared identifier 'ImGui'
-    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-                           ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:161:9: error: unknown type name 'ImColor'
-        ImColor color = player.IsTeam
-        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:162:15: error: use of undeclared identifier 'ImColor'
-            ? ImColor(g_Globals.Visuals.ESP.TeamColor[0], g_Globals.Visuals.ESP.TeamColor[1],
-              ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:164:15: error: use of undeclared identifier 'ImColor'
-            : ImColor(g_Globals.Visuals.ESP.EnemyColor[0], g_Globals.Visuals.ESP.EnemyColor[1],
-              ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:172:31: error: use of undeclared identifier 'ImVec2'
-            drawList->AddRect(ImVec2(x, y), ImVec2(x + w, y + h), color, 0.0f, 0, g_Globals.Visuals.ESP.Thickness);
-                              ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:172:45: error: use of undeclared identifier 'ImVec2'
-            drawList->AddRect(ImVec2(x, y), ImVec2(x + w, y + h), color, 0.0f, 0, g_Globals.Visuals.ESP.Thickness);
-                                            ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:175:41: error: use of undeclared identifier 'ImVec2'
-                drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h),
-                                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:175:55: error: use of undeclared identifier 'ImVec2'
-                drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h),
-                                                      ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:176:21: error: use of undeclared identifier 'ImColor'
-                    ImColor(g_Globals.Visuals.ESP.FilledBoxColor[0], g_Globals.Visuals.ESP.FilledBoxColor[1],
-                    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:187:37: error: use of undeclared identifier 'ImVec2'
-            drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(0, 0, 0, 200));
-                                    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:187:57: error: use of undeclared identifier 'ImVec2'
-            drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(0, 0, 0, 200));
-                                                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:187:91: error: use of undeclared identifier 'IM_COL32'
-            drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(0, 0, 0, 200));
-                                                                                          ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:188:37: error: use of undeclared identifier 'ImVec2'
-            drawList->AddRectFilled(ImVec2(barX, barY + barH * (1.0f - healthPct)),
-                                    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:189:37: error: use of undeclared identifier 'ImVec2'
-                                    ImVec2(barX + barW, barY + barH),
-                                    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:190:37: error: use of undeclared identifier 'IM_COL32'
-                                    IM_COL32((int)(255 * (1.0f - healthPct)), (int)(255 * healthPct), 0, 255));
-                                    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:194:13: error: unknown type name 'ImVec2'
-            ImVec2 textSize = ImGui::CalcTextSize(player.Name);
-            ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:194:31: error: use of undeclared identifier 'ImGui'
-            ImVec2 textSize = ImGui::CalcTextSize(player.Name);
-                              ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:201:13: error: use of undeclared identifier 'snprintf'
-            snprintf(distStr, sizeof(distStr), "%.0fm", player.Distance);
-            ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-20 errors generated.
+[1/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
 [2/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
-[3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[3/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
 [4/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
 FAILED: CMakeFiles/panel.dir/Panel/PanelApp.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -MF CMakeFiles\panel.dir\Panel\PanelApp.cpp.o.d -o CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:15:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/hresetintrin.h:42:27: error: invalid input constraint 'a' in asm
-  __asm__ ("hreset $0" :: "a"(__eax));
-                          ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:25:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:33:10: error: use of undeclared identifier '__builtin_ia32_crc32qi'
-  return __builtin_ia32_crc32qi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: error: use of undeclared identifier '__builtin_ia32_crc32hi'; did you mean '__builtin_arm_crc32h'?
-  return __builtin_ia32_crc32hi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: note: '__builtin_arm_crc32h' declared here
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:73:10: error: use of undeclared identifier '__builtin_ia32_crc32si'
-  return __builtin_ia32_crc32si(__C, __D);
-         ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:5: error: use of undeclared identifier '__builtin_ia32_emms'; did you mean '__builtin_isless'?
-    __builtin_ia32_emms();
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/math.h:651:12: note: '__builtin_isless' declared here
-    return isless(__lcpp_x, __lcpp_y);
-           ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/math.h:311:22: note: expanded from macro 'isless'
-#define isless(x, y) __builtin_isless((x), (y))
-                     ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:25: error: too few arguments to function call, expected 2, have 0
-    __builtin_ia32_emms();
-    ~~~~~~~~~~~~~~~~~~~~^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:54:19: error: use of undeclared identifier '__builtin_ia32_vec_init_v2si'
-    return (__m64)__builtin_ia32_vec_init_v2si(__i, 0);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:71:12: error: use of undeclared identifier '__builtin_ia32_vec_ext_v2si'
-    return __builtin_ia32_vec_ext_v2si((__v2si)__m, 0);
-           ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:133:19: error: use of undeclared identifier '__builtin_ia32_packsswb'
-    return (__m64)__builtin_ia32_packsswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:163:19: error: use of undeclared identifier '__builtin_ia32_packssdw'
-    return (__m64)__builtin_ia32_packssdw((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:193:19: error: use of undeclared identifier '__builtin_ia32_packuswb'
-    return (__m64)__builtin_ia32_packuswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:220:19: error: use of undeclared identifier '__builtin_ia32_punpckhbw'
-    return (__m64)__builtin_ia32_punpckhbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:243:19: error: use of undeclared identifier '__builtin_ia32_punpckhwd'
-    return (__m64)__builtin_ia32_punpckhwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:264:19: error: use of undeclared identifier '__builtin_ia32_punpckhdq'
-    return (__m64)__builtin_ia32_punpckhdq((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:291:19: error: use of undeclared identifier '__builtin_ia32_punpcklbw'
-    return (__m64)__builtin_ia32_punpcklbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:314:19: error: use of undeclared identifier '__builtin_ia32_punpcklwd'
-    return (__m64)__builtin_ia32_punpcklwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:335:19: error: use of undeclared identifier '__builtin_ia32_punpckldq'
-    return (__m64)__builtin_ia32_punpckldq((__v2si)__m1, (__v2si)__m2);
-                  ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-20 errors generated.
-[5/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:3:10: fatal error: 'IPCClient.hpp' file not found
+#include "IPCClient.hpp"
+         ^~~~~~~~~~~~~~~
+1 error generated.
+[5/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
+[6/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
 FAILED: CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -MF CMakeFiles\panel.dir\Panel\Interface\Interface.cpp.o.d -o CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:3:10: fatal error: 'IPCClient.hpp' file not found
+#include "IPCClient.hpp"
+         ^~~~~~~~~~~~~~~
+1 error generated.
+[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+FAILED: CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -MF CMakeFiles\panel.dir\Shared\Config\saveconfig.cpp.o.d -o CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:1:9: warning: #pragma once in main file [-Wpragma-once-outside-header]
+#pragma once
+        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:2:10: fatal error: 'Windows.h' file not found
+#include <Windows.h>
+         ^~~~~~~~~~~
+1 warning and 1 error generated.
+[8/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+FAILED: CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o -MF CMakeFiles\panel.dir\Shared\Utils\Utils.cpp.o.d -o CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:301:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + Indices * 2),
+                    ^                                                       ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:15:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/hresetintrin.h:42:27: error: invalid input constraint 'a' in asm
-  __asm__ ("hreset $0" :: "a"(__eax));
-                          ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:302:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + Indices * 2))
+                    ^                                                   ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:25:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:33:10: error: use of undeclared identifier '__builtin_ia32_crc32qi'
-  return __builtin_ia32_crc32qi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: error: use of undeclared identifier '__builtin_ia32_crc32hi'; did you mean '__builtin_arm_crc32h'?
-  return __builtin_ia32_crc32hi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: note: '__builtin_arm_crc32h' declared here
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:73:10: error: use of undeclared identifier '__builtin_ia32_crc32si'
-  return __builtin_ia32_crc32si(__C, __D);
-         ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:5: error: use of undeclared identifier '__builtin_ia32_emms'; did you mean '__builtin_isless'?
-    __builtin_ia32_emms();
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/math.h:651:12: note: '__builtin_isless' declared here
-    return isless(__lcpp_x, __lcpp_y);
-           ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/math.h:311:22: note: expanded from macro 'isless'
-#define isless(x, y) __builtin_isless((x), (y))
-                     ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:4:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:25: error: too few arguments to function call, expected 2, have 0
-    __builtin_ia32_emms();
-    ~~~~~~~~~~~~~~~~~~~~^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:54:19: error: use of undeclared identifier '__builtin_ia32_vec_init_v2si'
-    return (__m64)__builtin_ia32_vec_init_v2si(__i, 0);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:71:12: error: use of undeclared identifier '__builtin_ia32_vec_ext_v2si'
-    return __builtin_ia32_vec_ext_v2si((__v2si)__m, 0);
-           ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:133:19: error: use of undeclared identifier '__builtin_ia32_packsswb'
-    return (__m64)__builtin_ia32_packsswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:163:19: error: use of undeclared identifier '__builtin_ia32_packssdw'
-    return (__m64)__builtin_ia32_packssdw((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:193:19: error: use of undeclared identifier '__builtin_ia32_packuswb'
-    return (__m64)__builtin_ia32_packuswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:220:19: error: use of undeclared identifier '__builtin_ia32_punpckhbw'
-    return (__m64)__builtin_ia32_punpckhbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:243:19: error: use of undeclared identifier '__builtin_ia32_punpckhwd'
-    return (__m64)__builtin_ia32_punpckhwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:264:19: error: use of undeclared identifier '__builtin_ia32_punpckhdq'
-    return (__m64)__builtin_ia32_punpckhdq((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:291:19: error: use of undeclared identifier '__builtin_ia32_punpcklbw'
-    return (__m64)__builtin_ia32_punpcklbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:314:19: error: use of undeclared identifier '__builtin_ia32_punpcklwd'
-    return (__m64)__builtin_ia32_punpcklwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:335:19: error: use of undeclared identifier '__builtin_ia32_punpckldq'
-    return (__m64)__builtin_ia32_punpckldq((__v2si)__m1, (__v2si)__m2);
-                  ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-20 errors generated.
-[6/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:298:73: error: expression contains unexpanded parameter pack 'Indices'
+            ((Indices >= sizeof(_storage) / 16 ? static_cast<void>(0) : vst1q_u64(
+                                                                        ^
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26801:3: note: expanded from macro 'vst1q_u64'
+  __builtin_neon_vst1q_v(__p0, (int8x16_t)__s1, 51); \
+  ^                      ~~~~
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:39:10: fatal error: 'stb_image.h' file not found
+#include <stb_image.h>
+         ^~~~~~~~~~~~~
+4 errors generated.
+[9/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
 FAILED: CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -MF CMakeFiles\panel.dir\Panel\Fonts\Fonts.cpp.o.d -o CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:301:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + Indices * 2),
+                    ^                                                       ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:15:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/hresetintrin.h:42:27: error: invalid input constraint 'a' in asm
-  __asm__ ("hreset $0" :: "a"(__eax));
-                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:302:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + Indices * 2))
+                    ^                                                   ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:17:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/x86gprintrin.h:25:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:33:10: error: use of undeclared identifier '__builtin_ia32_crc32qi'
-  return __builtin_ia32_crc32qi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: error: use of undeclared identifier '__builtin_ia32_crc32hi'; did you mean '__builtin_arm_crc32h'?
-  return __builtin_ia32_crc32hi(__C, __D);
-         ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:53:10: note: '__builtin_arm_crc32h' declared here
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/crc32intrin.h:73:10: error: use of undeclared identifier '__builtin_ia32_crc32si'
-  return __builtin_ia32_crc32si(__C, __D);
-         ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:298:73: error: expression contains unexpanded parameter pack 'Indices'
+            ((Indices >= sizeof(_storage) / 16 ? static_cast<void>(0) : vst1q_u64(
+                                                                        ^
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26801:3: note: expanded from macro 'vst1q_u64'
+  __builtin_neon_vst1q_v(__p0, (int8x16_t)__s1, 51); \
+  ^                      ~~~~
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:14:2: error: "This header is only meant to be used on x86 and x64 architecture"
-#error "This header is only meant to be used on x86 and x64 architecture"
- ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:5: error: use of undeclared identifier '__builtin_ia32_emms'; did you mean '__builtin_isless'?
-    __builtin_ia32_emms();
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/math.h:651:12: note: '__builtin_isless' declared here
-    return isless(__lcpp_x, __lcpp_y);
-           ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/math.h:311:22: note: expanded from macro 'isless'
-#define isless(x, y) __builtin_isless((x), (y))
-                     ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:7:
-In file included from C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/immintrin.h:21:
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:37:25: error: too few arguments to function call, expected 2, have 0
-    __builtin_ia32_emms();
-    ~~~~~~~~~~~~~~~~~~~~^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:54:19: error: use of undeclared identifier '__builtin_ia32_vec_init_v2si'
-    return (__m64)__builtin_ia32_vec_init_v2si(__i, 0);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:71:12: error: use of undeclared identifier '__builtin_ia32_vec_ext_v2si'
-    return __builtin_ia32_vec_ext_v2si((__v2si)__m, 0);
-           ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:133:19: error: use of undeclared identifier '__builtin_ia32_packsswb'
-    return (__m64)__builtin_ia32_packsswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:163:19: error: use of undeclared identifier '__builtin_ia32_packssdw'
-    return (__m64)__builtin_ia32_packssdw((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:193:19: error: use of undeclared identifier '__builtin_ia32_packuswb'
-    return (__m64)__builtin_ia32_packuswb((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:220:19: error: use of undeclared identifier '__builtin_ia32_punpckhbw'
-    return (__m64)__builtin_ia32_punpckhbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:243:19: error: use of undeclared identifier '__builtin_ia32_punpckhwd'
-    return (__m64)__builtin_ia32_punpckhwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:264:19: error: use of undeclared identifier '__builtin_ia32_punpckhdq'
-    return (__m64)__builtin_ia32_punpckhdq((__v2si)__m1, (__v2si)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:291:19: error: use of undeclared identifier '__builtin_ia32_punpcklbw'
-    return (__m64)__builtin_ia32_punpcklbw((__v8qi)__m1, (__v8qi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:314:19: error: use of undeclared identifier '__builtin_ia32_punpcklwd'
-    return (__m64)__builtin_ia32_punpcklwd((__v4hi)__m1, (__v4hi)__m2);
-                  ^
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/mmintrin.h:335:19: error: use of undeclared identifier '__builtin_ia32_punpckldq'
-    return (__m64)__builtin_ia32_punpckldq((__v2si)__m1, (__v2si)__m2);
-                  ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-20 errors generated.
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:39:10: fatal error: 'stb_image.h' file not found
+#include <stb_image.h>
+         ^~~~~~~~~~~~~
+4 errors generated.
 ninja: build stopped: subcommand failed.

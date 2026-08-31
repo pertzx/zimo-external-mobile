@@ -1,4 +1,5 @@
 #include "Interface.hpp"
+#include "Globals.hpp"
 #include "Notify/Notify.hpp"
 // REMOVIDO PRA PORTAR ANDROID: #include <Main/Memory/Memory.hpp>
 // REMOVIDO PRA PORTAR ANDROID: #include <Cheat/saveconfig.cpp>

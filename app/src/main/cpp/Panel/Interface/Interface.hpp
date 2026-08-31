@@ -1,6 +1,6 @@
 #pragma once
 #include <imgui.h>
-#include "IPC/IPCClient.hpp"
+#include "IPCClient.hpp"
 #include "Fonts/Fonts.hpp"
 #include <Custom.hpp>
 #include <Utils/Utils.hpp>

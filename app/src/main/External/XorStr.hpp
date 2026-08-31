@@ -1,12 +1,18 @@
 ﻿#ifndef FW_XORSTR_HPP
 #define FW_XORSTR_HPP
 
-#if (defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__)) && !defined(__ANDROID__)
-#include <arm_neon.h>
-#elif defined(_M_X64) || defined(__amd64__) || defined(_M_IX86) || defined(__i386__) || defined(__ANDROID__)
-#include <immintrin.h>
+#if defined(__ANDROID__)
+    #if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+        #include <arm_neon.h>
+    #else
+        #error Unsupported Android architecture
+    #endif
+#elif defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__)
+    #include <arm_neon.h>
+#elif defined(_M_X64) || defined(__amd64__) || defined(_M_IX86) || defined(__i386__)
+    #include <immintrin.h>
 #else
-#error Unsupported platform
+    #error Unsupported platform
 #endif
 
 #include <cstdint>
