@@ -83,7 +83,6 @@ public class DaemonService extends Service {
         }
     }
 
-    // JNI nativo
     private native void nativeRunDaemon();
     private native void nativeStopDaemon();
 }

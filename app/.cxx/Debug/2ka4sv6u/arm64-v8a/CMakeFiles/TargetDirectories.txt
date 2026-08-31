@@ -1,0 +1,4 @@
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/panel.dir
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/daemon.dir
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/rebuild_cache.dir

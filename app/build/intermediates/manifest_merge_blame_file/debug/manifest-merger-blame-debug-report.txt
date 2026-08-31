@@ -1,0 +1,93 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.stormcheats"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="28"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+11-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:6:5-78
+11-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:6:22-75
+12    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+12-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:7:5-77
+12-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:7:22-74
+13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+13-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:8:5-94
+13-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:8:22-91
+14    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+14-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:9:5-87
+14-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:9:22-84
+15    <uses-permission android:name="android.permission.INTERNET" />
+15-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:10:5-67
+15-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:10:22-64
+16    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+16-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:11:5-79
+16-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:11:22-76
+17
+18    <permission
+18-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+19        android:name="com.stormcheats.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+19-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+20        android:protectionLevel="signature" />
+20-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+21
+22    <uses-permission android:name="com.stormcheats.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+22-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+22-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+23
+24    <application
+24-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:13:5-39:19
+25        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+25-->[androidx.core:core:1.12.0] C:\Users\Márcio Ribeiro\.gradle\caches\transforms-3\de8c3b838232e943fc8a6a53f2c25d4a\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+26        android:debuggable="true"
+27        android:extractNativeLibs="false"
+28        android:label="Storm Cheats"
+28-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:14:9-37
+29        android:theme="@android:style/Theme.NoDisplay" >
+29-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:15:9-55
+30        <activity
+30-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:17:9-27:20
+31            android:name="com.stormcheats.MainActivity"
+31-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:18:13-41
+32            android:excludeFromRecents="true"
+32-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:21:13-46
+33            android:exported="true"
+33-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:22:13-36
+34            android:launchMode="singleInstance"
+34-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:20:13-48
+35            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+35-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:19:13-72
+36            <intent-filter>
+36-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:23:13-26:29
+37                <action android:name="android.intent.action.MAIN" />
+37-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:24:17-69
+37-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:24:25-66
+38
+39                <category android:name="android.intent.category.LAUNCHER" />
+39-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:25:17-77
+39-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:25:27-74
+40            </intent-filter>
+41        </activity>
+42
+43        <service
+43-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:29:9-32:63
+44            android:name="com.stormcheats.OverlayService"
+44-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:30:13-43
+45            android:foregroundServiceType="mediaProjection"
+45-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:32:13-60
+46            android:permission="android.permission.SYSTEM_ALERT_WINDOW" />
+46-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:31:13-72
+47        <service
+47-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:34:9-37:56
+48            android:name="com.stormcheats.DaemonService"
+48-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:35:13-42
+49            android:foregroundServiceType="dataSync"
+49-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:37:13-53
+50            android:process=":daemon" />
+50-->C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\AndroidManifest.xml:36:13-38
+51    </application>
+52
+53</manifest>

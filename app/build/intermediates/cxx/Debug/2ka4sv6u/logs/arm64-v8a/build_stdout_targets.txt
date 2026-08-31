@@ -1,0 +1,180 @@
+ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
+[1/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o -MF CMakeFiles\panel.dir\Panel\IPC\IPCClient.cpp.o.d -o CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:61:28: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_Enabled = g_Globals.AimBot.Enabled;
+                           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:62:24: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_Fov = g_Globals.AimBot.Fov;
+                       ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:63:32: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_MaxDistance = g_Globals.AimBot.MaxDistance;
+                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:64:27: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_Target = g_Globals.AimBot.Target;
+                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:65:31: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_IgnoreBots = g_Globals.AimBot.IgnoreBots;
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:66:34: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_IgnoreKnocked = g_Globals.AimBot.IgnoreKnocked;
+                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:67:33: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_VisibleCheck = g_Globals.AimBot.VisibleCheck;
+                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:68:25: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_Pull = g_Globals.AimBot.aimmagnect;
+                        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:69:26: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_Ghost = g_Globals.AimBot.ghost;
+                         ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:70:28: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_ShowFov = g_Globals.Misc.Screen.ShowAimbotFov;
+                           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:71:28: error: use of undeclared identifier 'g_Globals'
+    state.AimBot_KeyBind = g_Globals.AimBot.KeyBind;
+                           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:73:28: error: use of undeclared identifier 'g_Globals'
+    state.Silent_Enabled = g_Globals.Silent.Enabled;
+                           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:74:24: error: use of undeclared identifier 'g_Globals'
+    state.Silent_Fov = g_Globals.Silent.Fov;
+                       ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:75:32: error: use of undeclared identifier 'g_Globals'
+    state.Silent_MaxDistance = g_Globals.Silent.MaxDistance;
+                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:76:28: error: use of undeclared identifier 'g_Globals'
+    state.Silent_ShowFov = g_Globals.Misc.Screen.ShowSilentFov;
+                           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:78:23: error: use of undeclared identifier 'g_Globals'
+    state.ESP_Enemy = g_Globals.Visuals.ESP.Enemy;
+                      ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:79:26: error: use of undeclared identifier 'g_Globals'
+    state.ESP_ShowTeam = g_Globals.Visuals.ESP.ShowTeam;
+                         ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:80:27: error: use of undeclared identifier 'g_Globals'
+    state.ESP_Watermark = g_Globals.Visuals.ESP.Watermark;
+                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/IPC/IPCClient.cpp:81:21: error: use of undeclared identifier 'g_Globals'
+    state.ESP_Box = g_Globals.Visuals.ESP.Box;
+                    ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+[2/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o -MF CMakeFiles\panel.dir\Panel\AndroidInput.cpp.o.d -o CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/AndroidInput.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/AndroidInput.cpp:4:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui/imgui_impl_android.h:7:48: error: unknown type name 'ANativeWindow'
+IMGUI_IMPL_API bool     ImGui_ImplAndroid_Init(ANativeWindow* window);
+                                               ^
+1 error generated.
+[3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[4/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/PanelApp.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -MF CMakeFiles\panel.dir\Panel\PanelApp.cpp.o.d -o CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:3:10: fatal error: 'IPC/IPCClient.hpp' file not found
+#include "IPC/IPCClient.hpp"
+         ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+[5/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -MF CMakeFiles\panel.dir\Panel\Interface\Interface.cpp.o.d -o CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:3:10: fatal error: 'IPC/IPCClient.hpp' file not found
+#include "IPC/IPCClient.hpp"
+         ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+[6/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -MF CMakeFiles\panel.dir\Panel\Fonts\Fonts.cpp.o.d -o CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:4:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:57:12: error: use of undeclared identifier 'malloc'
+    return malloc(dwSize);
+           ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:61:5: error: use of undeclared identifier 'free'
+    free(lpAddress);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:69:5: error: use of undeclared identifier 'memset'
+    memset(Destination, 0, Length);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:72:5: error: use of undeclared identifier 'memset'
+    memset(Destination, 0, Length);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:75:5: error: use of undeclared identifier 'memcpy'
+    memcpy(Destination, Source, Length);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:120:18: error: use of undeclared identifier 'strlen'
+    size_t len = strlen(dest);
+                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:135:5: error: use of undeclared identifier 'memcpy'
+    memcpy(dest, src, count);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:140:5: error: use of undeclared identifier 'memmove'
+    memmove(dest, src, count);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:157:5: error: use of undeclared identifier 'pthread_cancel'
+    pthread_cancel(hThread);
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/WindowsCompat.hpp:200:25: error: use of undeclared identifier 'ANDROID_LOG_DEBUG'
+    __android_log_print(ANDROID_LOG_DEBUG, "StormDebug", "%s", lpOutputString);
+                        ^
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:24:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui/imgui_impl_android.h:7:48: error: unknown type name 'ANativeWindow'
+IMGUI_IMPL_API bool     ImGui_ImplAndroid_Init(ANativeWindow* window);
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui/imgui_impl_android.h:8:66: error: unknown type name 'AInputEvent'
+IMGUI_IMPL_API int32_t  ImGui_ImplAndroid_HandleInputEvent(const AInputEvent* input_event);
+                                                                 ^
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:78:28: error: unknown type name 'consteval'; did you mean 'constexpr'?
+            FW_FORCEINLINE consteval std::uint32_t murmur_mix(std::uint32_t h) noexcept
+                           ^~~~~~~~~
+                           constexpr
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:88:28: error: unknown type name 'consteval'; did you mean 'constexpr'?
+            FW_FORCEINLINE consteval std::uint64_t murmur_mix64(std::uint64_t k) noexcept
+                           ^~~~~~~~~
+                           constexpr
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:101:24: error: unknown type name 'consteval'; did you mean 'constexpr'?
+        FW_FORCEINLINE consteval std::uint32_t key4() noexcept
+                       ^~~~~~~~~
+                       constexpr
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:117:24: error: unknown type name 'consteval'; did you mean 'constexpr'?
+        FW_FORCEINLINE consteval std::uint64_t key8()
+                       ^~~~~~~~~
+                       constexpr
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:129:24: error: unknown type name 'consteval'; did you mean 'constexpr'?
+        FW_FORCEINLINE consteval std::uint64_t
+                       ^~~~~~~~~
+                       constexpr
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:295:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + Indices * 2),
+                    ^                                                       ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:296:21: error: expression contains unexpanded parameter pack 'Indices'
+                    vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + Indices * 2))
+                    ^                                                   ~~~~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:3: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+  ^                                           ~~~~
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:26800:21: note: expanded from macro 'vst1q_u64'
+  uint64x2_t __s1 = __p1; \
+                    ^~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+ninja: build stopped: subcommand failed.

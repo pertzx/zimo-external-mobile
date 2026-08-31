@@ -1,0 +1,8 @@
+// Root build file. Plugins declarados para nao duplicar versoes nos modulos.
+plugins {
+    id 'com.android.application' version '8.2.2' apply false
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}

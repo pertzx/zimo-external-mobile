@@ -1,0 +1,45 @@
+{
+  "buildFiles": [
+    "C:\\Users\\Márcio Ribeiro\\Desktop\\Pyerre\\zimo-external-mobile\\app\\src\\main\\cpp\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\Márcio Ribeiro\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\Márcio Ribeiro\\Desktop\\Pyerre\\zimo-external-mobile\\app\\.cxx\\Debug\\2ka4sv6u\\arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\Márcio Ribeiro\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\Márcio Ribeiro\\Desktop\\Pyerre\\zimo-external-mobile\\app\\.cxx\\Debug\\2ka4sv6u\\arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "daemon::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "daemon",
+      "output": "C:\\Users\\Márcio Ribeiro\\Desktop\\Pyerre\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\arm64-v8a\\libdaemon.so",
+      "runtimeFiles": []
+    },
+    "panel::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "panel",
+      "output": "C:\\Users\\Márcio Ribeiro\\Desktop\\Pyerre\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\arm64-v8a\\libpanel.so",
+      "runtimeFiles": []
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "C:\\Users\\Márcio Ribeiro\\AppData\\Local\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
+      "cppCompilerExecutable": "C:\\Users\\Márcio Ribeiro\\AppData\\Local\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}
