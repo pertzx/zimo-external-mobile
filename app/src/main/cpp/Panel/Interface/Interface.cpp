@@ -1,14 +1,43 @@
 #include "Interface.hpp"
 #include "Notify/Notify.hpp"
-#include <Main/Memory/Memory.hpp>
-#include <Cheat/saveconfig.cpp>
-#include <Cheat/SharedMemory.h>
-#include <Cheat/WebPanel.hpp>
-// REMOVIDO PRA PORTAR ANDROID: #include <shellapi.h>
+// REMOVIDO PRA PORTAR ANDROID: #include <Main/Memory/Memory.hpp>
+// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/saveconfig.cpp>
+// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/SharedMemory.h>
+// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/WebPanel.hpp>
+#include "AndroidInput.hpp"
 #include <cmath>
 #include <XorStr.hpp>
 // REMOVIDO PRA PORTAR ANDROID: #include <ext/KeyAuth/KeyAuth.hpp>
 // REMOVIDO PRA PORTAR ANDROID: #include <ext/Discord/DiscordRPC.hpp>
+
+// STUBS para Android (substituem funcionalidades PC-only)
+namespace KeyAuth {
+    struct api {
+        bool initalized = true;
+        std::string username = "AndroidUser";
+        std::string message;
+        api(const char*, const char*, const char*, const char*, const char*) {}
+        void init() {}
+        bool license(const char*) { username = "AndroidUser"; return true; }
+        std::string getExpiry() { return "Lifetime"; }
+    };
+}
+namespace DiscordRPC {
+    bool GetUsername(std::string& out) { out.clear(); return false; }
+    struct AvatarData { const uint8_t* pixels = nullptr; int width = 0; int height = 0; };
+    bool GetAvatarData(AvatarData&) { return false; }
+    void Tick(bool = false) {}
+    void Shutdown() {}
+}
+namespace WebPanel {
+    std::string GetWebUrl() { return "http://localhost:8080"; }
+}
+namespace Cheat {
+    namespace Manager {
+        bool Save() { return true; }
+        bool Load() { return true; }
+    }
+}
 
 // REMOVIDO PRA PORTAR ANDROID: extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 

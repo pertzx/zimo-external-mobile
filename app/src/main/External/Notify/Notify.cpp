@@ -34,7 +34,7 @@ namespace NotifyManager
     }
 
     void DeleteNotify(int Index) {
-        if (Index >= 0 && Index < NotifyList.size()) {
+        if (Index >= 0 && Index < (int)NotifyList.size()) {
             NotifyList.erase(NotifyList.begin() + Index);
         }
     }
@@ -44,7 +44,7 @@ namespace NotifyManager
         const auto WindowSize = Overlay::GetTargetWindowSize();
         float NextHeight = 0.f;
 
-        for (auto i = 0; i < NotifyList.size(); i++) {
+        for (auto i = 0; i < (int)NotifyList.size(); i++) {
             auto& Notify = NotifyList.at(i);
             const auto Id = Notify.GetDescription() + std::to_string(Notify.GetCreationTime());
 
@@ -76,7 +76,6 @@ namespace NotifyManager
                 continue;
             }
 
-            // Use InterMedium font for modern look
             ImGui::PushFont(Fonts::InterMedium);
             auto DescTxtSize = ImGui::CalcTextSize(Notify.GetDescription().c_str());
             ImGui::PopFont();
@@ -86,8 +85,8 @@ namespace NotifyManager
             const float NotifyHeight = 48;
             float NotifyWidth = DescTxtSize.x + Padding * 3 + IconSize + 10;
             NotifyWidth = ImMax(NotifyWidth, 180.0f);
-            NotifyWidth = ImMin(NotifyWidth, 550.0f); // Aumentado para textos grandes
-            
+            NotifyWidth = ImMin(NotifyWidth, 550.0f);
+
             ImVec2 NotifySize = ImVec2(NotifyWidth, NotifyHeight);
 
             NotifyAnim->TargetY = NextHeight;
@@ -154,8 +153,7 @@ namespace NotifyManager
                 1.0f
             );
 
-            // Pink accent on left - dentro do background arredondado
-            // ComeÃ§a apÃ³s o arredondamento (12px) para nÃ£o vazar
+            // Pink accent on left
             DrawList->AddRectFilled(
                 ImVec2(NotifyMin.x + 1, NotifyMin.y + 12),
                 ImVec2(NotifyMin.x + 4, NotifyMax.y - 12),
@@ -186,10 +184,10 @@ namespace NotifyManager
             // Progress bar at bottom
             float Progress = 1.0f - ((float)Notify.GetTimeDiff() / (float)Notify.GetExpireTime());
             Progress = ImClamp(Progress, 0.0f, 1.0f);
-            
+
             ImVec2 ProgressMin = ImVec2(NotifyMin.x + 4, NotifyMax.y - 3);
             ImVec2 ProgressMax = ImVec2(NotifyMin.x + 4 + (NotifySize.x - 8) * Progress, NotifyMax.y);
-            
+
             DrawList->AddRectFilled(
                 ProgressMin,
                 ProgressMax,
@@ -201,40 +199,13 @@ namespace NotifyManager
         }
     }
 
-    static std::wstring Utf8ToUtf16(const std::string& s) {
-        if (s.empty()) return L"";
-        int len = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), nullptr, 0);
-        std::wstring w(len, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), w.data(), len);
-        return w;
-    }
-
-    static std::string Utf16ToUtf8(const std::wstring& w) {
-        if (w.empty()) return "";
-        int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), nullptr, 0, nullptr, nullptr);
-        std::string s(len, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), s.data(), len, nullptr, nullptr);
-        return s;
-    }
-
-    static std::string NormalizeUtf8ToNFC(const std::string& utf8) {
-        std::wstring w = Utf8ToUtf16(utf8);
-        int needed = NormalizeString(NormalizationC, w.c_str(), (int)w.size(), nullptr, 0);
-        if (needed <= 0) return utf8;
-        std::wstring out(needed, L'\0');
-        NormalizeString(NormalizationC, w.c_str(), (int)w.size(), out.data(), needed);
-        return Utf16ToUtf8(out);
-    }
-
     void Send(std::string Description, time_t ExpireTime) {
-        Description = NormalizeUtf8ToNFC(Description);
         NotifyManager::NotifyClass Notify(NotifyManager::eType::Info, ExpireTime);
-        Notify.SetTitle("Storm Cheats");  // Literal - fica na seção .rdata, não no heap!
+        Notify.SetTitle("Storm Cheats");
         Notify.SetDescription(Description);
         NotifyList.push_back(Notify);
     }
 
-    // Função para zerar string na memória antes de liberar
     static void SecureZeroString(std::string& str) {
         if (!str.empty()) {
             volatile char* p = const_cast<volatile char*>(str.data());
@@ -247,7 +218,6 @@ namespace NotifyManager
     }
 
     void Cleanup() {
-        // Limpar descrições das notificações (Title é const char* - não aloca no heap)
         for (auto& notify : NotifyList) {
             std::string desc = notify.GetDescription();
             SecureZeroString(desc);
@@ -256,7 +226,6 @@ namespace NotifyManager
         NotifyList.clear();
         NotifyList.shrink_to_fit();
 
-        // Limpar animações
         for (auto& anim : AnimList) {
             SecureZeroString(anim.Id);
         }

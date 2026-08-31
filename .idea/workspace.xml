@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="80633d5e-33b2-48ba-96b8-d1782b3397ee" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/PROMPT.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/app/settings.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/External/Notify/Notify.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/External/Notify/Notify.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/External/Notify/Notify.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/External/Notify/Notify.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Daemon/DaemonApp.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Daemon/DaemonApp.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Daemon/IPC/IPCServer.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Daemon/IPC/IPCServer.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/AndroidInput.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/AndroidInput.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/IPC/IPCClient.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/IPC/IPCClient.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/IPCClient.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/IPCClient.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/Interface/Interface.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/Interface/Interface.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/Interface/Interface.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/Interface/Interface.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Panel/PanelApp.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Panel/PanelApp.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Shared/Globals.hpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Shared/Globals.hpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/cpp/Shared/Utils/Utils.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/cpp/Shared/Utils/Utils.cpp" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 2
+}]]></component>
+  <component name="ProjectId" id="3IeFb3Ml3CQ4e7F7gaZ7KRu2KwE" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="80633d5e-33b2-48ba-96b8-d1782b3397ee" name="Changes" comment="" />
+      <created>1788117195569</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1788117195569</updated>
+    </task>
+    <servers />
+  </component>
+</project>

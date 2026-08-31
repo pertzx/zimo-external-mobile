@@ -1,43 +1,35 @@
 #pragma once
-#include "Includes.hpp"
-#include <Cheat/Globals.hpp>
-#include <Render/Overlay/Overlay.hpp>
-#include "Render/Fonts/Fonts.hpp"
-#include <Render/Fonts/Bytes/IconsFontAwesome6.h>
+#include <imgui.h>
+#include "IPC/IPCClient.hpp"
+#include "Fonts/Fonts.hpp"
 #include <Custom.hpp>
 #include <Utils/Utils.hpp>
 
 class Interface
 {
 public:
-    Interface(HWND Window, HWND TargetWindow, HDC DeviceContext, HGLRC RenderContext) {
-        Initialize(Window, TargetWindow, DeviceContext, RenderContext);
-    }
+    Interface() = default;
     ~Interface() {
         ShutDown();
     }
 
-    void Initialize(HWND Window, HWND TargetWindow, HDC DeviceContext, HGLRC RenderContext);
+    void Initialize();
     void InitializeMenu();
     void UpdateStyle();
     void RenderGui();
-    void WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     void HandleMenuKey();
     void ShutDown();
     bool GetMenuOpen() const { return bIsMenuOpen; }
     int  GetCurrentTab() const { return CurrentTab; }
 
 private:
-    HWND hWindow;
-    HWND hTargetWindow;
-    HDC hDeviceContext;
-    HGLRC hRenderContext;
     bool bIsMenuOpen = false;
     int CurrentTab = 0;
     bool isLoading = false;
     char loadingMessage[64] = "";
+    bool MenuKeyDown = false;
 public:
-    UINT ResizeWidht;
-    UINT ResizeHeight;
+    int ResizeWidth = 0;
+    int ResizeHeight = 0;
 };
 inline Interface* g_Interface = nullptr;

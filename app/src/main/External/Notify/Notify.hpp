@@ -1,12 +1,11 @@
 #pragma once
-#include <Windows.h>
 #include <vector>
 #include <chrono>
 #include <imgui.h>
 #include <Utils/Utils.hpp>
-#include <Render/Fonts/Fonts.hpp>
-#include <Render/Overlay/Overlay.hpp>
-#include <Render/Fonts/Bytes/IconsFontAwesome6.h>
+#include <Fonts/Fonts.hpp>
+#include <Overlay/Overlay.hpp>
+#include <Fonts/Bytes/IconsFontAwesome6.h>
 
 namespace NotifyManager
 {
@@ -33,7 +32,7 @@ namespace NotifyManager
 
     class NotifyClass {
     private:
-        const char* Title = nullptr;  // Ponteiro para literal - não aloca no heap!
+        const char* Title = nullptr;
         std::string Description;
         time_t ExpireTime = 0;
         time_t CreationTime = 0;
@@ -66,5 +65,5 @@ namespace NotifyManager
     void DeleteNotify(int Index);
     void Render();
     void Send(std::string Description, time_t ExpireTime = 4000);
-    void Cleanup();  // Limpar todos os buffers
+    void Cleanup();
 }
