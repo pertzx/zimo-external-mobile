@@ -1,4 +1,4 @@
-#pragma once
+// #pragma once
 #ifdef __ANDROID__
     #include <android/log.h>
 #else
@@ -20,6 +20,10 @@
     #include <sys/stat.h>
     #include <unistd.h>
     #include <jni.h>
+#endif
+
+#ifndef __ANDROID__
+    #include <shlobj.h>
 #endif
 
 extern Cheat::Globals g_Globals;
@@ -155,7 +159,7 @@ namespace Cheat {
             }
         }
 
-        static bool LoadFrom(const std::wstring& path) {
+        static bool LoadFrom(const std::string& path) {
             std::ifstream ifs{ std::filesystem::path(path) };
             if (!ifs.is_open()) return false;
 

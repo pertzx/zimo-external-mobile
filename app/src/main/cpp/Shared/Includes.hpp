@@ -19,6 +19,9 @@
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
 
+// ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
+// #define IMGUI_DEFINE_MATH_OPERATORS
+
 // ImGui
 #include <imgui.h>
 #include <imgui_impl_android.h>

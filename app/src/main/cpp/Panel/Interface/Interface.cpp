@@ -5,7 +5,8 @@
 // REMOVIDO PRA PORTAR ANDROID: #include <Cheat/saveconfig.cpp>
 // REMOVIDO PRA PORTAR ANDROID: #include <Cheat/SharedMemory.h>
 // REMOVIDO PRA PORTAR ANDROID: #include <Cheat/WebPanel.hpp>
-#include "AndroidInput.hpp"
+#include "../AndroidInput.hpp"
+#include "../AndroidOverlay.hpp"
 #include <cmath>
 #include <XorStr.hpp>
 // REMOVIDO PRA PORTAR ANDROID: #include <ext/KeyAuth/KeyAuth.hpp>
@@ -38,6 +39,14 @@ namespace Cheat {
         bool Save() { return true; }
         bool Load() { return true; }
     }
+}
+// Stub para Android (substitui g_FreeFireMemory do PC)
+namespace {
+    struct FreeFireMemoryStub {
+        void Initialize() {}
+        void Restart() {}
+    };
+    FreeFireMemoryStub g_FreeFireMemory;
 }
 
 // REMOVIDO PRA PORTAR ANDROID: extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -1189,7 +1198,7 @@ void Interface::RenderGui()
 							ImGui::Dummy(ImVec2(0, 3));
 							if (Custom::Button(XorStr("Restart"), ImVec2(ImGui::GetWindowSize().x - 28, 36)))
 							{
-								std::thread(g_FreeFireMemory.Restart).detach();
+								std::thread([]{ g_FreeFireMemory.Restart(); }).detach();
 								NotifyManager::Send(XorStr("Restarted"), 4000);
 							}
 						}
@@ -1245,6 +1254,22 @@ void Interface::RenderGui()
 
 void Interface::HandleMenuKey()
 {
+    extern bool g_AndroidMenuKeyPressed;
+    if (g_AndroidMenuKeyPressed)
+    {
+        if (!MenuKeyDown)
+        {
+            MenuKeyDown = true;
+            bIsMenuOpen = !bIsMenuOpen;
+        }
+    }
+    else
+    {
+        MenuKeyDown = false;
+    }
+}
+/* void Interface::HandleMenuKey()
+{
 	extern bool g_AndroidMenuKeyPressed;
 	if (g_AndroidMenuKeyPressed)
 	{
@@ -1278,14 +1303,14 @@ void Interface::HandleMenuKey()
 	{
 		MenuKeyDown = false;
 	}
-}
+} */
 
 void Interface::ShutDown()
 {
 	DiscordRPC::Shutdown();
 	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplWin32_Shutdown();
+	ImGui_ImplAndroid_Shutdown();
 	ImGui::DestroyContext();
 	Fonts::CleanupTextures();
-	Overlay::ShutDown();
+	Overlay::ShutDown(); // COMENTE SE NAO EXISTIR NO ANDROID
 }

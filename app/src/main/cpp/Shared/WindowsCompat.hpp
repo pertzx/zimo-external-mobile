@@ -118,6 +118,13 @@ inline int strcpy_s(char* dest, size_t destsz, const char* src) {
     dest[i] = 0;
     return 0;
 }
+
+// Overload template para arrays (compatível com MSVC)
+template <size_t N>
+inline int strcpy_s(char (&dest)[N], const char* src) {
+    return strcpy_s(dest, N, src);
+}
+
 inline int strcat_s(char* dest, size_t destsz, const char* src) {
     if (!dest || !src || destsz == 0) return -1;
     size_t len = strlen(dest);

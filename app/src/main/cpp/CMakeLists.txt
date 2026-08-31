@@ -106,10 +106,12 @@ add_library(panel SHARED ${PANEL_SOURCES} ${SHARED_SOURCES} ${IMGUI_SOURCES})
 target_include_directories(panel PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Panel
+    ${CPP_DIR}/Daemon        # <-- ADICIONAR
     ${IMGUI_DIR}
     ${FREETYPE_INCLUDE_DIR}
     ${EXTERNAL_DIR}
 )
+target_compile_definitions(panel PRIVATE IMGUI_DEFINE_MATH_OPERATORS)  # <-- ADICIONAR
 target_link_libraries(panel
     ${log-lib}
     ${android-lib}

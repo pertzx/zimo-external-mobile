@@ -1,7 +1,9 @@
 #include "Offsets.hpp"
-#include <Main/Memory/Memory.hpp>
-#include <Cheat/Globals.hpp>
-#include <Main/Unity/UTF/UTF8.hpp>
+#include "../../Daemon/Memory/Memory.hpp"
+// #include <Main/Memory/Memory.hpp>   // <-- REVERTER para isso
+#include "../Globals.hpp"
+#include "../../Daemon/Unity/UTF/UTF8.hpp"
+// #include <Main/Unity/UTF/UTF8.hpp>
 
 // ==================== Offsets ====================
 

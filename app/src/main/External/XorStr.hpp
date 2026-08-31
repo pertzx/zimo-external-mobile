@@ -213,23 +213,23 @@ class xor_string<CharT, Size, std::integer_sequence<std::uint64_t, Keys...>, std
     //  Chamadas antes do XOR no keys array, sem lambdas (MSVC compat)
     // ========================================================================
   private:
-    FW_FORCEINLINE static void _obfuscate_keys(std::uint64_t *keys, std::size_t count) noexcept
+    FW_FORCEINLINE static void _obfuscate_keys(std::uint64_t *key_array, std::size_t count) noexcept
     {
 #if defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__)
         for (std::size_t i = 0; i < count; i += 2)
         {
-            uint64x2_t k = vld1q_u64(keys + i);
+            uint64x2_t k = vld1q_u64(key_array + i);
             // double byte-reverse = identity, mas gera instrução real
             k = vreinterpretq_u64_u8(vrev64q_u8(vreinterpretq_u8_u64(k)));
             k = vreinterpretq_u64_u8(vrev64q_u8(vreinterpretq_u8_u64(k)));
-            vst1q_u64(keys + i, k);
+            vst1q_u64(key_array + i, k);
         }
 #else
         // x86 SSE2 — aplica transformações identity variadas por bloco
         std::size_t blocks = count / 2;
         for (std::size_t i = 0; i < blocks; ++i)
         {
-            __m128i k = _mm_load_si128(reinterpret_cast<const __m128i *>(keys) + i);
+            __m128i k = _mm_load_si128(reinterpret_cast<const __m128i *>(key_array) + i);
 
             switch (i % 3)
             {
@@ -251,8 +251,7 @@ class xor_string<CharT, Size, std::integer_sequence<std::uint64_t, Keys...>, std
                 break;
             }
             }
-
-            _mm_store_si128(reinterpret_cast<__m128i *>(keys) + i, k);
+            _mm_store_si128(reinterpret_cast<__m128i *>(key_array) + i, k);
         }
 #endif
     }
@@ -261,34 +260,35 @@ class xor_string<CharT, Size, std::integer_sequence<std::uint64_t, Keys...>, std
     // ========================================================================
     //  Decrypt in-place (SSE / NEON) — sem lambdas em fold expressions
     // ========================================================================
-            FW_FORCEINLINE constexpr void crypt() noexcept
-        {
+        FW_FORCEINLINE void crypt() noexcept
+    {
+        alignas(alignment) static constexpr std::uint64_t _keys[sizeof...(Keys)] = {Keys...};
+
 #if defined(__ANDROID__) && (defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM))
-            // Loop simples em vez de fold expression (compatível Clang 14 Android)
             for (std::size_t i = 0; i < sizeof(_storage) / 16; ++i) {
                 uint64x2_t data_vec = vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + i * 2);
-                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + i * 2);
+                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(_keys) + i * 2);
                 uint64x2_t result = veorq_u64(data_vec, key_vec);
                 vst1q_u64(reinterpret_cast<uint64_t*>(_storage) + i * 2, result);
             }
 #elif defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__)
             for (std::size_t i = 0; i < sizeof(_storage) / 16; ++i) {
                 uint64x2_t data_vec = vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + i * 2);
-                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + i * 2);
+                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(_keys) + i * 2);
                 uint64x2_t result = veorq_u64(data_vec, key_vec);
                 vst1q_u64(reinterpret_cast<uint64_t*>(_storage) + i * 2, result);
             }
 #elif defined(_M_X64) || defined(__amd64__) || defined(_M_IX86) || defined(__i386__)
             for (std::size_t i = 0; i < sizeof(_storage) / 16; ++i) {
                 __m128i data_vec = _mm_load_si128(reinterpret_cast<const __m128i*>(_storage) + i);
-                __m128i key_vec  = _mm_load_si128(reinterpret_cast<const __m128i*>(keys) + i);
+                __m128i key_vec  = _mm_load_si128(reinterpret_cast<const __m128i*>(_keys) + i);
                 _mm_store_si128(reinterpret_cast<__m128i*>(_storage) + i, _mm_xor_si128(data_vec, key_vec));
             }
 #else
     #error Unsupported platform
 #endif
-            _encrypted = !_encrypted;
-        } // END crypt()
+            _decrypted = !_decrypted;
+    } // END crypt()
 
 
 

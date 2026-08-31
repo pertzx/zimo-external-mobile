@@ -8,7 +8,10 @@
 #include "Bytes/BytesImg.hpp"
 #include <Utils/Utils.hpp>
 #include <imgui_freetype.h>
+
+#ifdef _MSC_VER
 #pragma comment(lib, "freetype.lib")
+#endif
 
 bool Fonts::LoadTextureFromPNG(const unsigned char* png_data, size_t png_size, 
                                 GLuint* out_texture, int* out_width, int* out_height) {
@@ -116,10 +119,10 @@ void Fonts::Initialize() {
         0xF900, 0xFAFF,   // CJK Compatibility Ideographs
         0xFE00, 0xFE0F,   // Variation Selectors
         0xFF00, 0xFFEF,   // Halfwidth/Halfwidth + Fullwidth
-        0x1F300, 0x1F5FF, // Emojis
-        0x1F600, 0x1F64F, // Emojis adicionais (faces)
-        0x1F680, 0x1F6FF, // Transport and map symbols
-        0x1F700, 0x1F77F, // Alchemical Symbols
+        // 0x1F300, 0x1F5FF, // Emojis
+        // 0x1F600, 0x1F64F, // Emojis adicionais (faces)
+        // 0x1F680, 0x1F6FF, // Transport and map symbols
+        // 0x1F700, 0x1F77F, // Alchemical Symbols
         0x0000           // Termina a lista
     };
 

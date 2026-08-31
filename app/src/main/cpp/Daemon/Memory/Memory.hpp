@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <Utils/Utils.hpp>
-#include <Main/Offsets/Offsets.hpp>
+#include "../Offsets/Offsets.hpp"
 
 // PORTAR ANDROID
 #include <sys/types.h>

@@ -1,5 +1,6 @@
 #pragma once
-
+// ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <unordered_set>
 #include <Main/Unity/Unity.hpp>

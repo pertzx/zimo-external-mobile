@@ -1,5 +1,7 @@
 #pragma once
 #include <pthread.h>
+// ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <time.h>
 #include <Main/Memory/Memory.hpp>
