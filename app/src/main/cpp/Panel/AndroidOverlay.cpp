@@ -128,22 +128,28 @@ namespace Overlay {
         bInitialized = false;
     }
 
-    void glRefresh() {
-        if (!bInitialized) return;
+    // Adicionar no final de AndroidOverlay.cpp:
+
+void glRefresh() {
+    if (eglDisplay != EGL_NO_DISPLAY && eglSurface != EGL_NO_SURFACE) {
         eglSwapBuffers(eglDisplay, eglSurface);
     }
+}
 
-    void glClearTransparent() {
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
+void glClearTransparent() {
+    glClear(GL_COLOR_BUFFER_BIT);
+}
 
-    ImVec2 GetTargetWindowSize() {
-        if (!bInitialized) return ImVec2(0, 0);
-        EGLint width, height;
+ImVec2 GetTargetWindowSize() {
+    EGLint width = 0, height = 0;
+    if (eglDisplay != EGL_NO_DISPLAY && eglSurface != EGL_NO_SURFACE) {
         eglQuerySurface(eglDisplay, eglSurface, EGL_WIDTH, &width);
         eglQuerySurface(eglDisplay, eglSurface, EGL_HEIGHT, &height);
-        return ImVec2((float)width, (float)height);
     }
+    return ImVec2((float)width, (float)height);
+}
 
-    bool IsInitialized() { return bInitialized; }
+bool IsInitialized() {
+    return bInitialized;
+}
 }

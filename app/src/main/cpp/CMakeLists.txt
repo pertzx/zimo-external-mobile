@@ -1,17 +1,14 @@
 cmake_minimum_required(VERSION 3.18.1)
 project("stormcheats")
 
-# ==== Configuracoes globais ====
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ==== Encontrar bibliotecas do NDK ====
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(EGL-lib EGL)
 find_library(GLESv3-lib GLESv3)
 
-# ==== Diretorios ====
 set(CPP_DIR ${CMAKE_SOURCE_DIR})
 set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/../../External)
 set(IMGUI_DIR ${EXTERNAL_DIR}/ImGui)
@@ -35,13 +32,8 @@ set(SHARED_SOURCES
     ${CPP_DIR}/Shared/Globals.hpp
     ${CPP_DIR}/Shared/Utils/Utils.cpp
     ${CPP_DIR}/Shared/Utils/Utils.hpp
-    ${CPP_DIR}/Shared/Utils/AndroidUtils.cpp
-    ${CPP_DIR}/Shared/Utils/AndroidUtils.hpp
     ${CPP_DIR}/Shared/Config/saveconfig.cpp
     ${CPP_DIR}/Shared/IPC/IPCProtocol.hpp
-    ${CPP_DIR}/Shared/Math/Math.cpp
-    ${CPP_DIR}/Shared/Math/Math.hpp
-    ${CPP_DIR}/Shared/Math/MathUtils.hpp
     ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.cpp
     ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.hpp
     ${CPP_DIR}/Shared/Math/Vectors/Vector2.cpp
@@ -62,8 +54,9 @@ set(PANEL_SOURCES
     ${CPP_DIR}/Panel/AndroidOverlay.cpp
     ${CPP_DIR}/Panel/AndroidOverlay.hpp
     ${CPP_DIR}/Panel/AndroidInput.cpp
+    ${CPP_DIR}/Panel/AndroidInput.hpp
     ${CPP_DIR}/Panel/IPC/IPCClient.cpp
-    ${CPP_DIR}/Panel/IPCClient.hpp
+    ${CPP_DIR}/Panel/IPC/IPCClient.hpp
     ${CPP_DIR}/Panel/Interface/Interface.cpp
     ${CPP_DIR}/Panel/Interface/Interface.hpp
     ${CPP_DIR}/Panel/Interface/unpacker.h
@@ -99,6 +92,8 @@ set(DAEMON_SOURCES
     ${CPP_DIR}/Daemon/Unity/UTF/UTF8.hpp
     ${CPP_DIR}/Daemon/WebPanel/WebPanel.cpp
     ${CPP_DIR}/Daemon/WebPanel/WebPanel.hpp
+    ${CPP_DIR}/External/Notify/Notify.cpp
+    ${CPP_DIR}/External/Notify/Notify.hpp
 )
 
 # ==== Biblioteca do Painel ====
@@ -108,6 +103,7 @@ target_include_directories(panel PRIVATE
     ${CPP_DIR}/Panel
     ${IMGUI_DIR}
     ${FREETYPE_INCLUDE_DIR}
+    ${CPP_DIR}/External
 )
 target_link_libraries(panel
     ${log-lib}
@@ -121,6 +117,7 @@ add_library(daemon SHARED ${DAEMON_SOURCES} ${SHARED_SOURCES})
 target_include_directories(daemon PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Daemon
+    ${CPP_DIR}/External
 )
 target_link_libraries(daemon
     ${log-lib}

@@ -27,4 +27,11 @@ extern "C" {
     Java_com_stormcheats_OverlayService_nativeStopPanel(JNIEnv* env, jobject thiz) {
         PanelApp::RequestShutdown();
     }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz, 
+            jint action, jfloat x, jfloat y, jint pointerId) {
+        // Forward para ImGui Android backend se necessário
+        // Ou tratar manualmente via AndroidInput
+    }
 }

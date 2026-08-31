@@ -60,7 +60,20 @@ static ImVec2 g_WindowPos = ImVec2(-1, -1);
 static bool g_Dragging = false;
 static ImVec2 g_DragOffset = ImVec2(0, 0);
 
-void Interface::Initialize(HWND Window, HWND TargetWindow, HDC DeviceContext, HGLRC RenderContext)
+
+void Interface::Initialize()
+{
+    // No Android, o contexto ImGui já foi criado em PanelApp.cpp
+    // Apenas inicializamos o menu e estilo
+    bIsMenuOpen = true;
+    InitializeMenu();
+    
+    // Notificação de boas-vindas
+    std::thread([]() {
+        NotifyManager::Send(XorStr("Bem Vindo(a)"), 4000);
+    }).detach();
+}
+/* void Interface::Initialize(HWND Window, HWND TargetWindow, HDC DeviceContext, HGLRC RenderContext)
 {
 	hWindow = Window;
 	hTargetWindow = TargetWindow;
@@ -78,7 +91,7 @@ void Interface::Initialize(HWND Window, HWND TargetWindow, HDC DeviceContext, HG
 		{
 			NotifyManager::Send(XorStr("Bem Vindo(a)"), 4000);
 		}).detach();
-}
+} */
 
 void Interface::InitializeMenu()
 {

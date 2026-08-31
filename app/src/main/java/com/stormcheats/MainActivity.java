@@ -6,46 +6,46 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.widget.Toast;
+import android.util.Log;
 
 public class MainActivity extends Activity {
+    private static final int REQUEST_CODE_OVERLAY = 1001;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Não mostra UI
+        finish();
 
-        // Solicitar permissão de overlay
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-                startActivityForResult(intent, 1);
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, REQUEST_CODE_OVERLAY);
                 return;
             }
         }
 
         startServices();
-        finish();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == 1) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Settings.canDrawOverlays(this)) {
-                    startServices();
-                } else {
-                    Toast.makeText(this, "Permissão de overlay necessária", Toast.LENGTH_LONG).show();
-                }
+        if (requestCode == REQUEST_CODE_OVERLAY) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+                startServices();
             }
         }
-        finish();
     }
 
     private void startServices() {
-        // Iniciar daemon
+        // Inicia daemon primeiro (processo :daemon)
         startService(new Intent(this, DaemonService.class));
-
-        // Iniciar overlay (painel)
+        
+        // Inicia overlay
         startService(new Intent(this, OverlayService.class));
+        
+        Log.i("Storm", "Serviços iniciados");
     }
 }

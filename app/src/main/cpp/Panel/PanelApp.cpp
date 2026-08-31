@@ -39,9 +39,11 @@ void Run(ANativeWindow* window) {
     // Carregar fonts e estilo
     Fonts::Initialize();
 
+    // Em PanelApp.cpp, dentro de Run():
     g_Interface = new Interface();
-    g_Interface->Initialize();
+    g_Interface->Initialize(); // Sem parametros
     g_Interface->UpdateStyle();
+
 
     // Conectar ao daemon via IPC
     IPCClient::Connect("/data/local/tmp/storm_daemon.sock");
