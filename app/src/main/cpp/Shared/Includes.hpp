@@ -35,7 +35,7 @@
 #include <android/log.h>
 
 // stb_image para load de texturas
-#define STB_IMAGE_IMPLEMENTATION
+// REMOVIDO: #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 // Android keycodes mapeados para uso no painel

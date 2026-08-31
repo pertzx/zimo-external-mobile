@@ -26,7 +26,7 @@ C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Sh
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\PanelApp.hpp
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\AndroidOverlay.hpp
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\AndroidInput.hpp
-C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\IPCClient.hpp
+C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\IPC\IPCClient.hpp
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\Interface\Interface.hpp
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\Interface\unpacker.h
 C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\Panel\Fonts\Fonts.hpp

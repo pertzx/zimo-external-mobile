@@ -1,11 +1,11 @@
 # ninja log v5
-407	3986	8098498371799628	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
-17	4245	8098501007647033	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
-0	519	0	clean	1ec1a960d8b71768
-999	19237	8098511949964231	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
-1885	19328	8098511950464272	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
-1	415	0	clean	1ec1a960d8b71768
-538	8833	8098523023744003	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
-2174	9295	8098523023254018	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
-3381	10110	8098523038350731	CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o	f7016507386c6e07
-9297	10772	8098523044053580	CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o	91c0fab315273c0d
+13	7371	8098544118449747	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+291	7934	8098544119089703	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
+7936	9977	8098544145607817	CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o	91c0fab315273c0d
+2286	10558	8098544154202339	CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o	f7016507386c6e07
+10560	12552	8098544168722635	CMakeFiles/panel.dir/Shared/Math/Math.cpp.o	515a631a681fc707
+12553	13880	8098544189777068	CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o	a627b1fb12a3b82f
+464	17568	8098547442449077	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+1328	23719	8098547463771485	CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o	f7016507386c6e07
+143	31064	8098547442251536	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
+23720	33446	8098547665933819	CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o	91c0fab315273c0d

@@ -281,7 +281,7 @@
 		},
 		{
 			"backtrace" : 1,
-			"path" : "Panel/IPCClient.hpp",
+			"path" : "Panel/IPC/IPCClient.hpp",
 			"sourceGroupIndex" : 1
 		},
 		{

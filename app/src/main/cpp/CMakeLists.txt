@@ -61,7 +61,7 @@ set(PANEL_SOURCES
     ${CPP_DIR}/Panel/AndroidInput.cpp
     ${CPP_DIR}/Panel/AndroidInput.hpp
     ${CPP_DIR}/Panel/IPC/IPCClient.cpp
-    ${CPP_DIR}/Panel/IPCClient.hpp
+    ${CPP_DIR}/Panel/IPC/IPCClient.hpp
     ${CPP_DIR}/Panel/Interface/Interface.cpp
     ${CPP_DIR}/Panel/Interface/Interface.hpp
     ${CPP_DIR}/Panel/Interface/unpacker.h

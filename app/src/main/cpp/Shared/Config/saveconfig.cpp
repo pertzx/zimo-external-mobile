@@ -1,7 +1,10 @@
 #pragma once
-#include <Windows.h>
-// REMOVIDO PRA PORTAR ANDROID: #include <ShlObj.h>
-// REMOVIDO PRA PORTAR ANDROID: #include <filesystem>
+#ifdef __ANDROID__
+    #include <android/log.h>
+#else
+    #include <Windows.h>
+#endif
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -13,11 +16,11 @@
 #include <cstring>
 #include "Globals.hpp"
 
-// REMOVIDO PRA PORTAR ANDROID: #pragma comment(lib, "Shell32.lib")
-
-// ADICIONADO PRA PORTAR ANDROID:
-#include <sys/stat.h>
-#include <unistd.h>
+#ifdef __ANDROID__
+    #include <sys/stat.h>
+    #include <unistd.h>
+    #include <jni.h>
+#endif
 
 extern Cheat::Globals g_Globals;
 
@@ -281,10 +284,21 @@ namespace Cheat {
         }
 
         // Caminho padrao do arquivo
-        static std::string DefaultPath() {
-    // Android: /data/data/<package>/files/config.dat
-    return "/data/data/com.stormcheats/files/config.dat";
-}
+                static std::string DefaultPath() {
+#ifdef __ANDROID__
+            std::string fullPath = "/data/data/com.stormcheats/files/stormcheats.ini";
+            ensureParent(fullPath);
+            return fullPath;
+#else
+            char path[MAX_PATH];
+            if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, path))) {
+                std::string fullPath = std::string(path) + "\\StormCheats\\config.ini";
+                ensureParent(fullPath);
+                return fullPath;
+            }
+            return "";
+#endif
+        }
 
     private:
         // ---------- Helpers de caminho ----------
