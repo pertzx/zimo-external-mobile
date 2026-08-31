@@ -6,9 +6,12 @@
 #ifdef __ANDROID__
 
 #include <cstdint>
+#include <cstdlib>    // <-- ADICIONAR (malloc, free)
+#include <cstring>    // <-- ADICIONAR (memset, memcpy, memmove, strlen)
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <android/log.h>  // <-- ADICIONAR (ANDROID_LOG_DEBUG)
 
 // Tipos Windows comuns
 using HANDLE = void*;
@@ -152,9 +155,15 @@ inline DWORD CreateThreadWrapper(void* (*start_routine)(void*), void* arg) {
 // Suspend/Resume thread stubs
 inline DWORD SuspendThread(pthread_t hThread) { (void)hThread; return 0; }
 inline DWORD ResumeThread(pthread_t hThread) { (void)hThread; return 0; }
-inline BOOL TerminateThread(pthread_t hThread, DWORD dwExitCode) {
+/* inline BOOL TerminateThread(pthread_t hThread, DWORD dwExitCode) {
     (void)dwExitCode;
     pthread_cancel(hThread);
+    return TRUE;
+} */
+ inline BOOL TerminateThread(pthread_t hThread, DWORD dwExitCode) {
+    (void)hThread;
+    (void)dwExitCode;
+    // pthread_cancel não existe no Android Bionic
     return TRUE;
 }
 

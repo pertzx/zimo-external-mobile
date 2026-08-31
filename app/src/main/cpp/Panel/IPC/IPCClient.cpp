@@ -1,4 +1,5 @@
 #include "IPCClient.hpp"
+#include "Globals.hpp"  // <-- ADICIONAR ESTA LINHA
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>

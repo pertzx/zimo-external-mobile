@@ -1,2 +1,6 @@
 # ninja log v5
 407	3986	8098498371799628	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+17	4245	8098501007647033	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc
+0	519	0	clean	1ec1a960d8b71768
+999	19237	8098511949964231	CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o	524cd74a9d209d8b
+1885	19328	8098511950464272	CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o	8cad371f2eadf5dc

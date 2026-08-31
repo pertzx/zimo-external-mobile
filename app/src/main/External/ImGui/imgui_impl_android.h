@@ -3,6 +3,8 @@
 
 #pragma once
 #include "imgui.h"
+#include <android/native_window.h>  // <-- ADICIONAR
+#include <android/input.h>          // <-- ADICIONAR
 
 IMGUI_IMPL_API bool     ImGui_ImplAndroid_Init(ANativeWindow* window);
 IMGUI_IMPL_API int32_t  ImGui_ImplAndroid_HandleInputEvent(const AInputEvent* input_event);

@@ -62,6 +62,7 @@ static ImVec2 g_DragOffset = ImVec2(0, 0);
 
 
 // Versão Android do Initialize (sem handles Windows)
+
 void Interface::Initialize()
 {
     // No Android, o contexto ImGui já foi criado em PanelApp.cpp
