@@ -12,6 +12,7 @@
 		[
 			"add_library",
 			"target_link_libraries",
+			"target_compile_definitions",
 			"target_include_directories"
 		],
 		"files" : 
@@ -38,6 +39,12 @@
 			{
 				"command" : 2,
 				"file" : 0,
+				"line" : 133,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
 				"line" : 124,
 				"parent" : 0
 			}
@@ -58,21 +65,25 @@
 			"defines" : 
 			[
 				{
+					"backtrace" : 3,
+					"define" : "DAEMON_BUILD"
+				},
+				{
 					"define" : "daemon_EXPORTS"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"path" : "C:/Users/M\u00e1rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared"
 				},
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"path" : "C:/Users/M\u00e1rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon"
 				},
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"path" : "C:/Users/M\u00e1rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External"
 				}
 			],

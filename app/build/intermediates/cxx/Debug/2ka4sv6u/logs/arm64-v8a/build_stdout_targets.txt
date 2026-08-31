@@ -1,89 +1,55 @@
 ninja: Entering directory `C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
 [1/50] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
-[2/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[2/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
 [3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
-[4/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[4/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
 [5/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
-[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
-[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
-[8/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
-[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+[8/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
 [10/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector3.cpp.o
-[11/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
-[12/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
+[11/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[12/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
 [13/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
-[14/50] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
-[15/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
-[16/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[14/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+[15/50] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
+[16/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
 [17/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
-[18/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
-[19/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_freetype.cpp.o
-[20/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
-[21/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
-[22/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
-FAILED: CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o -MF CMakeFiles\panel.dir\C_\Users\Márcio_Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\External\ImGui\Custom.cpp.o.d -o CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp"
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1005:55: error: use of undeclared identifier 'GetKeyNameFromSystem'
-        const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
-                                                      ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1061:34: error: use of undeclared identifier 'VK_ESCAPE'
-            if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
-                                 ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1069:31: error: use of undeclared identifier 'VK_ESCAPE'
-                    if (vk == VK_ESCAPE) continue;
-                              ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:35: error: use of undeclared identifier 'VK_LBUTTON'
-                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
-                                  ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:55: error: use of undeclared identifier 'VK_RBUTTON'
-                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
-                                                      ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1073:75: error: use of undeclared identifier 'VK_MBUTTON'
-                        if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON) continue;
-                                                                          ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1074:35: error: use of undeclared identifier 'VK_XBUTTON1'
-                        if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
-                                  ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1074:56: error: use of undeclared identifier 'VK_XBUTTON2'
-                        if (vk == VK_XBUTTON1 || vk == VK_XBUTTON2) continue;
-                                                       ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:31: error: use of undeclared identifier 'VK_LBUTTON'
-                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                              ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:51: error: use of undeclared identifier 'VK_RBUTTON'
-                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                                                  ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1078:71: error: use of undeclared identifier 'VK_MBUTTON'
-                    if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                                                                      ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1079:31: error: use of undeclared identifier 'VK_XBUTTON1'
-                        vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-                              ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1079:52: error: use of undeclared identifier 'VK_XBUTTON2'
-                        vk == VK_XBUTTON1 || vk == VK_XBUTTON2) {
-                                                   ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp:1084:25: error: use of undeclared identifier 'GetAsyncKeyState'
-                    if (GetAsyncKeyState(vk) & 0x8000) {
-                        ^
-14 errors generated.
-[23/50] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
-FAILED: CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o -MF CMakeFiles\daemon.dir\Daemon\daemon_main.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/daemon_main.cpp"
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/daemon_main.cpp:25:5: error: use of undeclared identifier 'g_Globals'
-    g_Globals.General.ShutDown = true;
-    ^
+[18/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[19/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[20/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[21/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[22/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_freetype.cpp.o
+[23/50] Building CXX object CMakeFiles/daemon.dir/Daemon/IPC/IPCServer.cpp.o
+[24/50] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
+[25/50] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Silent.cpp.o
+FAILED: CMakeFiles/daemon.dir/Daemon/Draw/Silent.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DDAEMON_BUILD -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/Draw/Silent.cpp.o -MF CMakeFiles\daemon.dir\Daemon\Draw\Silent.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/Draw/Silent.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Silent.cpp"
+In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Silent.cpp:1:
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Silent.hpp:2:10: fatal error: 'Windows.h' file not found
+#include <Windows.h>
+         ^~~~~~~~~~~
 1 error generated.
-[24/50] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
+[26/50] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
 FAILED: CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -MF CMakeFiles\daemon.dir\Daemon\DaemonApp.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp"
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DDAEMON_BUILD -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -MF CMakeFiles\daemon.dir\Daemon\DaemonApp.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp"
 In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp:3:
 In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:4:
 In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:2:
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:26:10: fatal error: 'imgui.h' file not found
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:45:10: fatal error: 'stb_image.h' file not found
+#include <stb_image.h>
+         ^~~~~~~~~~~~~
+1 error generated.
+[27/50] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o
+FAILED: CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DDAEMON_BUILD -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o -MF CMakeFiles\daemon.dir\Daemon\Draw\Draw.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.cpp"
+In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.cpp:1:
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.hpp:5:10: fatal error: 'imgui.h' file not found
 #include <imgui.h>
          ^~~~~~~~~
 1 error generated.
-[25/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
-[26/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
-[27/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
+[28/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+[29/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[30/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
 ninja: build stopped: subcommand failed.
