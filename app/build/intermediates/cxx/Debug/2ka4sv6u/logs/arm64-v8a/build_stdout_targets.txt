@@ -1,8 +1,15 @@
 ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
-[1/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
-[2/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
-[3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
-[4/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[1/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[2/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[3/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[4/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
+[5/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
+[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Math/Math.cpp:3:9: warning: #pragma once in main file [-Wpragma-once-outside-header]
+#pragma once
+        ^
+1 warning generated.
+[7/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
 FAILED: CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -MF CMakeFiles\panel.dir\Panel\Interface\Interface.cpp.o.d -o CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.cpp:1:
@@ -38,8 +45,77 @@ C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/..
 #include <Overlay/Overlay.hpp>
          ^~~~~~~~~~~~~~~~~~~~~
 4 errors generated.
-[5/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
-[6/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[8/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+FAILED: CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -MF CMakeFiles\panel.dir\Shared\Config\saveconfig.cpp.o.d -o CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:1:9: warning: #pragma once in main file [-Wpragma-once-outside-header]
+#pragma once
+        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:35:29: error: no viable conversion from 'basic_string<char, char_traits<char>, allocator<char>>' to 'const basic_string<wchar_t, char_traits<wchar_t>, allocator<wchar_t>>'
+            return LoadFrom(DefaultPath());
+                            ^~~~~~~~~~~~~
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:801:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'const std::basic_string<wchar_t> &' for 1st argument
+    basic_string(const basic_string& __str);
+    ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:806:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'std::basic_string<wchar_t> &&' for 1st argument
+    basic_string(basic_string&& __str)
+    ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:819:5: note: candidate constructor template not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'const wchar_t *' for 1st argument
+    basic_string(const _CharT* __s) : __r_(__default_init_tag(), __default_init_tag()) {
+    ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:870:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'initializer_list<wchar_t>' for 1st argument
+    basic_string(initializer_list<_CharT> __il);
+    ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:794:40: note: explicit constructor is not a candidate
+    _LIBCPP_INLINE_VISIBILITY explicit basic_string(const allocator_type& __a)
+                                       ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:856:18: note: explicit constructor is not a candidate
+        explicit basic_string(const _Tp& __t);
+                 ^
+C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:878:5: note: candidate function
+    operator __self_view() const _NOEXCEPT { return __self_view(data(), size()); }
+    ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:158:50: note: passing argument to parameter 'path' here
+        static bool LoadFrom(const std::wstring& path) {
+                                                 ^
+1 warning and 1 error generated.
+[10/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+FAILED: CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -MF CMakeFiles\panel.dir\Panel\Fonts\Fonts.cpp.o.d -o CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp"
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:270:83: error: use of undeclared identifier 'keys'; did you mean 'Keys'?
+                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + i * 2);
+                                                                                  ^~~~
+                                                                                  Keys
+C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:47: note: expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:180:59: note: 'Keys' declared here
+template <class CharT, std::size_t Size, std::uint64_t... Keys, std::size_t... Indices>
+                                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:290:13: error: use of undeclared identifier '_encrypted'; did you mean '_decrypted'?
+            _encrypted = !_encrypted;
+            ^~~~~~~~~~
+            _decrypted
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:187:10: note: '_decrypted' declared here
+    bool _decrypted = false;
+         ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:290:27: error: use of undeclared identifier '_encrypted'; did you mean '_decrypted'?
+            _encrypted = !_encrypted;
+                          ^~~~~~~~~~
+                          _decrypted
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:187:10: note: '_decrypted' declared here
+    bool _decrypted = false;
+         ^
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:8:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Bytes/BytesImg.hpp:6:10: fatal error: '../../../../logo.c' file not found
+#include "../../../../logo.c"
+         ^~~~~~~~~~~~~~~~~~~~
+4 errors generated.
+[11/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
 FAILED: CMakeFiles/panel.dir/Panel/PanelApp.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -MF CMakeFiles\panel.dir\Panel\PanelApp.cpp.o.d -o CMakeFiles/panel.dir/Panel/PanelApp.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:4:
@@ -88,123 +164,11 @@ static Interface* g_Interface = nullptr;
 C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Interface/Interface.hpp:35:19: note: previous definition is here
 inline Interface* g_Interface = nullptr;
                   ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:56:13: error: use of undeclared identifier 'g_Globals'
-        if (g_Globals.General.ShutDown) {
-            ^
 C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:77:13: error: use of undeclared identifier 'NotifyManager'
             NotifyManager::Render();
             ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:80:17: error: use of undeclared identifier 'g_Globals'
-            if (g_Globals.Misc.Screen.ShowAimbotFov) {
-                ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:81:33: error: use of undeclared identifier 'g_Globals'
-                ImColor Outline(g_Globals.Misc.Screen.AimbotFovColor[0], g_Globals.Misc.Screen.AimbotFovColor[1],
-                                ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:81:74: error: use of undeclared identifier 'g_Globals'
-                ImColor Outline(g_Globals.Misc.Screen.AimbotFovColor[0], g_Globals.Misc.Screen.AimbotFovColor[1],
-                                                                         ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:82:33: error: use of undeclared identifier 'g_Globals'
-                                g_Globals.Misc.Screen.AimbotFovColor[2], g_Globals.Misc.Screen.AimbotFovColor[3]);
-                                ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:82:74: error: use of undeclared identifier 'g_Globals'
-                                g_Globals.Misc.Screen.AimbotFovColor[2], g_Globals.Misc.Screen.AimbotFovColor[3]);
-                                                                         ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:83:30: error: use of undeclared identifier 'g_Globals'
-                ImColor Fill(g_Globals.Misc.Screen.FilledFovColor[0], g_Globals.Misc.Screen.FilledFovColor[1],
-                             ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:83:71: error: use of undeclared identifier 'g_Globals'
-                ImColor Fill(g_Globals.Misc.Screen.FilledFovColor[0], g_Globals.Misc.Screen.FilledFovColor[1],
-                                                                      ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:84:30: error: use of undeclared identifier 'g_Globals'
-                             g_Globals.Misc.Screen.FilledFovColor[2], g_Globals.Misc.Screen.FilledFovColor[3]);
-                             ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:84:71: error: use of undeclared identifier 'g_Globals'
-                             g_Globals.Misc.Screen.FilledFovColor[2], g_Globals.Misc.Screen.FilledFovColor[3]);
-                                                                      ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:86:73: error: use of undeclared identifier 'g_Globals'
-                ImGui::GetBackgroundDrawList()->AddCircleFilled(Center, g_Globals.AimBot.Fov, Fill, 360);
-                                                                        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:87:67: error: use of undeclared identifier 'g_Globals'
-                ImGui::GetBackgroundDrawList()->AddCircle(Center, g_Globals.AimBot.Fov, Outline, 360);
-                                                                  ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:90:17: error: use of undeclared identifier 'g_Globals'
-            if (g_Globals.Misc.Screen.ShowSilentFov) {
-                ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/PanelApp.cpp:91:33: error: use of undeclared identifier 'g_Globals'
-                ImColor Outline(g_Globals.Misc.Screen.SilentFovColor[0], g_Globals.Misc.Screen.SilentFovColor[1],
-                                ^
-fatal error: too many errors emitted, stopping now [-ferror-limit=]
-2 warnings and 20 errors generated.
-[7/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
-FAILED: CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -MF CMakeFiles\panel.dir\Panel\Fonts\Fonts.cpp.o.d -o CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp"
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:1:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.hpp:2:
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:30:
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:270:83: error: use of undeclared identifier 'keys'; did you mean 'Keys'?
-                uint64x2_t key_vec  = vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + i * 2);
-                                                                                  ^~~~
-                                                                                  Keys
-C:/Users/MRCIOR~1/AppData/Local/Android/Sdk/ndk/251~1.893/TOOLCH~1/llvm/prebuilt/WINDOW~1/lib64/clang/14.0.6/include/arm_neon.h:8741:47: note: expanded from macro 'vld1q_u64'
-  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
-                                              ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:180:59: note: 'Keys' declared here
-template <class CharT, std::size_t Size, std::uint64_t... Keys, std::size_t... Indices>
-                                                          ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:290:13: error: use of undeclared identifier '_encrypted'; did you mean '_decrypted'?
-            _encrypted = !_encrypted;
-            ^~~~~~~~~~
-            _decrypted
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:187:10: note: '_decrypted' declared here
-    bool _decrypted = false;
-         ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:290:27: error: use of undeclared identifier '_encrypted'; did you mean '_decrypted'?
-            _encrypted = !_encrypted;
-                          ^~~~~~~~~~
-                          _decrypted
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/XorStr.hpp:187:10: note: '_decrypted' declared here
-    bool _decrypted = false;
-         ^
-In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Fonts.cpp:8:
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel/Fonts/Bytes/BytesImg.hpp:6:10: fatal error: '../../../../logo.c' file not found
-#include "../../../../logo.c"
-         ^~~~~~~~~~~~~~~~~~~~
-4 errors generated.
-[8/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
-FAILED: CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -MF CMakeFiles\panel.dir\Shared\Config\saveconfig.cpp.o.d -o CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp"
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:1:9: warning: #pragma once in main file [-Wpragma-once-outside-header]
-#pragma once
-        ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:35:29: error: no viable conversion from 'basic_string<char, char_traits<char>, allocator<char>>' to 'const basic_string<wchar_t, char_traits<wchar_t>, allocator<wchar_t>>'
-            return LoadFrom(DefaultPath());
-                            ^~~~~~~~~~~~~
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:801:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'const std::basic_string<wchar_t> &' for 1st argument
-    basic_string(const basic_string& __str);
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:806:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'std::basic_string<wchar_t> &&' for 1st argument
-    basic_string(basic_string&& __str)
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:819:5: note: candidate constructor template not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'const wchar_t *' for 1st argument
-    basic_string(const _CharT* __s) : __r_(__default_init_tag(), __default_init_tag()) {
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:870:5: note: candidate constructor not viable: no known conversion from 'std::string' (aka 'basic_string<char, char_traits<char>, allocator<char>>') to 'initializer_list<wchar_t>' for 1st argument
-    basic_string(initializer_list<_CharT> __il);
-    ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:794:40: note: explicit constructor is not a candidate
-    _LIBCPP_INLINE_VISIBILITY explicit basic_string(const allocator_type& __a)
-                                       ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:856:18: note: explicit constructor is not a candidate
-        explicit basic_string(const _Tp& __t);
-                 ^
-C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/c++/v1/string:878:5: note: candidate function
-    operator __self_view() const _NOEXCEPT { return __self_view(data(), size()); }
-    ^
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Config/saveconfig.cpp:158:50: note: passing argument to parameter 'path' here
-        static bool LoadFrom(const std::wstring& path) {
-                                                 ^
-1 warning and 1 error generated.
-[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+2 warnings and 5 errors generated.
+[12/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
 FAILED: CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o 
 C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o -MF CMakeFiles\panel.dir\Shared\Utils\Utils.cpp.o.d -o CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp"
 In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.cpp:1:
