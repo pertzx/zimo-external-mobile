@@ -42,7 +42,7 @@
 
 // stb_image para load de texturas
 // REMOVIDO: #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "../../External/ImGui/stb_image.h"
 
 // Android keycodes mapeados para uso no painel
 #include <android/keycodes.h>
