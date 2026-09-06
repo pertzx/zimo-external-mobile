@@ -1,0 +1,11 @@
+d=open('hesco_ov.png','rb').read()
+print('PNG:',len(d))
+o=open('app/src/main/cpp/Panel/Fonts/Bytes/BytesImg.hpp','w')
+o.write('#pragma once\n\nconst int LogoWidth = 720;\nconst int LogoHeight = 1600;\n\nconst unsigned char LogoMenuRawRGBA[] = {\n')
+for i,b in enumerate(d):
+    if i%16==0: o.write('    ')
+    o.write('0x%02X, '%b)
+    if i%16==15: o.write('\n')
+o.write('\n};\nconst size_t LogoMenuRawRGBASize = %d;\n'%len(d))
+o.close()
+print('Done')

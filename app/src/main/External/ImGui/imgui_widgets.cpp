@@ -125,7 +125,7 @@ static const ImU64          IM_U64_MAX = (2ULL * 9223372036854775807LL + 1);
 #ifdef _WIN32
 #include <Windows.h>
 #endif
-#include "../../Fonts/Fonts.hpp"
+#include <Fonts/Fonts.hpp>
 
 //-------------------------------------------------------------------------
 // [SECTION] Forward Declarations

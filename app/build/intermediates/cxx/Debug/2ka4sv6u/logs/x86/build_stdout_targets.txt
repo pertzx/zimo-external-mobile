@@ -1,0 +1,64 @@
+ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\x86'
+[1/60] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
+[2/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[3/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[4/60] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[5/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/EmulatorEnv.cpp.o
+[6/60] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+[7/60] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[8/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
+[9/60] Building CXX object CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o
+FAILED: CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o 
+C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=i686-none-linux-android28 --sysroot="C:/Users/M�rcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Panel" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External/ImGui" -I"C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o -MF CMakeFiles\panel.dir\Daemon\Unity\UTF\UTF8.cpp.o.d -o CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o -c "C:/Users/M�rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp"
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:55: error: constant expression evaluates to 192 which cannot be narrowed to type 'UTF8' (aka 'char') [-Wc++11-narrowing]
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                      ^~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:55: note: insert an explicit cast to silence this issue
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                      ^~~~
+                                                      static_cast<UTF8>( )
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:61: error: constant expression evaluates to 224 which cannot be narrowed to type 'UTF8' (aka 'char') [-Wc++11-narrowing]
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                            ^~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:61: note: insert an explicit cast to silence this issue
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                            ^~~~
+                                                            static_cast<UTF8>( )
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:67: error: constant expression evaluates to 240 which cannot be narrowed to type 'UTF8' (aka 'char') [-Wc++11-narrowing]
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                  ^~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:67: note: insert an explicit cast to silence this issue
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                  ^~~~
+                                                                  static_cast<UTF8>( )
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:73: error: constant expression evaluates to 248 which cannot be narrowed to type 'UTF8' (aka 'char') [-Wc++11-narrowing]
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                        ^~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:73: note: insert an explicit cast to silence this issue
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                        ^~~~
+                                                                        static_cast<UTF8>( )
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:79: error: constant expression evaluates to 252 which cannot be narrowed to type 'UTF8' (aka 'char') [-Wc++11-narrowing]
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                              ^~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:6:79: note: insert an explicit cast to silence this issue
+static const UTF8 FirstByteMark [ 7 ] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+                                                                              ^~~~
+                                                                              static_cast<UTF8>( )
+5 errors generated.
+[10/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
+[11/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/Memory.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:335:34: warning: shift count >= width of type [-Wshift-count-overflow]
+        uint64_t PML4_index = ( GuestVA >> 39 ) & 0x1FF;
+                                        ^  ~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:519:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:609:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+3 warnings generated.
+[12/60] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+[13/60] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[14/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+ninja: build stopped: subcommand failed.

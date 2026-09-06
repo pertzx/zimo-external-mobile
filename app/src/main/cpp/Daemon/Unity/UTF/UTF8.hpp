@@ -21,15 +21,16 @@
 
 typedef unsigned char boolean;
 typedef unsigned int CharType;
-typedef char UTF8;
+typedef unsigned char UTF8;
 typedef unsigned short UTF16;
 typedef unsigned int UTF32;
 
-extern const UTF32 HalfMask;
-extern const UTF32 HalfBase;
-extern const UTF8 FirstByteMark [ 7 ];
-extern const UTF32 OffsetsFromUTF8 [ 6 ];
-extern const char TrailingBytesForUTF8 [ 256 ];
+// These are defined as static const in the .cpp file
+// extern const UTF32 HalfMask;
+// extern const UTF32 HalfBase;
+// extern const UTF8 FirstByteMark [ 7 ];
+// extern const UTF32 OffsetsFromUTF8 [ 6 ];
+// extern const char TrailingBytesForUTF8 [ 256 ];
 
 typedef enum
 {

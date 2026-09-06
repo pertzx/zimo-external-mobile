@@ -1,9 +1,9 @@
 #pragma once
 #include <cstdint>
-#include <Main/Memory/Memory.hpp>
+#include <Memory/Memory.hpp>
 #include <Math/Vectors/Vector3.hpp>
 #include <Math/Vectors/Vector4.hpp>
-#include <Cheat/Globals.hpp>
+#include <Globals.hpp>
 
 extern int ScreenWidth;
 extern int ScreenHeight;

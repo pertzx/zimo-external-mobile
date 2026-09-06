@@ -1,5 +1,5 @@
 #include "Skeleton.hpp"
-#include <Main/Offsets/Offsets.hpp>
+#include <Offsets/Offsets.hpp>
 #include <cmath>
 
 namespace

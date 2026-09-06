@@ -1,14 +1,13 @@
 #pragma once
 #include <pthread.h>
 // ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <time.h>
-#include <Main/Memory/Memory.hpp>
-#include <Main/Offsets/Offsets.hpp>
-#include <Main/Unity/Unity.hpp>
+#include <Memory/Memory.hpp>
+#include <Offsets/Offsets.hpp>
+#include <Unity/Unity.hpp>
 #include <Math/Vectors/Vector3.hpp>
-#include <Cheat/Globals.hpp>
+#include <Globals.hpp>
 #include <vector>
 #include <mutex>
 #include <thread>
@@ -29,6 +28,7 @@ struct PlayerData
 {
 	Vector3 HeadScreen;
 	Vector3 FeetScreen;
+	Vector3 ScreenPos;
 	// Posicoes no mundo (usadas para reprojetar na tela com a view matrix mais
 	// recente a cada frame, mesmo quando a leitura de entidades engasga — assim
 	// o ESP continua "grudado" nos jogadores em vez de congelar/desligar).
@@ -39,13 +39,18 @@ struct PlayerData
 	// true = aliado (so entra no snapshot com Visuals.ESP.ShowTeam ligado).
 	// Desenhado com a cor de time e NUNCA pode virar alvo do aimbot/silent.
 	bool IsTeammate;
+	bool IsVisible;
+	bool IsBot;
 	int WeaponID;
 	uintptr_t Entity;
 	uintptr_t UMAData;
 	std::string Name;
+	std::string Weapon;
 	float Distance;
 	short CurrentHealth;
 	short MaxHealth;
+	// Skeleton points
+	std::vector<Vector3> Skeleton;
 	// Tick (GetTickCount64) da última leitura boa desta entidade. Entidades
 	// confirmadas na lista de ataque que caírem por falha TRANSITÓRIA de leitura
 	// herdam o último estado bom (anti-flicker), mas só dentro desta janela —
@@ -61,6 +66,8 @@ struct GameContext
 	uintptr_t MainCamera;
 	Matrix4x4 ViewMatrix;
 	bool IsObserving;
+	float ClosestEnemyDist;
+	float LocalYaw;
 };
 
 class Data
@@ -94,6 +101,17 @@ class Data
 
 		return PLAYER_UNKNOWN;
 	}
+
+	// Public accessors for DaemonApp IPC
+	static std::vector<PlayerData>& GetPlayers() { return m_Players; }
+	static GameContext& GetContextRef() { return m_Context; }
+	static std::mutex& GetMutex() { return m_Mutex; }
+	static std::atomic<bool>& GetRunning() { return m_Running; }
+
+	public:
+	// Explicitly allow access to private members from implementation
+	static void SetRunning(bool value);
+	static bool IsRunning();
 
 	private:
 	template <bool N32, bool V31>

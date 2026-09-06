@@ -78,8 +78,13 @@ void Interface::Initialize()
     // No Android, o contexto ImGui já foi criado em PanelApp.cpp
     // Apenas inicializamos o menu e estilo
     bIsMenuOpen = true;
+
+    // Pular tela de auth - ir direto para interface principal
+    CurrentTab = 1;  // 1 = Aimbot (primeira aba real)
+    bIsMenuOpen = true;
+
     InitializeMenu();
-    
+
     // Notificação de boas-vindas
     std::thread([]() {
         NotifyManager::Send(XorStr("Bem Vindo(a)"), 4000);
@@ -459,9 +464,13 @@ void Interface::RenderGui()
 		SubAnimaVelocity = 0.0f;
 	}
 
-	ImVec2 windowSize = ImVec2(700, 460);
+	// Responsive window size based on device screen
 	ImVec2 displaySize = io.DisplaySize;
+	float maxWidth = displaySize.x * 0.95f;
+	float maxHeight = displaySize.y * 0.85f;
+	ImVec2 windowSize = ImVec2(ImMin(700.0f, maxWidth), ImMin(460.0f, maxHeight));
 
+	// Scale factor for mobile - increase base scale
 	static bool g_WindowPosInitialized = false;
 	if (!g_WindowPosInitialized)
 	{
@@ -472,10 +481,21 @@ void Interface::RenderGui()
 		g_WindowPosInitialized = true;
 	}
 
-	g_WindowPos.x = ImClamp(g_WindowPos.x, -windowSize.x + 100.0f, displaySize.x - 100.0f);
+	g_WindowPos.x = ImClamp(g_WindowPos.x, -windowSize.x + 50.0f, displaySize.x - 50.0f);
 	g_WindowPos.y = ImClamp(g_WindowPos.y, 0.0f, displaySize.y - 50.0f);
 
-	ImVec2 scaledSize = windowSize * g_WindowScale;
+	// Mobile-friendly scale (starts at 1.0 for better readability)
+	static float g_BaseScale = 1.0f;
+	static float g_FontScale = 1.0f;
+	if (g_BaseScale == 1.0f && displaySize.x < 800) {
+		g_BaseScale = 1.15f; // Larger window on mobile
+		g_FontScale = 1.35f; // Larger fonts on mobile
+	}
+
+	// Apply font scale
+	ImGui::GetIO().FontGlobalScale = g_FontScale;
+
+	ImVec2 scaledSize = windowSize * g_WindowScale * g_BaseScale;
 	ImVec2 scaledPos = g_WindowPos + (windowSize - scaledSize) * 0.5f;
 
 	if (g_WantShutdown)
@@ -487,7 +507,7 @@ void Interface::RenderGui()
 	ImGui::SetNextWindowPos(scaledPos);
 	ImGui::SetNextWindowSize(scaledSize);
 	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, g_WindowAlpha);
-	ImGui::Begin(XorStr("Storm Cheats"), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
+	ImGui::Begin(XorStr("Storm Cheats"), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 	{
 		ImDrawList* DrawList = ImGui::GetWindowDrawList();
 		ImVec2 Pos = ImGui::GetWindowPos();
@@ -539,6 +559,8 @@ void Interface::RenderGui()
 		else
 		{
 			float headerHeight = 55.0f;
+
+			// Mobile: drag from full header area (top 55px)
 			bool inHeader = io.MousePos.y >= Pos.y && io.MousePos.y <= Pos.y + headerHeight &&
 				io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x;
 
@@ -579,9 +601,12 @@ void Interface::RenderGui()
 			bool inContentArea = io.MousePos.y >= contentTop && io.MousePos.y <= contentBottom &&
 				io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x;
 
-			bool inEmptyContentArea = inContentArea && lastFrameHoveredId == 0 && !scrollbarActive;
+			// Allow scroll in content area when not over interactive elements
+			bool overInteractive = (lastFrameHoveredId != 0) || scrollbarActive ||
+				io.WantCaptureMouse || io.WantCaptureKeyboard;
 
-			canStartDrag = inHeader || inDockBackground || inEmptyContentArea;
+			// Mobile: drag from header OR dock background, NOT from content area
+			canStartDrag = (inHeader || inDockBackground) && !overInteractive;
 		}
 
 		extern ImGuiID activeSlider;
@@ -900,7 +925,8 @@ void Interface::RenderGui()
 
 			ImGui::SetCursorPos(ImVec2(14, contentTop));
 			ImGui::PushStyleVar(ImGuiStyleVar_Alpha, g_ContentAlpha);
-			ImGui::BeginChild(XorStr("ContentArea"), ImVec2(Size.x - 28, contentHeight), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+			// Allow vertical scrolling for mobile
+			ImGui::BeginChild(XorStr("ContentArea"), ImVec2(Size.x - 28, contentHeight), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
 			{
 				float cardWidth = (ImGui::GetWindowSize().x - 10) * 0.5f;
 				float cardHeight = contentHeight - 8;
@@ -1254,8 +1280,7 @@ void Interface::RenderGui()
 
 void Interface::HandleMenuKey()
 {
-    extern bool g_AndroidMenuKeyPressed;
-    if (g_AndroidMenuKeyPressed)
+    if (AndroidInput::IsKeyPressed(0x2F))
     {
         if (!MenuKeyDown)
         {

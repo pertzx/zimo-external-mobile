@@ -6,8 +6,14 @@
 #include <thread>
 #include <chrono>
 
+// LOGI/LOGE are already defined in Shared/Includes.hpp
+// Only define if not already defined
+#ifndef LOGI
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormDaemon", __VA_ARGS__)
+#endif
+#ifndef LOGE
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormDaemon", __VA_ARGS__)
+#endif
 
 namespace DaemonApp {
 
@@ -37,23 +43,24 @@ void Run() {
         state.Magic = IPC_MAGIC_PLAYERS;
         state.Seq++;
 
-        // Preencher dados dos jogadores a partir de Data::m_Players
+        // Preencher dados dos jogadores a partir de Data::GetPlayers()
         {
-            std::lock_guard<std::mutex> lock(Data::m_Mutex);
+            std::lock_guard<std::mutex> lock(Data::GetMutex());
+            auto& players = Data::GetPlayers();
             state.PlayerCount = 0;
-            for (size_t i = 0; i < Data::m_Players.size() && state.PlayerCount < state.MaxPlayers; i++) {
-                const PlayerData& src = Data::m_Players[i];
+            for (size_t i = 0; i < players.size() && state.PlayerCount < state.MaxPlayers; i++) {
+                const PlayerData& src = players[i];
                 IPC_PLAYER_DATA& dst = state.Players[state.PlayerCount];
 
-                dst.ScreenPos[0] = src.ScreenPos.x;
-                dst.ScreenPos[1] = src.ScreenPos.y;
-                dst.Box[0] = src.Box.x;
-                dst.Box[1] = src.Box.y;
-                dst.Box[2] = src.Box.z;
-                dst.Box[3] = src.Box.w;
-                dst.Health = src.Health;
+                dst.ScreenPos[0] = src.ScreenPos.X;
+                dst.ScreenPos[1] = src.ScreenPos.Y;
+                dst.Box[0] = src.HeadScreen.X;  // Using HeadScreen as Box.x
+                dst.Box[1] = src.HeadScreen.Y;  // Using HeadScreen as Box.y
+                dst.Box[2] = src.FeetScreen.X;  // Using FeetScreen as Box.z
+                dst.Box[3] = src.FeetScreen.Y;  // Using FeetScreen as Box.w
+                dst.Health = src.CurrentHealth;
                 dst.MaxHealth = src.MaxHealth;
-                dst.IsTeam = src.IsTeam;
+                dst.IsTeam = src.IsTeammate;
                 dst.IsVisible = src.IsVisible;
                 dst.IsKnocked = src.IsKnocked;
                 dst.IsBot = src.IsBot;
@@ -64,8 +71,8 @@ void Run() {
                 // Skeleton simplificado
                 dst.SkeletonPointCount = 0;
                 for (size_t s = 0; s < src.Skeleton.size() && dst.SkeletonPointCount < 20; s++) {
-                    dst.SkeletonPoints[dst.SkeletonPointCount][0] = src.Skeleton[s].x;
-                    dst.SkeletonPoints[dst.SkeletonPointCount][1] = src.Skeleton[s].y;
+                    dst.SkeletonPoints[dst.SkeletonPointCount][0] = src.Skeleton[s].X;
+                    dst.SkeletonPoints[dst.SkeletonPointCount][1] = src.Skeleton[s].Y;
                     dst.SkeletonPointCount++;
                 }
 
@@ -74,8 +81,9 @@ void Run() {
         }
 
         // Info geral
-        state.ClosestEnemyDist = Data::m_Context.ClosestEnemyDist;
-        state.LocalYaw = Data::m_Context.LocalYaw;
+        auto& context = Data::GetContextRef();
+        state.ClosestEnemyDist = context.ClosestEnemyDist;
+        state.LocalYaw = context.LocalYaw;
 
         IPCServer::UpdateGameState(state);
         IPCServer::SyncState();

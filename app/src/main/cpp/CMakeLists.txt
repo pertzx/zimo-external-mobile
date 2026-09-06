@@ -21,10 +21,11 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/imgui_stdlib.cpp
-    ${IMGUI_DIR}/imgui_freetype.cpp
+    # ${IMGUI_DIR}/imgui_freetype.cpp  # Excluded: FreeType not available in NDK
     ${IMGUI_DIR}/imgui_impl_opengl3.cpp
     ${IMGUI_DIR}/imgui_impl_android.cpp
     ${IMGUI_DIR}/Custom.cpp
+    ${IMGUI_DIR}/stb_image.cpp
 )
 
 # ==== Sources compartilhados ====
@@ -49,6 +50,10 @@ set(SHARED_SOURCES
     ${CPP_DIR}/Shared/Math/Vectors/Vector4.hpp
     ${CPP_DIR}/Shared/Offsets/Offsets.cpp
     ${CPP_DIR}/Shared/Offsets/Offsets.hpp
+    ${EXTERNAL_DIR}/Notify/Notify.cpp
+    ${EXTERNAL_DIR}/Notify/Notify.hpp
+    ${CPP_DIR}/Daemon/Memory/Memory.cpp
+    ${CPP_DIR}/Daemon/Memory/Memory.hpp
 )
 
 # ==== Sources do Painel ====
@@ -67,6 +72,9 @@ set(PANEL_SOURCES
     ${CPP_DIR}/Panel/Interface/unpacker.h
     ${CPP_DIR}/Panel/Fonts/Fonts.cpp
     ${CPP_DIR}/Panel/Fonts/Fonts.hpp
+    ${CPP_DIR}/Daemon/Unity/UTF/UTF8.cpp
+    ${CPP_DIR}/Daemon/Memory/Memory.cpp
+    ${CPP_DIR}/Daemon/Memory/EmulatorEnv.cpp
 )
 
 # ==== Sources do Daemon ====
@@ -78,40 +86,41 @@ set(DAEMON_SOURCES
     ${CPP_DIR}/Daemon/IPC/IPCServer.hpp
     ${CPP_DIR}/Daemon/Memory/Memory.cpp
     ${CPP_DIR}/Daemon/Memory/Memory.hpp
-    ${CPP_DIR}/Daemon/Memory/MemoryExternal.h
     ${CPP_DIR}/Daemon/Memory/EmulatorEnv.cpp
     ${CPP_DIR}/Daemon/Memory/EmulatorEnv.hpp
-    ${CPP_DIR}/Daemon/Draw/Draw.cpp
-    ${CPP_DIR}/Daemon/Draw/Draw.hpp
-    ${CPP_DIR}/Daemon/Draw/Silent.cpp
-    ${CPP_DIR}/Daemon/Draw/Silent.hpp
+    ${CPP_DIR}/Daemon/Data.cpp
+    # ${CPP_DIR}/Daemon/Draw/Draw.cpp      # Excluded: Windows-specific code
+    # ${CPP_DIR}/Daemon/Draw/Draw.hpp      # Excluded: Windows-specific code
+    # ${CPP_DIR}/Daemon/Draw/Silent.cpp    # Excluded: Windows-specific code
+    # ${CPP_DIR}/Daemon/Draw/Silent.hpp    # Excluded: Windows-specific code
     ${CPP_DIR}/Daemon/Draw/Skeleton.cpp
     ${CPP_DIR}/Daemon/Draw/Skeleton.hpp
     ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.cpp
     ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.h
-    ${CPP_DIR}/Daemon/Offsets/Offsets.cpp
-    ${CPP_DIR}/Daemon/Offsets/Offsets.hpp
     ${CPP_DIR}/Daemon/Unity/Unity.cpp
     ${CPP_DIR}/Daemon/Unity/Unity.hpp
     ${CPP_DIR}/Daemon/Unity/UTF/UTF8.cpp
     ${CPP_DIR}/Daemon/Unity/UTF/UTF8.hpp
-    ${CPP_DIR}/Daemon/WebPanel/WebPanel.cpp
-    ${CPP_DIR}/Daemon/WebPanel/WebPanel.hpp
-    ${EXTERNAL_DIR}/Notify/Notify.cpp      # <-- CORRIGIDO: caminho agora resolve certo
-    ${EXTERNAL_DIR}/Notify/Notify.hpp
 )
+
+# Windows-specific sources (excluded from Android build)
+# ${CPP_DIR}/External/DynamicStub/DynamicStub.cpp
+# ${CPP_DIR}/External/DynamicStub/DynamicStub.hpp
+# ${CPP_DIR}/External/VehPGDHook/Vehpageguardhook.cpp
+# ${CPP_DIR}/External/VehPGDHook/Vehpageguardhook.hpp
+# ${CPP_DIR}/Daemon/WebPanel/WebPanel.cpp
+# ${CPP_DIR}/Daemon/WebPanel/WebPanel.hpp
 
 # ==== Biblioteca do Painel ====
 add_library(panel SHARED ${PANEL_SOURCES} ${SHARED_SOURCES} ${IMGUI_SOURCES})
 target_include_directories(panel PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Panel
-    ${CPP_DIR}/Daemon        # <-- ADICIONAR
+    ${CPP_DIR}/Daemon
     ${IMGUI_DIR}
-    ${FREETYPE_INCLUDE_DIR}
     ${EXTERNAL_DIR}
 )
-target_compile_definitions(panel PRIVATE IMGUI_DEFINE_MATH_OPERATORS)  # <-- ADICIONAR
+target_compile_definitions(panel PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
 target_link_libraries(panel
     ${log-lib}
     ${android-lib}
@@ -120,14 +129,18 @@ target_link_libraries(panel
 )
 
 # ==== Biblioteca do Daemon ====
-add_library(daemon SHARED ${DAEMON_SOURCES} ${SHARED_SOURCES})
+add_library(daemon SHARED ${DAEMON_SOURCES} ${SHARED_SOURCES} ${IMGUI_SOURCES})
 target_include_directories(daemon PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Daemon
+    ${IMGUI_DIR}
+    ${FREETYPE_INCLUDE_DIR}
     ${EXTERNAL_DIR}
 )
 target_link_libraries(daemon
     ${log-lib}
     ${android-lib}
+    ${EGL-lib}
+    ${GLESv3-lib}
 )
-target_compile_definitions(daemon PRIVATE DAEMON_BUILD)
+target_compile_definitions(daemon PRIVATE DAEMON_BUILD IMGUI_DEFINE_MATH_OPERATORS)

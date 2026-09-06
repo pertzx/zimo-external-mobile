@@ -40,12 +40,22 @@ public class MainActivity extends Activity {
     }
 
     private void startServices() {
-        // Inicia daemon primeiro (processo :daemon)
-        startService(new Intent(this, DaemonService.class));
-        
+        // Inicia daemon primeiro (processo :daemon) - use startForegroundService for Android 12+
+        Intent daemonIntent = new Intent(this, DaemonService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(daemonIntent);
+        } else {
+            startService(daemonIntent);
+        }
+
         // Inicia overlay
-        startService(new Intent(this, OverlayService.class));
-        
+        Intent overlayIntent = new Intent(this, OverlayService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(overlayIntent);
+        } else {
+            startService(overlayIntent);
+        }
+
         Log.i("Storm", "Serviços iniciados");
     }
 }

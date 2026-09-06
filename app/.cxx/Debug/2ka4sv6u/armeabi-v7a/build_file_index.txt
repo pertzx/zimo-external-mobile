@@ -1,0 +1,1 @@
+C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\src\main\cpp\CMakeLists.txt

@@ -1,5 +1,5 @@
 #include "UTF8.hpp"
-#include <Main/Memory/Memory.hpp>
+#include <Memory/Memory.hpp>
 
 static const UTF32 HalfMask = 0x3FFUL;
 static const UTF32 HalfBase = 0x0010000UL;
@@ -135,6 +135,6 @@ std::string ObterStr( uintptr_t address, int count )
 	}
 
 	Utf16ToUtf8( buf16, buf88, sizeof( buf88 ), StrictConversion );
-	sprintf_s( a, ( "%s" ), buf88 );
+	snprintf( a, sizeof(a), "%s", buf88 );
 	return a;
 }

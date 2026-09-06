@@ -1,15 +1,44 @@
+#ifndef __ANDROID__
+
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#endif
+
 #include <thread>
 #include <string>
 #include <vector>
 #include <cstdio>
 #include <cstring>
 
-#include <Cheat/Globals.hpp>
-#include <Cheat/WebPanel.hpp>
+#include <Globals.hpp>
+
+// =====================================================================
+// Painel web local (controle pelo celular)
+// =====================================================================
+// So o essencial: Winsock cru, 1 request por conexao (Connection: close),
+// roteamento GET/ + GET /api/state + POST /api/set + POST /api/action.
+// Sem dependencias externas e sem travar: todas as operacoes sao curtas e
+// com timeout de socket. Seguranca: escuta na rede local sem senha por
+// padrao (LAN). Adicionar token/PIN aqui se for expor fora da rede.
+// =====================================================================
+
+namespace WebPanel
+{
+	static const int WEBPANEL_PORT = 8080;
+	static const int MAX_REQUEST = 8192;
+
+	static volatile LONG g_Running = 0;
+	static SOCKET g_ListenSocket = INVALID_SOCKET;
+	static std::thread g_Thread;
 
 // =====================================================================
 // Painel web local (controle pelo celular)

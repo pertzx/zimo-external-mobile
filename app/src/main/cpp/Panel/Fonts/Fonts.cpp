@@ -7,11 +7,11 @@
 #include "Bytes/IconsFontAwesome6Brands.h"
 #include "Bytes/BytesImg.hpp"
 #include <Utils/Utils.hpp>
-#include <imgui_freetype.h>
 
-#ifdef _MSC_VER
-#pragma comment(lib, "freetype.lib")
-#endif
+// FreeType is not available in Android NDK - use ImGui's built-in font rasterizer
+// #ifdef _MSC_VER
+// #pragma comment(lib, "freetype.lib")
+// #endif
 
 bool Fonts::LoadTextureFromPNG(const unsigned char* png_data, size_t png_size, 
                                 GLuint* out_texture, int* out_width, int* out_height) {
@@ -46,7 +46,7 @@ void Fonts::Initialize() {
          0
     };
 
-    Config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LightHinting | ImGuiFreeTypeBuilderFlags_NoHinting;
+    // Use default font rasterizer (no FreeType)
     Verdana = io.Fonts->AddFontFromMemoryCompressedTTF(verdana_compressed_data, verdana_compressed_size, 16.0f, &Config, kRangesPtBrComb);
     InterBold = io.Fonts->AddFontFromMemoryCompressedTTF(InterBold_compressed_data, InterBold_compressed_size, 16, &Config, kRangesPtBrComb);
     InterMedium = io.Fonts->AddFontFromMemoryCompressedTTF(InterMedium_compressed_data, InterMedium_compressed_size, 16, &Config, kRangesPtBrComb);
@@ -127,7 +127,6 @@ void Fonts::Initialize() {
     };
 
     GffConfig.GlyphRanges = ranges;
-    GffConfig.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LightHinting | ImGuiFreeTypeBuilderFlags_NoHinting;
     Gff = io.Fonts->AddFontFromMemoryCompressedTTF(seguiemj_compressed_data, seguiemj_compressed_size, 18.0f, &GffConfig, GffConfig.GlyphRanges);
 
     ImFontConfig IconWeaponConfig;
@@ -135,7 +134,6 @@ void Fonts::Initialize() {
     IconWeaponConfig.OversampleV = 1;
     IconWeaponConfig.PixelSnapH = true;
     IconWeaponConfig.MergeMode = true;
-    IconWeaponConfig.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LightHinting | ImGuiFreeTypeBuilderFlags_NoHinting;
     static const ImWchar IconWeaponRanges[] = { 0xe000, 0xe204, 0x00 };
     IconWeapon = io.Fonts->AddFontFromMemoryCompressedTTF(weapon_compressed_data, weapon_compressed_size, 41.0f, &IconWeaponConfig, IconWeaponRanges);
 
@@ -148,19 +146,21 @@ void Fonts::Initialize() {
     FontAwesomeSolid = io.Fonts->AddFontFromMemoryCompressedTTF(fa_solid_900_compressed_data, fa_solid_900_compressed_size, 27.f * (2.0f / 3.0f), &FontAwesomeConfig, &FontAwesomeRanges[0]);
     //FontAwesomeBrands = io.Fonts->AddFontFromMemoryCompressedTTF(fa_brands_400_compressed_data, fa_brands_400_compressed_size, 17.f, &FontAwesomeConfig, &FontAwesomeRangesBrands[0]);
 
-    // Load PNG logo dynamically using native WIC decoder
+    // Load PNG logo dynamically using stb_image
     int logoW = 0, logoH = 0;
     if (LoadTextureFromPNG(LogoMenuRawRGBA, LogoMenuRawRGBASize, &LogoTexture, &logoW, &logoH)) {
         LogoMenuWidth = logoW;
         LogoMenuHeight = logoH;
     } else {
-        // Fallback to raw load if it fails
-        LoadTextureFromRawRGBA(LogoMenuRawRGBA, LogoWidth, LogoHeight, &LogoTexture, false);
-        LogoMenuWidth = LogoWidth;
-        LogoMenuHeight = LogoHeight;
+        // PNG decode failed - log error and skip logo (don't crash with fallback)
+        printf("[Fonts] ERROR: Failed to load logo PNG, skipping logo texture\n");
+        LogoTexture = 0;
+        LogoMenuWidth = 0;
+        LogoMenuHeight = 0;
     }
 
-    ImGuiFreeType::BuildFontAtlas(io.Fonts);
+    // Use default font atlas builder (no FreeType)
+    io.Fonts->Build();
 }
 
 bool Fonts::LoadTextureFromRawRGBA(const unsigned char* rgba_data, int width, int height, GLuint* out_texture, bool flip_vertical) {

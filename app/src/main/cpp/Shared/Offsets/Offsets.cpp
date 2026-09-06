@@ -1,11 +1,9 @@
 
 #include <cinttypes>
 #include "Offsets.hpp"
-#include "../../Daemon/Memory/Memory.hpp"
-// #include <Main/Memory/Memory.hpp>   // <-- REVERTER para isso
-#include "../Globals.hpp"
-#include "../../Daemon/Unity/UTF/UTF8.hpp"
-// #include <Main/Unity/UTF/UTF8.hpp>
+#include <Memory/Memory.hpp>
+#include <Globals.hpp>
+#include <Unity/UTF/UTF8.hpp>
 
 // ==================== Offsets ====================
 

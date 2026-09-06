@@ -3,17 +3,19 @@
 #include <algorithm>
 #include <unordered_set>
 #include <cmath>
-#include <Cheat/Globals.hpp>
-#include <Main/Unity/Unity.hpp>
-#include <Main/Unity/UTF/UTF8.hpp>
-#include <DirectXMath.h>
-#include <Render/Fonts/Fonts.hpp>
+#include <Globals.hpp>
+#include <Unity/Unity.hpp>
+#include <Unity/UTF/UTF8.hpp>
+#include <Fonts/Fonts.hpp>
 #include "Weapon/NameGun.h"
 #include <Utils/Utils.hpp>
 #include <Math/Quaternion/Quaternion.hpp>
 #include <Math/MathUtils.hpp>
 #include "Skeleton.hpp"
+
+#ifndef __ANDROID__
 #include <DynamicStub/DynamicStub.hpp>
+#endif
 
 // Static members
 std::vector<PlayerData> Data::m_Players;

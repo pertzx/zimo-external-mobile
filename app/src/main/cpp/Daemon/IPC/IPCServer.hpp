@@ -1,6 +1,6 @@
 #pragma once
-#include "IPC/IPCProtocol.hpp"
-#include "../../Shared/Globals.hpp"
+#include <IPC/IPCProtocol.hpp>
+#include <Globals.hpp>
 
 namespace IPCServer {
     bool Start(const char* socketPath);

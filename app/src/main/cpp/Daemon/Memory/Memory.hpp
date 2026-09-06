@@ -102,6 +102,9 @@ class Memory
 	// novo CR3 e invalida os TLBs. Retorna true se mudou.
 	static bool RefreshCR3( );
 
+	// Shutdown - cleanup resources
+	static void Shutdown( );
+
 	// Flush thread-local TLB (1x por frame no ESP, 1x por burst no Silent)
 	static void FlushTLB( );
 	// Flush global — invalida TODAS as threads (Restart)
@@ -192,7 +195,12 @@ class Memory
 	static volatile LONG s_GlobalGen;
 	static volatile LONG s_RestartPending;
 	static volatile LONGLONG s_LastRestartTick;
+
+#ifdef __ANDROID__
+	static int         s_TlsIndex;     // pthread key
+#else
 	static DWORD         s_TlsIndex;     // TlsAlloc index
+#endif
 
 	// Retorna o TLB da thread atual (aloca se necessário)
 	static ThreadTLB* GetThreadTLB( );
@@ -212,6 +220,10 @@ class Memory
 	static bool CachedCR3Convert( uintptr_t GuestVA, uintptr_t& GuestPA );
 
 	static std::vector<uintptr_t> GetModuleAddress( bool N32 );
+
+#ifdef __ANDROID__
+	static int memFd;
+#endif
 
 	template<typename T>
 	static T ReadPA( uintptr_t address )

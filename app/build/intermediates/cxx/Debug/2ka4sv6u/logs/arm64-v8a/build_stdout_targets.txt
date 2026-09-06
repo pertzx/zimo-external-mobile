@@ -1,53 +1,111 @@
 ninja: Entering directory `C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\arm64-v8a'
-[1/50] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
-[2/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
-[3/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
-[4/50] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
-[5/50] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
-[6/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
-[7/50] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
-[8/50] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
-[9/50] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
-[10/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
-[11/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
-[12/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector3.cpp.o
-[13/50] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
-[14/50] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
-[15/50] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
-[16/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
-[17/50] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
-[18/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
-[19/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
-[20/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
-[21/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_freetype.cpp.o
-[22/50] Building CXX object CMakeFiles/daemon.dir/Daemon/IPC/IPCServer.cpp.o
-[23/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
-[24/50] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
-FAILED: CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DDAEMON_BUILD -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -MF CMakeFiles\daemon.dir\Daemon\DaemonApp.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp"
-In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp:3:
-In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:4:
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:7:12: error: unknown type name 'ImVec2'
-    static ImVec2 CalcTextSize(ImFont* font, int size, const char* label);
-           ^
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Utils/Utils.hpp:7:32: error: unknown type name 'ImFont'
-    static ImVec2 CalcTextSize(ImFont* font, int size, const char* label);
-                               ^
-In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp:4:
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.hpp:5:10: fatal error: 'imgui.h' file not found
-#include <imgui.h>
-         ^~~~~~~~~
-3 errors generated.
-[25/50] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
-[26/50] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o
-FAILED: CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o 
-C:\Users\MRCIOR~1\AppData\Local\Android\Sdk\ndk\251~1.893\TOOLCH~1\llvm\prebuilt\WINDOW~1\bin\CLANG_~1.EXE --target=aarch64-none-linux-android28 --sysroot="C:/Users/Márcio Ribeiro/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot" -DDAEMON_BUILD -Ddaemon_EXPORTS -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon" -I"C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/../External" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -MD -MT CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o -MF CMakeFiles\daemon.dir\Daemon\Draw\Draw.cpp.o.d -o CMakeFiles/daemon.dir/Daemon/Draw/Draw.cpp.o -c "C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.cpp"
-In file included from C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.cpp:1:
-C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.hpp:5:10: fatal error: 'imgui.h' file not found
-#include <imgui.h>
-         ^~~~~~~~~
-1 error generated.
-[27/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
-[28/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
-[29/50] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
-ninja: build stopped: subcommand failed.
+[1/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[2/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[3/60] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
+[4/60] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[5/60] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[6/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
+[7/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+[8/60] Building CXX object CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o
+[9/60] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+[10/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/Memory.cpp.o
+[11/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
+[12/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[13/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+[14/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/EmulatorEnv.cpp.o
+[15/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
+[16/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector3.cpp.o
+[17/60] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[18/60] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+[19/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[20/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
+[21/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[22/60] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
+[23/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/Notify/Notify.cpp.o
+[24/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
+[25/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[26/60] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
+[27/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp.o
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3481:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                case 2: writef(f, "111", d[0],d[0],d[0]);
+                                  ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3487:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                        writef(f, "111", px[1-rgb_dir],px[1],px[1+rgb_dir]);
+                                  ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3492:31: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                    writef(f, "111", d[1-rgb_dir],d[1],d[1+rgb_dir]);
+                              ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3520:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "11 4 22 4" "4 44 22 444444",
+                   ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3529:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "111 221 2222 11", 0,0,2, 0,0,0, 0,0,x,y, 24+8*has_alpha, 8*has_alpha);
+                   ^
+5 warnings generated.
+[28/60] Building CXX object CMakeFiles/daemon.dir/Daemon/IPC/IPCServer.cpp.o
+[29/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Memory/EmulatorEnv.cpp.o
+[30/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Memory/Memory.cpp.o
+[31/60] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
+[32/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Data.cpp.o
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Data.cpp:7:9: warning: 'LOGI' macro redefined [-Wmacro-redefined]
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormDaemon", __VA_ARGS__)
+        ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:55:9: note: previous definition is here
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "Storm", __VA_ARGS__)
+        ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Data.cpp:8:9: warning: 'LOGE' macro redefined [-Wmacro-redefined]
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormDaemon", __VA_ARGS__)
+        ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:58:9: note: previous definition is here
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "Storm", __VA_ARGS__)
+        ^
+2 warnings generated.
+[33/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[34/60] Building CXX object CMakeFiles/daemon.dir/Shared/Utils/AndroidUtils.cpp.o
+[35/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+[36/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Unity/Unity.cpp.o
+[37/60] Building CXX object CMakeFiles/daemon.dir/Shared/Utils/Utils.cpp.o
+[38/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Weapon/NameGun.cpp.o
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Weapon/NameGun.cpp:1:10: warning: non-portable path to file '"NameGun.h"'; specified path differs in case from file name on disk [-Wnonportable-include-path]
+#include "Namegun.h"
+         ^~~~~~~~~~~
+         "NameGun.h"
+1 warning generated.
+[39/60] Building CXX object CMakeFiles/daemon.dir/Shared/Config/saveconfig.cpp.o
+[40/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Unity/UTF/UTF8.cpp.o
+[41/60] Building CXX object CMakeFiles/panel.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
+[42/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Skeleton.cpp.o
+[43/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Math.cpp.o
+[44/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector3.cpp.o
+[45/60] Building CXX object CMakeFiles/daemon.dir/Shared/Offsets/Offsets.cpp.o
+[46/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[47/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector2.cpp.o
+[48/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector4.cpp.o
+[49/60] Linking CXX shared library "C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\build\intermediates\cxx\Debug\2ka4sv6u\obj\arm64-v8a\libpanel.so"
+[50/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[51/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/Notify/Notify.cpp.o
+[52/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
+[53/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp.o
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3481:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                case 2: writef(f, "111", d[0],d[0],d[0]);
+                                  ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3487:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                        writef(f, "111", px[1-rgb_dir],px[1],px[1+rgb_dir]);
+                                  ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3492:31: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                    writef(f, "111", d[1-rgb_dir],d[1],d[1+rgb_dir]);
+                              ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3520:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "11 4 22 4" "4 44 22 444444",
+                   ^
+C:/Users/MÃ¡rcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3529:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "111 221 2222 11", 0,0,2, 0,0,0, 0,0,x,y, 24+8*has_alpha, 8*has_alpha);
+                   ^
+5 warnings generated.
+[54/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[55/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
+[56/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+[57/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[58/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
+[59/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/Márcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[60/60] Linking CXX shared library "C:\Users\Márcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\build\intermediates\cxx\Debug\2ka4sv6u\obj\arm64-v8a\libdaemon.so"

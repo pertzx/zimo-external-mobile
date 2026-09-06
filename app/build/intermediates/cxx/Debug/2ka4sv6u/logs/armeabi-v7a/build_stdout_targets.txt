@@ -1,0 +1,404 @@
+ninja: Entering directory `C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\armeabi-v7a'
+[1/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidInput.cpp.o
+[2/60] Building CXX object CMakeFiles/panel.dir/Panel/AndroidOverlay.cpp.o
+[3/60] Building CXX object CMakeFiles/panel.dir/Panel/IPC/IPCClient.cpp.o
+[4/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/EmulatorEnv.cpp.o
+[5/60] Building CXX object CMakeFiles/panel.dir/Shared/Config/saveconfig.cpp.o
+[6/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/AndroidUtils.cpp.o
+[7/60] Building CXX object CMakeFiles/panel.dir/Panel/PanelApp.cpp.o
+[8/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Math.cpp.o
+[9/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector2.cpp.o
+[10/60] Building CXX object CMakeFiles/panel.dir/Daemon/Unity/UTF/UTF8.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+8 warnings generated.
+[11/60] Building CXX object CMakeFiles/panel.dir/Panel/main.cpp.o
+[12/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[13/60] Building CXX object CMakeFiles/panel.dir/Daemon/Memory/Memory.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:1:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:335:34: warning: shift count >= width of type [-Wshift-count-overflow]
+        uint64_t PML4_index = ( GuestVA >> 39 ) & 0x1FF;
+                                        ^  ~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:519:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:609:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+11 warnings generated.
+[14/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector4.cpp.o
+[15/60] Building CXX object CMakeFiles/panel.dir/Panel/Fonts/Fonts.cpp.o
+[16/60] Building CXX object CMakeFiles/panel.dir/Shared/Math/Vectors/Vector3.cpp.o
+[17/60] Building CXX object CMakeFiles/panel.dir/Panel/Interface/Interface.cpp.o
+[18/60] Building CXX object CMakeFiles/panel.dir/Shared/Utils/Utils.cpp.o
+[19/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[20/60] Building CXX object CMakeFiles/panel.dir/Shared/Offsets/Offsets.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:4:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:322:73: warning: format specifies type 'unsigned long long' but the argument has type 'uintptr_t' (aka 'unsigned int') [-Wformat]
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+                                                        ~~~~~~~~~       ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:357:73: warning: format specifies type 'unsigned long long' but the argument has type 'uintptr_t' (aka 'unsigned int') [-Wformat]
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+                                                        ~~~~~~~~~       ^~~~~~~~~~~~~~~~~~~~
+10 warnings generated.
+[21/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/Notify/Notify.cpp.o
+[22/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[23/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
+[24/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
+[25/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[26/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Memory/EmulatorEnv.cpp.o
+[27/60] Building CXX object CMakeFiles/daemon.dir/Daemon/IPC/IPCServer.cpp.o
+[28/60] Building CXX object CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o
+[29/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3481:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                case 2: writef(f, "111", d[0],d[0],d[0]);
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3487:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                        writef(f, "111", px[1-rgb_dir],px[1],px[1+rgb_dir]);
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3492:31: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                    writef(f, "111", d[1-rgb_dir],d[1],d[1+rgb_dir]);
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3520:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "11 4 22 4" "4 44 22 444444",
+                   ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3529:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "111 221 2222 11", 0,0,2, 0,0,0, 0,0,x,y, 24+8*has_alpha, 8*has_alpha);
+                   ^
+5 warnings generated.
+[30/60] Building CXX object CMakeFiles/daemon.dir/Daemon/DaemonApp.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/DaemonApp.cpp:3:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+8 warnings generated.
+[31/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Memory/Memory.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:1:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:335:34: warning: shift count >= width of type [-Wshift-count-overflow]
+        uint64_t PML4_index = ( GuestVA >> 39 ) & 0x1FF;
+                                        ^  ~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:519:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.cpp:609:56: warning: result of comparison of constant 18446744073709551615 with expression of type 'uintptr_t' (aka 'unsigned int') is always false [-Wtautological-constant-out-of-range-compare]
+                return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
+                                                                   ~ ^  ~~~~~~~~~~
+11 warnings generated.
+[32/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Data.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Data.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Draw.hpp:6:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Data.cpp:7:9: warning: 'LOGI' macro redefined [-Wmacro-redefined]
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormDaemon", __VA_ARGS__)
+        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:55:9: note: previous definition is here
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "Storm", __VA_ARGS__)
+        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Data.cpp:8:9: warning: 'LOGE' macro redefined [-Wmacro-redefined]
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormDaemon", __VA_ARGS__)
+        ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Includes.hpp:58:9: note: previous definition is here
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "Storm", __VA_ARGS__)
+        ^
+10 warnings generated.
+[33/60] Building CXX object CMakeFiles/daemon.dir/Shared/Utils/Utils.cpp.o
+[34/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[35/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Unity/Unity.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/Unity.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/Unity.hpp:3:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+8 warnings generated.
+[36/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+[37/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Unity/UTF/UTF8.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/UTF/UTF8.cpp:2:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+8 warnings generated.
+[38/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Skeleton.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Skeleton.cpp:1:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Skeleton.hpp:5:
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Unity/Unity.hpp:3:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+8 warnings generated.
+[39/60] Building CXX object CMakeFiles/daemon.dir/Daemon/Draw/Weapon/NameGun.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Draw/Weapon/NameGun.cpp:1:10: warning: non-portable path to file '"NameGun.h"'; specified path differs in case from file name on disk [-Wnonportable-include-path]
+#include "Namegun.h"
+         ^~~~~~~~~~~
+         "NameGun.h"
+1 warning generated.
+[40/60] Building CXX object CMakeFiles/panel.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
+[41/60] Building CXX object CMakeFiles/daemon.dir/Shared/Utils/AndroidUtils.cpp.o
+[42/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Math.cpp.o
+[43/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector4.cpp.o
+[44/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector2.cpp.o
+[45/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Vectors/Vector3.cpp.o
+[46/60] Building CXX object CMakeFiles/daemon.dir/Shared/Math/Quaternion/Quaternion.cpp.o
+[47/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_stdlib.cpp.o
+[48/60] Linking CXX shared library "C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\build\intermediates\cxx\Debug\2ka4sv6u\obj\armeabi-v7a\libpanel.so"
+[49/60] Building CXX object CMakeFiles/daemon.dir/Shared/Config/saveconfig.cpp.o
+[50/60] Building CXX object CMakeFiles/daemon.dir/Shared/Offsets/Offsets.cpp.o
+In file included from C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:4:
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:151:41: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysReadExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbRead );
+                                               ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:152:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysWriteExternalType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, void* pvBuf, size_t cbWrite );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:153:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMR3PhysTlbGCPhys2PtrType = int( __cdecl* )( void* pVM, uintptr_t GCPhys, bool fWritable, void** ppv );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:154:39: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using PGMPhysGCPtr2GCPhysType = int( __cdecl* )( void* pVCpu, uintptr_t GCPtr, uintptr_t* pGCPhys );
+                                             ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:155:36: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using VMMGetCpuByIdType = void* ( __cdecl* )( void* pVM, int idCpu );
+                                          ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:156:42: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrROExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, const void** ppv, PGMPAGEMAPLOCK* pLock );
+                                                ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:157:40: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using GCPhys2CCPtrExternalType = int( __cdecl* )( void* pVM, uint64_t GCPhys, void** ppv, PGMPAGEMAPLOCK* pLock );
+                                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Daemon/Memory/Memory.hpp:158:43: warning: '__cdecl' calling convention is not supported for this target [-Wignored-attributes]
+        using ReleasePageMappingLockType = void( __cdecl* )( void* pVM, PGMPAGEMAPLOCK* pLock );
+                                                 ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:322:73: warning: format specifies type 'unsigned long long' but the argument has type 'uintptr_t' (aka 'unsigned int') [-Wformat]
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+                                                        ~~~~~~~~~       ^~~~~~~~~~~~~~~~~~~~
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/cpp/Shared/Offsets/Offsets.cpp:357:73: warning: format specifies type 'unsigned long long' but the argument has type 'uintptr_t' (aka 'unsigned int') [-Wformat]
+printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+                                                        ~~~~~~~~~       ^~~~~~~~~~~~~~~~~~~~
+10 warnings generated.
+[51/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/Notify/Notify.cpp.o
+[52/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_tables.cpp.o
+[53/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/Custom.cpp.o
+[54/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_opengl3.cpp.o
+[55/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp.o
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3481:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                case 2: writef(f, "111", d[0],d[0],d[0]);
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3487:35: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                        writef(f, "111", px[1-rgb_dir],px[1],px[1+rgb_dir]);
+                                  ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3492:31: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                    writef(f, "111", d[1-rgb_dir],d[1],d[1+rgb_dir]);
+                              ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3520:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "11 4 22 4" "4 44 22 444444",
+                   ^
+C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/stb_image.cpp:3529:20: warning: ISO C++11 does not allow conversion from string literal to 'char *' [-Wwritable-strings]
+                   "111 221 2222 11", 0,0,2, 0,0,0, 0,0,x,y, 24+8*has_alpha, 8*has_alpha);
+                   ^
+5 warnings generated.
+[56/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_impl_android.cpp.o
+[57/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_draw.cpp.o
+[58/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui_widgets.cpp.o
+[59/60] Building CXX object CMakeFiles/daemon.dir/C_/Users/M�rcio_Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/src/main/External/ImGui/imgui.cpp.o
+[60/60] Linking CXX shared library "C:\Users\M�rcio Ribeiro\Desktop\Pyerre\zimo-external-mobile\app\build\intermediates\cxx\Debug\2ka4sv6u\obj\armeabi-v7a\libdaemon.so"

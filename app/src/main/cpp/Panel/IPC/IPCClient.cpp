@@ -1,6 +1,6 @@
 #include "IPCClient.hpp"
 
-#include "Globals.hpp"  // <-- ADICIONAR ESTA LINHA
+#include "Globals.hpp"
 // ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
 // #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>

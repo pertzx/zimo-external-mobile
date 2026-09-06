@@ -54,7 +54,10 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
                         WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH |
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
+                        WindowManager.LayoutParams.FLAG_SPLIT_TOUCH |
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
@@ -70,14 +73,44 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         overlayView.addView(surfaceView);
         windowManager.addView(overlayView, params);
 
-        // Input forwarding
+        // Input forwarding - allow simultaneous touch on panel AND apps behind
+        // FLAG_NOT_FOCUSABLE + FLAG_NOT_TOUCH_MODAL + FLAG_WATCH_OUTSIDE_TOUCH allows touches to pass through
+        // FLAG_SPLIT_TOUCH enables multi-touch to be split between windows
+        // We forward touches to native for ImGui, but DON'T consume them (return false)
         overlayView.setOnTouchListener((v, event) -> {
             int action = event.getActionMasked();
             int pointerCount = event.getPointerCount();
+
+            // Forward ALL touch events to native (for ImGui interaction)
             for (int i = 0; i < pointerCount; i++) {
-                nativeOnTouch(event.getActionMasked(), event.getX(i), event.getY(i), event.getPointerId(i));
+                int pointerAction = action;
+                if (pointerCount > 1) {
+                    int pointerIndex = (action & MotionEvent.ACTION_POINTER_INDEX_MASK) >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
+                    if (i != pointerIndex) {
+                        pointerAction = MotionEvent.ACTION_MOVE;
+                    }
+                }
+                nativeOnTouch(pointerAction, event.getX(i), event.getY(i), event.getPointerId(i));
             }
-            return true; // consume all touch
+            return false; // CRITICAL: Don't consume - let touches pass through to apps behind
+        });
+
+        // Also set on the surfaceView to catch all touches
+        surfaceView.setOnTouchListener((v, event) -> {
+            int action = event.getActionMasked();
+            int pointerCount = event.getPointerCount();
+
+            for (int i = 0; i < pointerCount; i++) {
+                int pointerAction = action;
+                if (pointerCount > 1) {
+                    int pointerIndex = (action & MotionEvent.ACTION_POINTER_INDEX_MASK) >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
+                    if (i != pointerIndex) {
+                        pointerAction = MotionEvent.ACTION_MOVE;
+                    }
+                }
+                nativeOnTouch(pointerAction, event.getX(i), event.getY(i), event.getPointerId(i));
+            }
+            return false;
         });
     }
 

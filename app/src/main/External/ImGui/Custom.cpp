@@ -1,11 +1,11 @@
 #include "Custom.hpp"
 #include <imgui_internal.h>
 // #include <Render/Fonts/Fonts.hpp>
-#include "../../Fonts/Fonts.hpp"
-#include "../../../cpp/Shared/Utils/Utils.hpp"
-#include "../../Fonts/Bytes/IconsFontAwesome6.h"
+#include <Fonts/Fonts.hpp>
+#include <Utils/Utils.hpp>
+#include <Fonts/Bytes/IconsFontAwesome6.h>
 #include <map>
-#include "../../Overlay/Overlay.hpp"
+#include <Overlay/Overlay.hpp>
 using namespace ImGui;
 
 // ═══════════════════════════════════════════════════════════════════════════════
