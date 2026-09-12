@@ -2,7 +2,7 @@
 #include "AndroidOverlay.hpp"
 #include "AndroidInput.hpp"
 #include "Interface/Interface.hpp"
-#include "IPC/IPCClient.hpp"
+#include "Draw/Draw.hpp"
 
 #include <imgui_internal.h>
 #include <imgui_impl_android.h>
@@ -12,8 +12,8 @@
 #include <thread>
 #include <Notify/Notify.hpp>
 
-// #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormPanel", __VA_ARGS__)
-// #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormPanel", __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormPanel", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormPanel", __VA_ARGS__)
 
 static bool g_Running = true;
 // static Interface* g_Interface = nullptr;
@@ -55,8 +55,13 @@ void Run(ANativeWindow* window) {
     g_Interface->Initialize(); // Sem parametros
     g_Interface->UpdateStyle();
 
-    // Conectar ao daemon via IPC
-    IPCClient::Connect("/data/local/tmp/storm_daemon.sock");
+    /*
+     * NAO ha mais IPC de config: toda a logica do jogo (leitura, exploits,
+     * aimbot, ESP) roda no proprio libclient.so e os READ/WRITE saem pela
+     * ponte (daemon root em /data/local/tmp/stormdaemon).
+     * Data::Draw() abaixo acende a thread de leitura e aplica as funcoes.
+     */
+    LOGI("Painel iniciado - aguardando login para Memory::Initialize()");
 
     auto lastFrame = std::chrono::high_resolution_clock::now();
 
@@ -67,10 +72,6 @@ void Run(ANativeWindow* window) {
             break;
         }
 
-        // Sincronizar config com daemon
-        IPCClient::SyncConfigToDaemon();
-        IPCClient::SyncStateFromDaemon();
-
         g_Interface->HandleMenuKey();
 
         // Novo frame ImGui
@@ -79,8 +80,22 @@ void Run(ANativeWindow* window) {
         ImGui::NewFrame();
 
         {
-            // Render ESP recebido do daemon (via IPC)
-            IPCClient::RenderESP();
+            /*
+             * LOGICA DO JOGO no proprio client:
+             *  - Data::Draw inicia a thread de leitura (Data::ReadLoop)
+             *  - desenha o ESP a partir do snapshot lido
+             *  - aplica aimbot/silent/exploits (READ para conferir valor
+             *    atual + WRITE para aplicar) conforme os toggles do painel
+             *
+             * Todos os READ/WRITE passam pela ponte (daemon root).
+             * Se EnableFuncs == 0 (antes do login) isso e um no-op barato.
+             */
+            Data::Draw(
+                g_SurfaceWidth,
+                g_SurfaceHeight,
+                g_Globals.General.N32,
+                g_Globals.General.V31
+            );
 
             // Render menu ImGui
             g_Interface->RenderGui();
@@ -163,7 +178,9 @@ void Run(ANativeWindow* window) {
     ImGui::DestroyContext();
     Fonts::CleanupTextures();
     Overlay::ShutDown();
-    IPCClient::Disconnect();
+
+    // Para a thread de leitura do jogo
+    Data::StopReadThread();
 }
 
 void OnResize(int width, int height) {

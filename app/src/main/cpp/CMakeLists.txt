@@ -34,29 +34,18 @@ set(IMGUI_SOURCES
 )
 
 # ============================================================
-# CLIENT
+# CLIENT (libclient.so - processo do app)
+#
+# O client agora tem TODO o jogo:
+#   Memory (via ponte), Offsets, Unity, Draw/ESP/aimbot,
+#   Silent, Skeleton, painel ImGui.
+#
+# Os READ/WRITE saem pela ponte (Client/Memory/BridgeClient.cpp)
+# para o daemon root em /data/local/tmp/stormdaemon.
 # ============================================================
 
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     ${CPP_DIR}/Client/*.cpp
-)
-
-# O Client não deve compilar o backend do daemon.
-# O daemon possui sua própria cópia das rotinas backend.
-list(FILTER CLIENT_SOURCES EXCLUDE REGEX
-    ".*/Client/Memory/.*\\.cpp$"
-)
-
-list(FILTER CLIENT_SOURCES EXCLUDE REGEX
-    ".*/Client/Offsets/.*\\.cpp$"
-)
-
-list(FILTER CLIENT_SOURCES EXCLUDE REGEX
-    ".*/Client/Unity/.*\\.cpp$"
-)
-
-list(FILTER CLIENT_SOURCES EXCLUDE REGEX
-    ".*/Client/Draw/.*\\.cpp$"
 )
 
 add_library(client SHARED
@@ -82,6 +71,7 @@ target_include_directories(client PRIVATE
     ${CPP_DIR}/Client/Utils
 
     ${CPP_DIR}/Shared
+    ${CPP_DIR}/Shared/Bridge
 
     ${CPP_DIR}
 
@@ -111,119 +101,30 @@ target_link_libraries(client
 )
 
 # ============================================================
-# DAEMON BACKEND
+# DAEMON (executável "stormdaemon")
 #
-# IMPORTANTE:
-# Aqui NÃO usamos add_library(SHARED).
+# SOMENTE A PONTE de read/write:
+#   - Daemon/daemon_main.cpp  (servidor do socket + ops de memória)
+#   - Shared/Bridge/BridgeProtocol.hpp (protocolo compartilhado)
 #
-# O resultado é um ELF executável chamado "daemon".
-# ============================================================
-
-set(DAEMON_SOURCES
-
-    # --------------------------------------------------------
-    # Entry point
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Daemon/daemon_main.cpp
-
-    # --------------------------------------------------------
-    # Backend
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Daemon/DaemonApp.cpp
-    ${CPP_DIR}/Daemon/IPC/IPCServer.cpp
-
-    # --------------------------------------------------------
-    # Memory
-    #
-    # Essas fontes foram movidas para Client durante a
-    # reorganização, mas continuam pertencendo ao backend.
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Client/Memory/Memory.cpp
-    ${CPP_DIR}/Client/Memory/MemoryExternal.cpp
-    ${CPP_DIR}/Client/Memory/EmulatorEnv.cpp
-
-    # --------------------------------------------------------
-    # Offsets
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Client/Offsets/Offsets.cpp
-
-    # --------------------------------------------------------
-    # Unity / UTF
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Client/Unity/Unity.cpp
-    ${CPP_DIR}/Client/Unity/UTF/UTF8.cpp
-
-    # --------------------------------------------------------
-    # Data / leitura / entidades
-    #
-    # O Data.cpp deve ser colocado aqui caso esteja dentro
-    # de Client/Draw depois da reorganização.
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Client/Draw/Draw.cpp
-    ${CPP_DIR}/Client/Draw/Silent.cpp
-    ${CPP_DIR}/Client/Draw/Skeleton.cpp
-)
-
-# ============================================================
-# DAEMON EXECUTABLE
+# NÃO compila Memory.cpp/Offsets/Unity/Draw: nenhuma lógica de jogo
+# fica no daemon. Ele roda como root em /data/local/tmp/stormdaemon,
+# instalado pelo DaemonService (Java).
+#
+# Observação: o Gradle usa ANDROID_STL=c++_shared, então o daemon
+# precisa de libc++_shared.so ao lado dele; o DaemonService copia a
+# lib do APK para /data/local/tmp e exporta LD_LIBRARY_PATH.
 # ============================================================
 
 add_executable(daemon
-    ${DAEMON_SOURCES}
+    ${CPP_DIR}/Daemon/daemon_main.cpp
 )
 
 target_include_directories(daemon PRIVATE
 
-    # --------------------------------------------------------
-    # cpp root
-    # --------------------------------------------------------
-
     ${CPP_DIR}
-
-    # --------------------------------------------------------
-    # Shared
-    # --------------------------------------------------------
-
     ${CPP_DIR}/Shared
-
-    # --------------------------------------------------------
-    # Client headers usados pelo backend
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Client
-    ${CPP_DIR}/Client/Draw
-    ${CPP_DIR}/Client/Memory
-    ${CPP_DIR}/Client/Offsets
-    ${CPP_DIR}/Client/Unity
-    ${CPP_DIR}/Client/Unity/UTF
-    ${CPP_DIR}/Client/Utils
-    ${CPP_DIR}/Client/Math
-
-    # --------------------------------------------------------
-    # Daemon
-    # --------------------------------------------------------
-
-    ${CPP_DIR}/Daemon
-    ${CPP_DIR}/Daemon/IPC
-
-    # --------------------------------------------------------
-    # External
-    # --------------------------------------------------------
-
-    ${IMGUI_DIR}
-    ${FREETYPE_INCLUDE_DIR}
-    ${EXTERNAL_DIR}
-)
-
-target_compile_definitions(daemon PRIVATE
-    DAEMON_BUILD
-    IMGUI_DEFINE_MATH_OPERATORS
+    ${CPP_DIR}/Shared/Bridge
 )
 
 target_compile_options(daemon PRIVATE
@@ -236,12 +137,7 @@ target_link_options(daemon PRIVATE
 )
 
 target_link_libraries(daemon
-
     ${log-lib}
-    ${android-lib}
-
-    ${EGL-lib}
-    ${GLESv3-lib}
 )
 
 # ============================================================
@@ -249,12 +145,16 @@ target_link_libraries(daemon
 #
 # O Gradle/CMake gera:
 #
-# assets/bin/arm64-v8a/daemon
-# assets/bin/armeabi-v7a/daemon
+#   assets/bin/arm64-v8a/stormdaemon
+#   assets/bin/armeabi-v7a/stormdaemon
 #
-# O DaemonService depois copia esse arquivo para:
+# O DaemonService (Java) instala em:
 #
-# /data/local/tmp/daemon
+#   /data/local/tmp/stormdaemon   (chmod 755, via su)
+#
+# e inicia com:  su -c "exec /data/local/tmp/stormdaemon"
+#
+# Socket da ponte: /data/local/tmp/stormbridge.sock
 # ============================================================
 
 set(DAEMON_ASSET_DIR
@@ -267,7 +167,7 @@ file(MAKE_DIRECTORY
 
 set_target_properties(daemon PROPERTIES
 
-    OUTPUT_NAME "daemon"
+    OUTPUT_NAME "stormdaemon"
 
     RUNTIME_OUTPUT_DIRECTORY
         ${DAEMON_ASSET_DIR}
@@ -286,7 +186,7 @@ set_target_properties(daemon PROPERTIES
 message(STATUS "========================================")
 message(STATUS "Storm Cheats native build")
 message(STATUS "ANDROID_ABI = ${ANDROID_ABI}")
-message(STATUS "CLIENT      = libclient.so")
-message(STATUS "DAEMON      = executable")
+message(STATUS "CLIENT      = libclient.so (jogo completo + ponte)")
+message(STATUS "DAEMON      = stormdaemon (so ponte read/write)")
 message(STATUS "DAEMON_DIR  = ${DAEMON_ASSET_DIR}")
 message(STATUS "========================================")

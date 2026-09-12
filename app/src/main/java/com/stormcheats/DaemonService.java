@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -12,32 +14,78 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.Enumeration;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * ============================================================================
+ * DaemonService - GERENCIADOR DO DAEMON-PONTE (root)
+ * ============================================================================
+ *
+ * Responsabilidades deste serviço (TUDO logado, tag "StormDaemonMgr"):
+ *
+ *  1. Verificar acesso root (su).
+ *  2. Extrair o executável "stormdaemon" do APK (assets/bin/<abi>/) e
+ *     instalá-lo em /data/local/tmp/stormdaemon via su (cp + chmod 755).
+ *  3. Copiar libc++_shared.so para /data/local/tmp (o daemon precisa dele
+ *     para iniciar fora do linker do app).
+ *  4. Iniciar o daemon como root: su -c "exec /data/local/tmp/stormdaemon".
+ *     O daemon abre o socket /data/local/tmp/stormbridge.sock e fica
+ *     escutando os pedidos READ/WRITE do client (libclient.so).
+ *  5. Monitorar: watchdog verifica o processo a cada 3s e reinicia com
+ *     backoff se morrer; a cada 15s manda um PING pela ponte e loga a
+ *     saúde dela.
+ *  6. Parar: kill -TERM/-KILL + limpeza de socket/pid ao destruir o serviço.
+ *
+ * O daemon é SOMENTE PONTE de read/write - nada de lógica de jogo aqui.
+ * ============================================================================
+ */
 public class DaemonService extends Service {
 
-    private static final String TAG = "StormDaemon";
+    private static final String TAG = "StormDaemonMgr";
 
-    private static final String CHANNEL_ID =
-            "storm_daemon_channel";
+    private static final String CHANNEL_ID = "storm_daemon_channel";
 
-    private static final String DAEMON_LIBRARY =
-            "libdaemon.so";
+    // ------------------------------------------------------------------
+    // Caminhos fixos (mesmos do daemon_main.cpp e do BridgeClient.cpp)
+    // ------------------------------------------------------------------
 
-    private static final String CPP_SHARED_LIBRARY =
-            "libc++_shared.so";
+    private static final String REMOTE_DIR = "/data/local/tmp";
 
-    private static final String SOCKET_PATH =
-            "/data/local/tmp/storm_daemon.sock";
+    private static final String REMOTE_DAEMON = REMOTE_DIR + "/stormdaemon";
 
-    private static final String PID_PATH =
-            "/data/local/tmp/storm_daemon.pid";
+    private static final String REMOTE_CPP_SHARED = REMOTE_DIR + "/libc++_shared.so";
+
+    private static final String BRIDGE_SOCKET = REMOTE_DIR + "/stormbridge.sock";
+
+    private static final String BRIDGE_PIDFILE = REMOTE_DIR + "/stormbridge.pid";
+
+    private static final String BRIDGE_LOGFILE = REMOTE_DIR + "/stormbridge.log";
+
+    private static final int BRIDGE_MAGIC = 0x53544F52; // "STOR"
+
+    private static final int BRIDGE_PROTO_VERSION = 1;
+
+    private static final int BRIDGE_CMD_PING = 1;
+
+    // ------------------------------------------------------------------
+
+    private final AtomicBoolean installing = new AtomicBoolean(false);
 
     private volatile boolean started = false;
 
-    private Process rootProcess;
+    private volatile Process rootProcess;
+
+    private Thread watchdogThread;
+
+    // Backoff do watchdog: 3s, 5s, 10s, 15s, 20s, 20s...
+    private long restartBackoffMs = 3000;
+
+    // ------------------------------------------------------------------
+    // CICLO DE VIDA DO SERVIÇO
+    // ------------------------------------------------------------------
 
     @Override
     public void onCreate() {
@@ -47,28 +95,15 @@ public class DaemonService extends Service {
     }
 
     @Override
-    public int onStartCommand(
-            Intent intent,
-            int flags,
-            int startId
-    ) {
-        Log.i(
-                TAG,
-                "DaemonService iniciado"
-        );
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.i(TAG, "DaemonService iniciado (startId=" + startId + ")");
 
-        startForeground(
-                2,
-                buildNotification()
-        );
+        startForeground(2, buildNotification());
 
-        if (!started) {
-            started = true;
-
-            new Thread(
-                    this::startRootDaemon,
-                    "StormRootLauncher"
-            ).start();
+        if (installing.compareAndSet(false, true)) {
+            new Thread(this::installAndStart, "StormDaemonInstaller").start();
+        } else {
+            Log.i(TAG, "Instalação já em andamento - ignorando onStartCommand duplicado");
         }
 
         return START_STICKY;
@@ -76,13 +111,12 @@ public class DaemonService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.i(
-                TAG,
-                "DaemonService destruindo"
-        );
+        Log.i(TAG, "DaemonService sendo destruído - parando daemon");
 
-        stopRootDaemon();
+        stopWatchdog();
+        stopStormDaemon();
 
+        installing.set(false);
         started = false;
 
         super.onDestroy();
@@ -94,617 +128,538 @@ public class DaemonService extends Service {
     }
 
     private Notification buildNotification() {
-        return new Notification.Builder(
-                this,
-                CHANNEL_ID
-        )
-                .setContentTitle(
-                        "Storm Daemon"
-                )
-                .setContentText(
-                        "Backend root em execucao"
-                )
-                .setSmallIcon(
-                        android.R.drawable.ic_menu_info_details
-                )
+        return new Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("Storm Daemon")
+                .setContentText("Ponte root ativa (/data/local/tmp/stormdaemon)")
+                .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setOngoing(true)
                 .build();
     }
 
-    // ================================================================
-    // ROOT DAEMON
-    // ================================================================
-
-    private void startRootDaemon() {
-        try {
-            if (!checkRoot()) {
-                Log.e(
-                        TAG,
-                        "su nao retornou root"
-                );
-
-                started = false;
-                return;
-            }
-
-            stopRootDaemon();
-
-            File filesDir =
-                    getFilesDir();
-
-            File daemonLibrary =
-                    new File(
-                            filesDir,
-                            DAEMON_LIBRARY
-                    );
-
-            File cppSharedLibrary =
-                    new File(
-                            filesDir,
-                            CPP_SHARED_LIBRARY
-                    );
-
-            String abi =
-                    chooseAbi();
-
-            Log.i(
-                    TAG,
-                    "ABI do daemon: " + abi
-            );
-
-            extractNativeLibrary(
-                    daemonLibrary,
-                    abi,
-                    DAEMON_LIBRARY
-            );
-
-            extractNativeLibrary(
-                    cppSharedLibrary,
-                    abi,
-                    CPP_SHARED_LIBRARY
-            );
-
-            validateFile(
-                    daemonLibrary,
-                    DAEMON_LIBRARY
-            );
-
-            validateFile(
-                    cppSharedLibrary,
-                    CPP_SHARED_LIBRARY
-            );
-
-            String apkPath =
-                    getApplicationInfo().sourceDir;
-
-            String classPath =
-                    shellQuote(apkPath);
-
-            String daemonPath =
-                    shellQuote(
-                            daemonLibrary
-                                    .getAbsolutePath()
-                    );
-
-            String cppPath =
-                    shellQuote(
-                            filesDir
-                                    .getAbsolutePath()
-                    );
-
-            String pidPath =
-                    shellQuote(PID_PATH);
-
-            String appProcess =
-                    chooseAppProcess(abi);
-
-            String command =
-                    "rm -f " +
-                    shellQuote(SOCKET_PATH) +
-
-                    " && " +
-
-                    "rm -f " +
-                    shellQuote(PID_PATH) +
-
-                    " && " +
-
-                    "chmod 755 " +
-                    daemonPath +
-
-                    " && " +
-
-                    "chmod 644 " +
-                    shellQuote(
-                            cppSharedLibrary
-                                    .getAbsolutePath()
-                    ) +
-
-                    " && " +
-
-                    "export LD_LIBRARY_PATH=" +
-                    cppPath +
-
-                    " && " +
-
-                    "export CLASSPATH=" +
-                    classPath +
-
-                    " && " +
-
-                    "exec " +
-                    appProcess +
-                    " /system/bin " +
-                    "com.stormcheats.RootDaemonMain " +
-                    daemonPath +
-                    " " +
-                    pidPath;
-
-            Log.i(
-                    TAG,
-                    "APK: " + apkPath
-            );
-
-            Log.i(
-                    TAG,
-                    "daemon .so: " +
-                            daemonLibrary
-                                    .getAbsolutePath()
-            );
-
-            Log.i(
-                    TAG,
-                    "libc++: " +
-                            cppSharedLibrary
-                                    .getAbsolutePath()
-            );
-
-            Log.i(
-                    TAG,
-                    "app_process: " +
-                            appProcess
-            );
-
-            Log.i(
-                    TAG,
-                    "Iniciando libdaemon como root"
-            );
-
-            rootProcess =
-                    new ProcessBuilder(
-                            "su",
-                            "-c",
-                            command
-                    )
-                            .redirectErrorStream(true)
-                            .start();
-
-            final Process process =
-                    rootProcess;
-
-            new Thread(
-                    () -> readProcessOutput(
-                            process,
-                            "ROOT"
-                    ),
-                    "StormRootLog"
-            ).start();
-
-            new Thread(
-                    () -> waitForRootProcess(
-                            process
-                    ),
-                    "StormRootWait"
-            ).start();
-
-        } catch (Throwable e) {
-
-            Log.e(
-                    TAG,
-                    "Falha iniciando libdaemon root",
-                    e
-            );
-
-            started = false;
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Storm Daemon",
+                    NotificationManager.IMPORTANCE_LOW);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
         }
     }
 
-    // ================================================================
-    // ROOT CHECK
-    // ================================================================
+    // ==================================================================
+    // 1) INSTALAÇÃO + INICIALIZAÇÃO
+    // ==================================================================
+
+    private void installAndStart() {
+        try {
+            Log.i(TAG, "────────────────────────────────────────");
+            Log.i(TAG, "Instalando daemon-ponte em " + REMOTE_DIR);
+
+            if (!checkRoot()) {
+                Log.e(TAG, "SEM ROOT: su não retornou uid=0. O daemon-ponte não pode iniciar.");
+                Log.e(TAG, "Dica: conceda acesso su ao app no seu gerenciador root (Magisk/SuperSU).");
+                installing.set(false);
+                return;
+            }
+
+            // Para qualquer instância anterior antes de sobrescrever arquivos
+            stopStormDaemon();
+
+            String abi = chooseAbi();
+            Log.i(TAG, "ABI do daemon: " + abi);
+
+            File localDaemon = extractAsset("bin/" + abi + "/stormdaemon", "stormdaemon");
+            validateFile(localDaemon, "stormdaemon (" + abi + ")");
+
+            File localCppShared = extractNativeLibrary(abi, "libc++_shared.so");
+            validateFile(localCppShared, "libc++_shared.so");
+
+            if (!installFiles(localDaemon, localCppShared)) {
+                Log.e(TAG, "Falha instalando arquivos em " + REMOTE_DIR);
+                installing.set(false);
+                return;
+            }
+
+            startStormDaemon();
+            startWatchdog();
+
+            started = true;
+            installing.set(false);
+
+            Log.i(TAG, "────────────────────────────────────────");
+            Log.i(TAG, "Daemon-ponte pronto. Socket: " + BRIDGE_SOCKET);
+            Log.i(TAG, "Logs do daemon: logcat -s StormBridge  |  arquivo: " + BRIDGE_LOGFILE);
+            Log.i(TAG, "────────────────────────────────────────");
+
+        } catch (Throwable e) {
+            Log.e(TAG, "Falha no installAndStart", e);
+            installing.set(false);
+        }
+    }
+
+    // ==================================================================
+    // 2) ROOT
+    // ==================================================================
 
     private boolean checkRoot() {
         try {
-            Process process =
-                    new ProcessBuilder(
-                            "su",
-                            "-c",
-                            "id"
-                    )
-                            .redirectErrorStream(true)
-                            .start();
+            Process process = new ProcessBuilder("su", "-c", "id")
+                    .redirectErrorStream(true)
+                    .start();
 
-            byte[] buffer =
-                    new byte[1024];
+            byte[] buffer = new byte[1024];
+            int n = process.getInputStream().read(buffer);
+            String output = n > 0 ? new String(buffer, 0, n).trim() : "";
+            int exitCode = process.waitFor();
 
-            int n =
-                    process
-                            .getInputStream()
-                            .read(buffer);
+            Log.i(TAG, "su id -> exit=" + exitCode + " out='" + output + "'");
 
-            String output =
-                    n > 0
-                            ? new String(
-                                    buffer,
-                                    0,
-                                    n
-                            )
-                            : "";
+            boolean ok = exitCode == 0 && output.contains("uid=0");
 
-            int exitCode =
-                    process.waitFor();
+            Log.i(TAG, "Root disponível: " + ok);
 
-            Log.i(
-                    TAG,
-                    "su id: " +
-                            output.trim()
-            );
-
-            return exitCode == 0 &&
-                    output.contains("uid=0");
+            return ok;
 
         } catch (Throwable e) {
-
-            Log.e(
-                    TAG,
-                    "Falha verificando root",
-                    e
-            );
-
+            Log.e(TAG, "Erro verificando root", e);
             return false;
         }
     }
 
-    // ================================================================
-    // ABI
-    // ================================================================
+    private String runAsRoot(String command) {
+        try {
+            Log.d(TAG, "su -c: " + command);
+
+            Process process = new ProcessBuilder("su", "-c", command)
+                    .redirectErrorStream(true)
+                    .start();
+
+            byte[] buffer = new byte[4096];
+            StringBuilder out = new StringBuilder();
+            InputStream in = process.getInputStream();
+
+            int n;
+            while ((n = in.read(buffer)) > 0) {
+                out.append(new String(buffer, 0, n));
+            }
+
+            int code = process.waitFor();
+            String result = out.toString().trim();
+
+            if (code != 0 || !result.isEmpty()) {
+                Log.d(TAG, "su result: exit=" + code + " out='" + result + "'");
+            }
+
+            return result;
+
+        } catch (Throwable e) {
+            Log.w(TAG, "runAsRoot falhou: " + e.getMessage());
+            return "";
+        }
+    }
+
+    // ==================================================================
+    // 3) ABI + EXTRAÇÃO DO APK
+    // ==================================================================
 
     private String chooseAbi() {
-
-        for (
-                String abi :
-                Build.SUPPORTED_ABIS
-        ) {
-
-            if (
-                    "arm64-v8a".equals(
-                            abi
-                    )
-            ) {
-                return "arm64-v8a";
-            }
-
-            if (
-                    "armeabi-v7a".equals(
-                            abi
-                    )
-            ) {
-                return "armeabi-v7a";
-            }
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if ("arm64-v8a".equals(abi)) return "arm64-v8a";
+            if ("armeabi-v7a".equals(abi)) return "armeabi-v7a";
         }
 
-        throw new IllegalStateException(
-                "Nenhuma ABI ARM suportada"
-        );
+        throw new IllegalStateException("Nenhuma ABI ARM suportada");
     }
 
-    private String chooseAppProcess(
-            String abi
-    ) {
+    /**
+     * Extrai um asset para filesDir (área do app) e devolve o File local.
+     * A cópia para /data/local/tmp é feita depois VIA ROOT (o app não tem
+     * permissão de escrever lá diretamente).
+     */
+    private File extractAsset(String assetPath, String name) throws Exception {
+        File destination = new File(getFilesDir(), name + ".tmp");
+        File finalFile = new File(getFilesDir(), name);
 
-        if (
-                "arm64-v8a".equals(
-                        abi
-                )
-        ) {
+        Log.i(TAG, "Extraindo asset " + assetPath + " -> " + destination);
 
-            File appProcess64 =
-                    new File(
-                            "/system/bin/app_process64"
-                    );
+        try (InputStream in = getAssets().open(assetPath);
+             FileOutputStream out = new FileOutputStream(destination, false)) {
 
-            if (
-                    appProcess64.exists()
-            ) {
-                return "/system/bin/app_process64";
+            byte[] buffer = new byte[16 * 1024];
+            int n;
+            long total = 0;
+
+            while ((n = in.read(buffer)) > 0) {
+                out.write(buffer, 0, n);
+                total += n;
             }
+
+            out.flush();
+
+            Log.i(TAG, "Extraído: " + total + " bytes");
         }
 
-        File appProcess32 =
-                new File(
-                        "/system/bin/app_process32"
-                );
-
-        if (
-                appProcess32.exists()
-        ) {
-            return "/system/bin/app_process32";
+        if (finalFile.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            finalFile.delete();
         }
 
-        return "/system/bin/app_process";
+        if (!destination.renameTo(finalFile)) {
+            //noinspection ResultOfMethodCallIgnored
+            destination.delete();
+            throw new IllegalStateException("Falha renomeando " + name);
+        }
+
+        return finalFile;
     }
 
-    // ================================================================
-    // EXTRAÇÃO DAS .SO
-    // ================================================================
+    /**
+     * Extrai uma .so do APK (lib/<abi>/<name>) para filesDir.
+     */
+    private File extractNativeLibrary(String abi, String libraryName) throws Exception {
+        String apkPath = getApplicationInfo().sourceDir;
+        String entryName = "lib/" + abi + "/" + libraryName;
 
-    private void extractNativeLibrary(
-            File destination,
-            String abi,
-            String libraryName
-    ) throws Exception {
+        File finalFile = new File(getFilesDir(), libraryName);
+        File temporary = new File(getFilesDir(), libraryName + ".tmp");
 
-        String exactEntry =
-                "lib/" +
-                abi +
-                "/" +
-                libraryName;
+        Log.i(TAG, "Extraindo " + entryName + " do APK " + apkPath);
 
-        Log.i(
-                TAG,
-                "Procurando no APK: " +
-                        exactEntry
-        );
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(apkPath)) {
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
 
-        String apkPath =
-                getApplicationInfo().sourceDir;
-
-        try (
-                ZipFile zip =
-                        new ZipFile(apkPath)
-        ) {
-
-            ZipEntry entry =
-                    zip.getEntry(
-                            exactEntry
-                    );
-
-            if (
-                    entry == null
-            ) {
-
-                Log.w(
-                        TAG,
-                        "Entrada exata nao encontrada: " +
-                                exactEntry
-                );
-
-                Enumeration<? extends ZipEntry>
-                        entries =
-                        zip.entries();
-
-                while (
-                        entries.hasMoreElements()
-                ) {
-
-                    ZipEntry candidate =
-                            entries.nextElement();
-
-                    String name =
-                            candidate.getName();
-
-                    if (
-                            name.endsWith(
-                                    "/" +
-                                            libraryName
-                            )
-                    ) {
-
-                        entry =
-                                candidate;
-
-                        Log.i(
-                                TAG,
-                                "Entrada encontrada: " +
-                                        name
-                        );
-
-                        break;
-                    }
-                }
+            if (entry == null) {
+                throw new IllegalStateException(libraryName + " não encontrado no APK (" + entryName + ")");
             }
 
-            if (
-                    entry == null
-            ) {
+            try (InputStream in = zip.getInputStream(entry);
+                 FileOutputStream out = new FileOutputStream(temporary, false)) {
 
-                throw new IllegalStateException(
-                        libraryName +
-                                " nao encontrado no APK"
-                );
-            }
-
-            File temporary =
-                    new File(
-                            getFilesDir(),
-                            libraryName +
-                                    ".tmp"
-                    );
-
-            if (
-                    temporary.exists()
-            ) {
-                temporary.delete();
-            }
-
-            try (
-                    InputStream in =
-                            zip.getInputStream(
-                                    entry
-                            );
-
-                    FileOutputStream out =
-                            new FileOutputStream(
-                                    temporary
-                            )
-            ) {
-
-                byte[] buffer =
-                        new byte[
-                                16 * 1024
-                        ];
-
+                byte[] buffer = new byte[16 * 1024];
                 int n;
 
-                while (
-                        (n = in.read(buffer)) >
-                                0
-                ) {
-
-                    out.write(
-                            buffer,
-                            0,
-                            n
-                    );
+                while ((n = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, n);
                 }
 
                 out.flush();
             }
-
-            if (
-                    destination.exists()
-            ) {
-                destination.delete();
-            }
-
-            if (
-                    !temporary.renameTo(
-                            destination
-                    )
-            ) {
-
-                temporary.delete();
-
-                throw new IllegalStateException(
-                        "Falha movendo " +
-                                libraryName
-                );
-            }
-
-            if (
-                    !destination.setReadable(
-                            true,
-                            false
-                    )
-            ) {
-                Log.w(
-                        TAG,
-                        "setReadable falhou: " +
-                                libraryName
-                );
-            }
         }
 
-        Log.i(
-                TAG,
-                "Extraido: " +
-                        destination
-                                .getAbsolutePath() +
-                        " (" +
-                        destination.length() +
-                        " bytes)"
-        );
+        if (finalFile.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            finalFile.delete();
+        }
+
+        if (!temporary.renameTo(finalFile)) {
+            //noinspection ResultOfMethodCallIgnored
+            temporary.delete();
+            throw new IllegalStateException("Falha renomeando " + libraryName);
+        }
+
+        return finalFile;
     }
 
-    private void validateFile(
-            File file,
-            String name
-    ) {
-
-        if (
-                !file.exists()
-        ) {
-            throw new IllegalStateException(
-                    name +
-                            " nao existe"
-            );
+    private void validateFile(File file, String name) {
+        if (!file.exists() || !file.isFile()) {
+            throw new IllegalStateException(name + " não existe/ não é arquivo");
         }
 
-        if (
-                !file.isFile()
-        ) {
-            throw new IllegalStateException(
-                    name +
-                            " nao e arquivo"
-            );
+        if (file.length() <= 0) {
+            throw new IllegalStateException(name + " está vazio");
         }
 
-        if (
-                file.length() <= 0
-        ) {
-            throw new IllegalStateException(
-                    name +
-                            " esta vazio"
-            );
-        }
+        Log.i(TAG, "OK: " + name + " (" + file.length() + " bytes em " + file.getAbsolutePath() + ")");
     }
 
-    // ================================================================
-    // PARAR DAEMON
-    // ================================================================
+    // ==================================================================
+    // 4) INSTALAÇÃO EM /data/local/tmp (via su)
+    // ==================================================================
 
-    private void stopRootDaemon() {
+    private boolean installFiles(File localDaemon, File localCppShared) {
+        String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
+        String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
+        String qDaemon = shellQuote(REMOTE_DAEMON);
+        String qCpp = shellQuote(REMOTE_CPP_SHARED);
 
+        String command =
+                "mkdir -p " + shellQuote(REMOTE_DIR) +
+                " && cat " + qLocalDaemon + " > " + qDaemon +
+                " && chmod 755 " + qDaemon +
+                " && chown root:root " + qDaemon +
+                " && cat " + qLocalCpp + " > " + qCpp +
+                " && chmod 644 " + qCpp +
+                " && chmod 771 " + shellQuote(REMOTE_DIR) +
+                " && ls -l " + qDaemon;
+
+        String output = runAsRoot(command);
+
+        // Confirma tamanho instalado = tamanho extraído
         try {
+            long expected = localDaemon.length();
+            String check = runAsRoot("stat -c %s " + qDaemon);
 
-            Process process =
-                    new ProcessBuilder(
-                            "su",
-                            "-c",
-                            "if [ -f " +
-                                    shellQuote(
-                                            PID_PATH
-                                    ) +
-                                    " ]; then " +
-                                    "kill -TERM $(cat " +
-                                    shellQuote(
-                                            PID_PATH
-                                    ) +
-                                    ") 2>/dev/null; " +
-                                    "sleep 0.2; " +
-                                    "kill -KILL $(cat " +
-                                    shellQuote(
-                                            PID_PATH
-                                    ) +
-                                    ") 2>/dev/null; " +
-                                    "fi; " +
-                                    "rm -f " +
-                                    shellQuote(
-                                            PID_PATH
-                                    ) +
-                                    "; rm -f " +
-                                    shellQuote(
-                                            SOCKET_PATH
-                                    )
-                    )
-                            .redirectErrorStream(true)
-                            .start();
+            if (!check.isEmpty()) {
+                long installed = Long.parseLong(check.trim());
+                if (installed != expected) {
+                    Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installed);
+                    return false;
+                }
+                Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installed + " bytes)");
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
+        }
 
-            process.waitFor();
+        return !output.contains("Permission denied");
+    }
+
+    // ==================================================================
+    // 5) INICIAR O DAEMON COMO ROOT
+    // ==================================================================
+
+    private void startStormDaemon() {
+        try {
+            Log.i(TAG, "Iniciando daemon: " + REMOTE_DAEMON);
+
+            // Limpa resquícios da execução anterior (o daemon também faz
+            // unlink no bind, mas aqui garantimos estado limpo).
+            runAsRoot("rm -f " + shellQuote(BRIDGE_SOCKET) + " " + shellQuote(BRIDGE_PIDFILE));
+
+            String command =
+                    "export LD_LIBRARY_PATH=" + REMOTE_DIR +
+                    " && exec " + shellQuote(REMOTE_DAEMON) +
+                    " --socket " + shellQuote(BRIDGE_SOCKET) +
+                    " --pidfile " + shellQuote(BRIDGE_PIDFILE) +
+                    " --log " + shellQuote(BRIDGE_LOGFILE);
+
+            rootProcess = new ProcessBuilder("su", "-c", command)
+                    .redirectErrorStream(true)
+                    .start();
+
+            final Process process = rootProcess;
+
+            // Saída do daemon -> logcat (tag StormDaemonMgr, prefixo [DAEMON])
+            new Thread(() -> readProcessOutput(process, "DAEMON"), "StormDaemonLog").start();
+
+            // Aguarda o socket aparecer (até 5s)
+            for (int i = 0; i < 25; i++) {
+                if (pingBridge()) {
+                    Log.i(TAG, "Daemon-PONTE respondeu PING na tentativa " + (i + 1));
+                    return;
+                }
+
+                Thread.sleep(200);
+            }
+
+            Log.w(TAG, "Daemon iniciado mas PING não respondeu em 5s (verifique logs [DAEMON] e 'logcat -s StormBridge')");
 
         } catch (Throwable e) {
+            Log.e(TAG, "Falha iniciando daemon root", e);
+        }
+    }
 
-            Log.w(
-                    TAG,
-                    "Falha parando daemon anterior: " +
-                            e.getMessage()
-            );
+    // ==================================================================
+    // 6) WATCHDOG (monitorar + reiniciar + checar saúde da ponte)
+    // ==================================================================
+
+    private void startWatchdog() {
+        stopWatchdog();
+
+        watchdogThread = new Thread(() -> {
+            Log.i(TAG, "Watchdog iniciado (intervalo=3s, ping da ponte a cada 15s)");
+
+            int pingCounter = 0;
+
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(3000);
+
+                    Process process = rootProcess;
+
+                    if (process == null) {
+                        onDaemonDead("processo nulo");
+                        continue;
+                    }
+
+                    try {
+                        int exit = process.exitValue();
+
+                        Log.e(TAG, "Daemon morreu: exit code=" + exit);
+                        onDaemonDead("exit=" + exit);
+                        continue;
+
+                    } catch (IllegalThreadStateException alive) {
+                        // Ainda rodando - ok
+                    }
+
+                    // PING de saúde a cada 5 ciclos (15s)
+                    if (++pingCounter >= 5) {
+                        pingCounter = 0;
+
+                        boolean ok = pingBridge();
+
+                        Log.i(TAG, "Healthcheck ponte: " + (ok ? "OK" : "SEM RESPOSTA") +
+                                " (socket=" + BRIDGE_SOCKET + ")");
+                    }
+
+                } catch (InterruptedException e) {
+                    Log.i(TAG, "Watchdog interrompido");
+                    break;
+
+                } catch (Throwable e) {
+                    Log.w(TAG, "Watchdog erro: " + e.getMessage());
+                }
+            }
+        }, "StormDaemonWatchdog");
+
+        watchdogThread.start();
+    }
+
+    private void stopWatchdog() {
+        if (watchdogThread != null) {
+            watchdogThread.interrupt();
+            watchdogThread = null;
+        }
+    }
+
+    private void onDaemonDead(String reason) {
+        Log.e(TAG, "Daemon-morto detectado (" + reason + ") - reiniciando em " + restartBackoffMs + "ms");
+
+        try {
+            Thread.sleep(restartBackoffMs);
+        } catch (InterruptedException e) {
+            return;
         }
 
-        if (
-                rootProcess != null
-        ) {
+        restartBackoffMs = Math.min(restartBackoffMs * 2, 20000);
 
+        if (rootProcess != null) {
+            try {
+                rootProcess.destroy();
+            } catch (Throwable ignored) {
+            }
+            rootProcess = null;
+        }
+
+        if (!checkRoot()) {
+            Log.e(TAG, "Root perdido - não vou reiniciar o daemon");
+            return;
+        }
+
+        Log.i(TAG, "Reiniciando daemon após morte");
+
+        new Thread(() -> {
+            try {
+                startStormDaemon();
+                restartBackoffMs = 3000;
+            } catch (Throwable e) {
+                Log.e(TAG, "Falha reiniciando daemon", e);
+            }
+        }, "StormDaemonRestart").start();
+    }
+
+    // ==================================================================
+    // 7) PING NA PONTE (android.net.LocalSocket -> unix socket do daemon)
+    // ==================================================================
+
+    private boolean pingBridge() {
+        LocalSocket socket = null;
+
+        try {
+            socket = new LocalSocket();
+
+            socket.connect(new LocalSocketAddress(
+                    BRIDGE_SOCKET,
+                    LocalSocketAddress.Namespace.FILESYSTEM));
+
+            socket.setSoTimeout(1500);
+
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+
+            // BridgeRequest: magic, version, cmd=PING, seq, pid, payloadSize, address, size, reserved
+            ByteBuffer req = ByteBuffer.allocate(40).order(ByteOrder.LITTLE_ENDIAN);
+            req.putInt(BRIDGE_MAGIC);            // Magic
+            req.putInt(BRIDGE_PROTO_VERSION);    // Version
+            req.putInt(BRIDGE_CMD_PING);         // Cmd
+            req.putInt(1);                       // Seq
+            req.putInt(0);                       // Pid
+            req.putInt(0);                       // PayloadSize
+            req.putLong(0);                      // Address
+            req.putInt(0);                       // Size
+            req.putInt(0);                       // Reserved
+
+            out.write(req.array());
+            out.flush();
+
+            ByteBuffer resp = ByteBuffer.allocate(32).order(ByteOrder.LITTLE_ENDIAN);
+            byte[] buf = new byte[32];
+            int total = 0;
+
+            while (total < 32) {
+                int n = in.read(buf, total, 32 - total);
+                if (n < 0) break;
+                total += n;
+            }
+
+            if (total != 32) {
+                return false;
+            }
+
+            resp.put(buf);
+            resp.flip();
+
+            int magic = resp.getInt();
+            int version = resp.getInt();
+            int cmd = resp.getInt();
+            int seq = resp.getInt();
+            int status = resp.getInt();
+            int payloadSize = resp.getInt();
+            long value = resp.getLong();
+
+            boolean ok = magic == BRIDGE_MAGIC && status == 0 && value == BRIDGE_PROTO_VERSION;
+
+            Log.d(TAG, "PING resp: magic=0x" + Integer.toHexString(magic)
+                    + " v" + version + " cmd=" + cmd + " seq=" + seq
+                    + " status=" + status + " value=" + value);
+
+            return ok;
+
+        } catch (Throwable e) {
+            Log.d(TAG, "PING falhou: " + e.getMessage());
+            return false;
+
+        } finally {
+            try {
+                if (socket != null) socket.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    // ==================================================================
+    // 8) PARAR O DAEMON
+    // ==================================================================
+
+    private void stopStormDaemon() {
+        Log.i(TAG, "Parando daemon (kill via su + limpeza de socket/pid)");
+
+        try {
+            runAsRoot(
+                    "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
+                    "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+                    "sleep 0.5; " +
+                    "kill -KILL $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+                    "fi; " +
+                    "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET));
+
+        } catch (Throwable e) {
+            Log.w(TAG, "Erro no stop via su: " + e.getMessage());
+        }
+
+        if (rootProcess != null) {
             try {
                 rootProcess.destroy();
             } catch (Throwable ignored) {
@@ -714,168 +669,43 @@ public class DaemonService extends Service {
         }
     }
 
-    // ================================================================
-    // LOG DO ROOT
-    // ================================================================
+    // ==================================================================
+    // 9) LOG DA SAÍDA DO PROCESSO ROOT
+    // ==================================================================
 
-    private void readProcessOutput(
-            Process process,
-            String prefix
-    ) {
-
+    private void readProcessOutput(Process process, String prefix) {
         try {
-
-            InputStream input =
-                    process.getInputStream();
-
-            byte[] buffer =
-                    new byte[4096];
+            InputStream input = process.getInputStream();
+            byte[] buffer = new byte[4096];
+            StringBuilder pending = new StringBuilder();
 
             int n;
 
-            StringBuilder pending =
-                    new StringBuilder();
-
-            while (
-                    (n = input.read(buffer))
-                            > 0
-            ) {
-
-                pending.append(
-                        new String(
-                                buffer,
-                                0,
-                                n
-                        )
-                );
+            while ((n = input.read(buffer)) > 0) {
+                pending.append(new String(buffer, 0, n));
 
                 int newline;
 
-                while (
-                        (newline =
-                                pending.indexOf("\n"))
-                                >= 0
-                ) {
-
-                    String line =
-                            pending
-                                    .substring(
-                                            0,
-                                            newline
-                                    )
-                                    .trim();
-
-                    pending.delete(
-                            0,
-                            newline + 1
-                    );
+                while ((newline = pending.indexOf("\n")) >= 0) {
+                    String line = pending.substring(0, newline).trim();
+                    pending.delete(0, newline + 1);
 
                     if (!line.isEmpty()) {
-
-                        Log.i(
-                                TAG,
-                                "[" +
-                                        prefix +
-                                        "] " +
-                                        line
-                        );
+                        Log.i(TAG, "[" + prefix + "] " + line);
                     }
                 }
             }
 
         } catch (Throwable e) {
-
-            Log.w(
-                    TAG,
-                    "Falha lendo log root: " +
-                            e.getMessage()
-            );
+            Log.w(TAG, "Leitor de log do processo encerrado: " + e.getMessage());
         }
     }
 
-    // ================================================================
-    // MONITOR
-    // ================================================================
-
-    private void waitForRootProcess(
-            Process process
-    ) {
-
-        try {
-
-            int code =
-                    process.waitFor();
-
-            Log.e(
-                    TAG,
-                    "RootDaemon terminou. code=" +
-                            code
-            );
-
-        } catch (Throwable e) {
-
-            Log.e(
-                    TAG,
-                    "Erro aguardando root daemon",
-                    e
-            );
-
-        } finally {
-
-            if (
-                    rootProcess ==
-                            process
-            ) {
-                rootProcess = null;
-            }
-
-            started = false;
-        }
-    }
-
-    // ================================================================
+    // ==================================================================
     // UTIL
-    // ================================================================
+    // ==================================================================
 
-    private static String shellQuote(
-            String value
-    ) {
-
-        return "'" +
-                value.replace(
-                        "'",
-                        "'\\''"
-                ) +
-                "'";
-    }
-
-    private void createNotificationChannel() {
-
-        if (
-                Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.O
-        ) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "Storm Daemon",
-                            NotificationManager
-                                    .IMPORTANCE_LOW
-                    );
-
-            NotificationManager manager =
-                    getSystemService(
-                            NotificationManager.class
-                    );
-
-            if (
-                    manager != null
-            ) {
-                manager.createNotificationChannel(
-                        channel
-                );
-            }
-        }
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
     }
 }

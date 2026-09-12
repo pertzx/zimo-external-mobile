@@ -1,4 +1,6 @@
-﻿#include "Memory.hpp"
+#include "Memory.hpp"
+
+#include "BridgeClient.hpp"
 
 #include <Globals.hpp>
 #include <Offsets/Offsets.hpp>
@@ -16,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -40,6 +43,13 @@
         __VA_ARGS__ \
     )
 
+#define LOGW(...) \
+    __android_log_print( \
+        ANDROID_LOG_WARN, \
+        "StormMemory", \
+        __VA_ARGS__ \
+    )
+
 Memory g_FreeFireMemory;
 
 uintptr_t libAddress = 0;
@@ -54,7 +64,50 @@ volatile bool Memory::s_RestartInProgress = false;
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-12-READINIT-V3";
+        "StormMemory-2026-09-13-BRIDGE-V1";
+
+    /*
+     * Prioridade de acesso:
+     *
+     *  1. PONTE  -> daemon root em /data/local/tmp/stormdaemon
+     *                (process_vm_readv/writev com fallback /proc/pid/mem,
+     *                 executado COM privilegio root pelo daemon)
+     *  2. VM     -> process_vm_readv/writev direto do processo do app
+     *                (so funciona se o app tiver privilegio, ex: emulador
+     *                 rodando como root; no aparelho normal da EPERM)
+     *  3. MEMFD  -> pread64/pwrite64 em /proc/<pid>/mem aberto localmente
+     *
+     * A ponte sempre vem primeiro; o fallback mantem o comportamento
+     * antigo quando o daemon ainda nao subiu.
+     */
+    static std::atomic<uint64_t> g_BridgeReads{ 0 };
+    static std::atomic<uint64_t> g_BridgeWrites{ 0 };
+    static std::atomic<uint64_t> g_FallbackReads{ 0 };
+    static std::atomic<uint64_t> g_FallbackWrites{ 0 };
+    static std::atomic<uint64_t> g_FailLogs{ 0 };
+
+    /*
+     * Anti-spam: em falha sustentada loga no maximo 1x por segundo.
+     */
+    static std::atomic<long long> g_LastFailLogMs{ 0 };
+
+    static long long NowMs()
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()
+        ).count();
+    }
+
+    static bool ShouldLogFail()
+    {
+        long long now = NowMs();
+        long long last = g_LastFailLogMs.load();
+
+        if (now - last < 1000)
+            return false;
+
+        return g_LastFailLogMs.compare_exchange_strong(last, now);
+    }
 
     static bool IsNumeric(
         const char* text
@@ -282,6 +335,43 @@ pid_t Memory::FindTargetPid()
     const std::vector<std::string> names =
         GetTargetNames();
 
+    /*
+     * ----------------------------------------------------------------
+     * CAMINHO 1: ponte (daemon root varre /proc com privilegio)
+     * ----------------------------------------------------------------
+     */
+    if (BridgeClient::EnsureConnected())
+    {
+        int64_t bridgePid =
+            BridgeClient::FindPid(names);
+
+        if (bridgePid > 0)
+        {
+            LOGI(
+                "[PID] processo selecionado via PONTE: %lld",
+                (long long)bridgePid
+            );
+
+            return static_cast<pid_t>(bridgePid);
+        }
+
+        LOGW(
+            "[PID] ponte nao achou o processo (jogo aberto?)"
+        );
+    }
+    else
+    {
+        LOGW(
+            "[PID] ponte indisponivel em %s - usando busca local",
+            BridgeClient::GetSocketPath()
+        );
+    }
+
+    /*
+     * ----------------------------------------------------------------
+     * CAMINHO 2: varredura local de /proc (fallback)
+     * ----------------------------------------------------------------
+     */
     DIR* proc =
         ::opendir("/proc");
 
@@ -370,7 +460,7 @@ pid_t Memory::FindTargetPid()
         selectedPid = pid;
 
         LOGI(
-            "[PID] processo selecionado: %d",
+            "[PID] processo selecionado (local): %d",
             selectedPid
         );
 
@@ -400,11 +490,42 @@ uintptr_t Memory::FindModuleBase(
     pid_t pid,
     const char* moduleName,
     int index
-)
+    )
 {
     if (pid <= 0 || moduleName == nullptr || moduleName[0] == '\0') {
         LOGE("[LIB] parametros invalidos");
         return 0;
+    }
+
+    /*
+     * A ponte trabalha com o primeiro mapping (index 1), que é o único
+     * caso usado pelo projeto inteiro.
+     */
+    if (index == 1 && BridgeClient::IsConnected())
+    {
+        uint64_t bridgeBase =
+            BridgeClient::ModuleBase(
+                static_cast<uint32_t>(pid),
+                moduleName
+            );
+
+        if (bridgeBase != 0)
+        {
+            LOGI(
+                "[LIB] base via PONTE: %s @ 0x%lX (PID=%d)",
+                moduleName,
+                static_cast<unsigned long>(bridgeBase),
+                pid
+            );
+
+            return static_cast<uintptr_t>(bridgeBase);
+        }
+
+        LOGW(
+            "[LIB] ponte nao achou %s no PID=%d - tentando local",
+            moduleName,
+            pid
+        );
     }
 
     char mapsPath[64];
@@ -485,6 +606,30 @@ bool Memory::DetectTarget32Bit(
     if (pid <= 0)
         return false;
 
+    /*
+     * CAMINHO 1: ponte (daemon lê /proc/<pid>/exe com privilegio root).
+     */
+    if (BridgeClient::IsConnected())
+    {
+        bool is32 = false;
+
+        if (BridgeClient::Is32Bit(
+                static_cast<uint32_t>(pid),
+                is32
+            ))
+        {
+            LOGI(
+                "Target ELF = %s (via PONTE)",
+                is32 ? "32-bit" : "64-bit"
+            );
+
+            return is32;
+        }
+    }
+
+    /*
+     * CAMINHO 2: leitura local do ELF (fallback).
+     */
     char path[64];
 
     std::snprintf(
@@ -605,6 +750,11 @@ bool Memory::OpenProcessMemory(
     if (pid <= 0)
         return false;
 
+    /*
+     * A ponte NAO precisa de fd local: ela abre /proc/<pid>/mem dentro
+     * do daemon, como root. Este fd local existe apenas para o fallback
+     * (casos em que o proprio app tem privilegio).
+     */
     char path[64];
 
     std::snprintf(
@@ -622,8 +772,8 @@ bool Memory::OpenProcessMemory(
 
     if (s_ProcMemFd < 0)
     {
-        LOGE(
-            "Nao abriu %s: %s",
+        LOGI(
+            "fd local %s indisponivel (%s) - leitura/escrita sera 100%% pela PONTE",
             path,
             strerror(errno)
         );
@@ -634,7 +784,7 @@ bool Memory::OpenProcessMemory(
     }
 
     LOGI(
-        "/proc/%d/mem aberto",
+        "fd local /proc/%d/mem aberto (fallback ativo)",
         pid
     );
 
@@ -932,6 +1082,34 @@ bool Memory::Read(
         return false;
     }
 
+    /*
+     * ----------------------------------------------------------------
+     * CAMINHO 1: PONTE (daemon root). Este é o caminho principal em
+     * produção - o processo do app não tem permissão de ptrace no
+     * jogo, o daemon tem.
+     * ----------------------------------------------------------------
+     */
+    if (
+        BridgeClient::ReadMem(
+            static_cast<uint32_t>(s_TargetPid),
+            static_cast<uint64_t>(address),
+            outValue,
+            static_cast<uint32_t>(size)
+        )
+    )
+    {
+        g_BridgeReads++;
+
+        return true;
+    }
+
+    /*
+     * ----------------------------------------------------------------
+     * CAMINHO 2/3: fallback local (process_vm_readv -> /proc/pid/mem).
+     * Funciona apenas quando o app roda privilegiado (ex: emulador
+     * com root). Loga uma vez por segundo para nao floodar.
+     * ----------------------------------------------------------------
+     */
     if (
         ReadProcessVm(
             address,
@@ -940,6 +1118,8 @@ bool Memory::Read(
         )
     )
     {
+        g_FallbackReads++;
+
         return true;
     }
 
@@ -951,7 +1131,27 @@ bool Memory::Read(
         )
     )
     {
+        g_FallbackReads++;
+
         return true;
+    }
+
+    if (ShouldLogFail())
+    {
+        BridgeClient::Stats s =
+            BridgeClient::GetStats();
+
+        LOGE(
+            "[READ FALHOU] addr=0x%lX size=%zu pid=%d | ponte: reads=%llu writes=%llu erros=%llu reconexoes=%llu conectado=%d",
+            static_cast<unsigned long>(address),
+            size,
+            s_TargetPid,
+            (unsigned long long)s.Reads,
+            (unsigned long long)s.Writes,
+            (unsigned long long)s.Errors,
+            (unsigned long long)s.Reconnects,
+            BridgeClient::IsConnected() ? 1 : 0
+        );
     }
 
     return false;
@@ -973,6 +1173,26 @@ bool Memory::Write(
         return false;
     }
 
+    /*
+     * CAMINHO 1: PONTE (daemon root). Toda escrita de exploit sai daqui.
+     */
+    if (
+        BridgeClient::WriteMem(
+            static_cast<uint32_t>(s_TargetPid),
+            static_cast<uint64_t>(address),
+            value,
+            static_cast<uint32_t>(size)
+        )
+    )
+    {
+        g_BridgeWrites++;
+
+        return true;
+    }
+
+    /*
+     * CAMINHOS 2/3: fallback local.
+     */
     if (
         WriteProcessVm(
             address,
@@ -981,6 +1201,8 @@ bool Memory::Write(
         )
     )
     {
+        g_FallbackWrites++;
+
         return true;
     }
 
@@ -992,7 +1214,20 @@ bool Memory::Write(
         )
     )
     {
+        g_FallbackWrites++;
+
         return true;
+    }
+
+    if (ShouldLogFail())
+    {
+        LOGE(
+            "[WRITE FALHOU] addr=0x%lX size=%zu pid=%d (ponte conectada=%d)",
+            static_cast<unsigned long>(address),
+            size,
+            s_TargetPid,
+            BridgeClient::IsConnected() ? 1 : 0
+        );
     }
 
     return false;
@@ -1186,6 +1421,23 @@ uintptr_t Memory::GetLibIl2Cpp()
     return s_LibIl2Cpp;
 }
 
+void Memory::EnableOpLogging(
+    bool enabled
+)
+{
+    BridgeClient::EnableOpLogging(enabled);
+
+    LOGI(
+        "log individual de READ/WRITE: %s",
+        enabled ? "ON" : "OFF"
+    );
+}
+
+bool Memory::IsBridgeConnected()
+{
+    return BridgeClient::IsConnected();
+}
+
 bool Memory::Initialize()
 {
     LOGI(
@@ -1199,6 +1451,14 @@ bool Memory::Initialize()
     LOGI(
         "[INIT] Backend=%s",
         MEMORY_BACKEND_VERSION
+    );
+
+    LOGI(
+        "[INIT] Ponte=%s em %s",
+        BridgeClient::EnsureConnected()
+            ? "CONECTADA"
+            : "INDISPONIVEL (fallback local)",
+        BridgeClient::GetSocketPath()
     );
 
     LOGI(
@@ -1348,7 +1608,7 @@ LOGI("[INIT] LibIl2Cpp = 0x%lX",
 if (Offsets::LibIl2Cpp == 0) {
     LOGI("[INIT] Nenhuma configuracao de offsets foi identificada.");
     LOGI("[INIT] Continuando mesmo assim: a base de libil2cpp permanece valida.");
-    
+
     Offsets::LibIl2Cpp = libAddress;
 }
 
@@ -1414,6 +1674,12 @@ LOGI("[INIT] LibIl2Cpp final = 0x%lX",
 
 bool Memory::Restart()
 {
+    LOGI(
+        "[RESTART] reiniciando memoria (pid/base podem ter mudado)"
+    );
+
+    BridgeClient::Disconnect();
+
     Shutdown();
 
     std::this_thread::sleep_for(
@@ -1468,6 +1734,14 @@ bool Memory::RefreshCR3()
 
     if (!changed)
         return false;
+
+    LOGI(
+        "[REFRESH] alvo mudou: pid %d -> %d, lib 0x%lX -> 0x%lX",
+        s_TargetPid,
+        currentPid,
+        static_cast<unsigned long>(s_LibIl2Cpp),
+        static_cast<unsigned long>(currentLib)
+    );
 
     Shutdown();
 
@@ -1546,6 +1820,11 @@ void Memory::Shutdown()
 
 void Memory::FlushTLB()
 {
+    /*
+     * Com acesso via /proc/<pid>/mem (local ou pela ponte) não há
+     * TLB de kernel a invalidar do lado do leitor. Mantido como
+     * no-op para não quebrar a API.
+     */
 }
 
 void Memory::FlushAllTLB()

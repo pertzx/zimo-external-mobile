@@ -1,2 +1,0 @@
-C:\zimo-external-mobile\app\src\main\cpp\Daemon\DaemonApp.hpp
-C:\zimo-external-mobile\app\src\main\cpp\Daemon\IPC\IPCServer.hpp

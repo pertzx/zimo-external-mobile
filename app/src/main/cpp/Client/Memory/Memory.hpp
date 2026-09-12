@@ -21,6 +21,18 @@ public:
     static bool Read(uintptr_t address, void* outValue, size_t size);
     static bool Write(uintptr_t address, const void* value, size_t size);
 
+    /*
+     * Log verbose de cada operação READ/WRITE (diagnóstico da ponte).
+     * Off por padrão; ligue para ver no logcat (tag StormBridge) cada
+     * acesso feito quando você ativa uma função no painel.
+     */
+    static void EnableOpLogging(bool enabled);
+
+    /*
+     * true se o client está conectado ao daemon-ponte neste momento.
+     */
+    static bool IsBridgeConnected();
+
     template<typename T>
     static bool Read(uintptr_t address, T& outValue)
     {
