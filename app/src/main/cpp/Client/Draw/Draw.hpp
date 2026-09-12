@@ -1,4 +1,6 @@
 #pragma once
+
+#include <WindowsCompat.hpp>
 #include <pthread.h>
 // ========== DEFINIR ANTES DE INCLUIR imgui.h ==========
 #include <imgui.h>
@@ -121,7 +123,8 @@ class Data
 	static GameContext m_Context;
 	static std::mutex m_Mutex;
 	static std::atomic<bool> m_Running;
-	static HANDLE m_ThreadHandle;
+	static pthread_t m_ThreadHandle;
+	static bool m_ThreadValid;
 	// true quando m_Players/m_Context vieram de um frame de leitura que
 	// completou com sucesso. Em falha transitória o snapshot antigo é mantido
 	// (ESP continua desenhando), mas fica "não fresco" para o aimbot não mirar
@@ -130,8 +133,8 @@ class Data
 	// Tick (GetTickCount64) do último frame com snapshot fresco — usado pelo
 	// Draw para nunca desenhar posições congeladas por mais que ~3s (transição
 	// real de partida), como o cheat de referência que limpa as entidades.
-	static std::atomic<LONGLONG> m_LastFreshTick;
+	static std::atomic<int64_t> m_LastFreshTick;
 
 	template <bool N32, bool V31>
-	static DWORD WINAPI ReadLoopWrapper( LPVOID );
+	static void* ReadLoopWrapper(void*);
 };

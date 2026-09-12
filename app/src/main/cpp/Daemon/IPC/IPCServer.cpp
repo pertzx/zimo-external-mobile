@@ -1,12 +1,13 @@
 #include "IPCServer.hpp"
-#include "../Unity/Unity.hpp"
+
+#include <Globals.hpp>
 
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <android/log.h>
 #include <cstring>
-#include <errno.h>
+#include <cerrno>
 #include <fcntl.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormIPC", __VA_ARGS__)
@@ -20,8 +21,8 @@ static bool g_Running = false;
 
 namespace IPCServer {
 
-bool Start(const char* socketPath) {
-    // Remover socket antigo se existir
+bool Start(const char* socketPath)
+{
     unlink(socketPath);
 
     g_ServerSocket = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -30,12 +31,11 @@ bool Start(const char* socketPath) {
         return false;
     }
 
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socketPath, sizeof(addr.sun_path) - 1);
 
-    if (bind(g_ServerSocket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (bind(g_ServerSocket, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         LOGE("Falha ao bind socket: %s", strerror(errno));
         close(g_ServerSocket);
         g_ServerSocket = -1;
@@ -46,11 +46,11 @@ bool Start(const char* socketPath) {
         LOGE("Falha ao listen socket: %s", strerror(errno));
         close(g_ServerSocket);
         g_ServerSocket = -1;
+        unlink(socketPath);
         return false;
     }
 
-    // Non-blocking
-    int flags = fcntl(g_ServerSocket, F_GETFL, 0);
+    const int flags = fcntl(g_ServerSocket, F_GETFL, 0);
     fcntl(g_ServerSocket, F_SETFL, flags | O_NONBLOCK);
 
     g_Running = true;
@@ -58,53 +58,73 @@ bool Start(const char* socketPath) {
     return true;
 }
 
-void Stop() {
+void Stop()
+{
     g_Running = false;
+
     if (g_ClientSocket >= 0) {
         close(g_ClientSocket);
         g_ClientSocket = -1;
     }
+
     if (g_ServerSocket >= 0) {
         close(g_ServerSocket);
         g_ServerSocket = -1;
     }
 }
 
-bool IsRunning() {
+bool IsRunning()
+{
     return g_Running;
 }
 
-void AcceptClient() {
-    if (g_ClientSocket >= 0) return; // Ja tem cliente
+void AcceptClient()
+{
+    if (g_ServerSocket < 0 || g_ClientSocket >= 0)
+        return;
 
-    struct sockaddr_un addr;
+    sockaddr_un addr{};
     socklen_t len = sizeof(addr);
-    int client = accept(g_ServerSocket, (struct sockaddr*)&addr, &len);
+    const int client = accept(
+        g_ServerSocket,
+        reinterpret_cast<sockaddr*>(&addr),
+        &len
+    );
+
     if (client >= 0) {
         g_ClientSocket = client;
-        int flags = fcntl(g_ClientSocket, F_GETFL, 0);
+
+        const int flags = fcntl(g_ClientSocket, F_GETFL, 0);
         fcntl(g_ClientSocket, F_SETFL, flags | O_NONBLOCK);
+
         LOGI("Cliente IPC conectado");
     }
 }
 
-void ProcessCommands() {
+void ProcessCommands()
+{
     AcceptClient();
-    if (g_ClientSocket < 0) return;
 
-    IPC_CONFIG_STATE config;
-    ssize_t n = recv(g_ClientSocket, &config, sizeof(config), MSG_DONTWAIT);
-    if (n == sizeof(config) && config.Magic == IPC_MAGIC_STATE) {
+    if (g_ClientSocket < 0)
+        return;
+
+    IPC_CONFIG_STATE config{};
+    const ssize_t n = recv(
+        g_ClientSocket,
+        &config,
+        sizeof(config),
+        MSG_DONTWAIT
+    );
+
+    if (n == static_cast<ssize_t>(sizeof(config)) &&
+        config.Magic == IPC_MAGIC_STATE) {
+
         if (config.Seq != g_LastConfig.Seq) {
             g_LastConfig = config;
 
-            ScreenWidth =
-    config.ScreenWidth;
+            // ScreenWidth = config.ScreenWidth;
+            // ScreenHeight = config.ScreenHeight;
 
-ScreenHeight =
-    config.ScreenHeight;
-
-            // Mapear IPC_CONFIG_STATE de volta para g_Globals
             g_Globals.AimBot.Enabled = config.AimBot_Enabled;
             g_Globals.AimBot.Fov = config.AimBot_Fov;
             g_Globals.AimBot.MaxDistance = config.AimBot_MaxDistance;
@@ -174,27 +194,38 @@ ScreenHeight =
             memcpy(g_Globals.Visuals.ESP.SkeletonColor, config.SkeletonColor, sizeof(config.SkeletonColor));
         }
     } else if (n == 0) {
-        // Cliente desconectou
         close(g_ClientSocket);
         g_ClientSocket = -1;
         LOGI("Cliente IPC desconectado");
+    } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        close(g_ClientSocket);
+        g_ClientSocket = -1;
+        LOGI("Cliente IPC desconectado (recv)");
     }
 }
 
-void SyncState() {
-    if (g_ClientSocket < 0) return;
+void SyncState()
+{
+    if (g_ClientSocket < 0)
+        return;
 
-    ssize_t sent = send(g_ClientSocket, &g_CurrentState, sizeof(g_CurrentState), 0);
-    if (sent != sizeof(g_CurrentState)) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            close(g_ClientSocket);
-            g_ClientSocket = -1;
-            LOGI("Cliente IPC desconectado (send)");
-        }
+    const ssize_t sent = send(
+        g_ClientSocket,
+        &g_CurrentState,
+        sizeof(g_CurrentState),
+        MSG_DONTWAIT
+    );
+
+    if (sent != static_cast<ssize_t>(sizeof(g_CurrentState)) &&
+        errno != EAGAIN && errno != EWOULDBLOCK) {
+        close(g_ClientSocket);
+        g_ClientSocket = -1;
+        LOGI("Cliente IPC desconectado (send)");
     }
 }
 
-void UpdateGameState(const IPC_GAME_STATE& state) {
+void UpdateGameState(const IPC_GAME_STATE& state)
+{
     g_CurrentState = state;
 }
 

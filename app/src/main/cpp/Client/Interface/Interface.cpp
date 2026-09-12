@@ -1,16 +1,16 @@
 #include "Interface.hpp"
+
+#include <imgui_internal.h>
+#include <imspinner.h>
+#include <imgui_impl_android.h>
+#include <imgui_impl_opengl3.h>
+
 #include "Globals.hpp"
 #include "Notify/Notify.hpp"
-// REMOVIDO PRA PORTAR ANDROID: #include <Main/Memory/Memory.hpp>
-// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/saveconfig.cpp>
-// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/SharedMemory.h>
-// REMOVIDO PRA PORTAR ANDROID: #include <Cheat/WebPanel.hpp>
 #include "../AndroidInput.hpp"
 #include "../AndroidOverlay.hpp"
 #include <cmath>
 #include <XorStr.hpp>
-// REMOVIDO PRA PORTAR ANDROID: #include <ext/KeyAuth/KeyAuth.hpp>
-// REMOVIDO PRA PORTAR ANDROID: #include <ext/Discord/DiscordRPC.hpp>
 
 // STUBS para Android (substituem funcionalidades PC-only)
 namespace KeyAuth {

@@ -4,8 +4,24 @@
 // Define os tipos e macros que o codigo PC usa mas que nao existem no Android
 
 #ifdef __ANDROID__
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+#ifndef WAIT_OBJECT_0
+#define WAIT_OBJECT_0 0x00000000u
+#endif
+
+#ifndef INFINITE
+#define INFINITE 0xFFFFFFFFu
+#endif
 
 #include <cstdint>
+#include <sched.h>
 #include <cstdlib>    // <-- ADICIONAR (malloc, free)
 #include <cstring>    // <-- ADICIONAR (memset, memcpy, memmove, strlen)
 #include <pthread.h>
@@ -32,9 +48,38 @@ using LPDWORD = DWORD*;
 using LPBYTE = BYTE*;
 using SIZE_T = size_t;
 
+
+struct CURSORINFO
+{
+    DWORD cbSize;
+    DWORD flags;
+    void* hCursor;
+    struct
+    {
+        int32_t x;
+        int32_t y;
+    } ptScreenPos;
+};
+
+inline BOOL GetCursorInfo(CURSORINFO* info)
+{
+    if (!info)
+        return FALSE;
+
+    info->flags = 0;
+    info->hCursor = nullptr;
+    info->ptScreenPos.x = 0;
+    info->ptScreenPos.y = 0;
+
+    return TRUE;
+}
+
+inline short GetAsyncKeyState(int)
+{
+    return 0;
+}
+
 // Macros Windows
-#define TRUE 1
-#define FALSE 0
 #define INVALID_HANDLE_VALUE ((HANDLE)-1)
 #define WINAPI
 #define CALLBACK
@@ -83,6 +128,13 @@ inline PVOID RtlSecureZeroMemory(PVOID ptr, SIZE_T cnt) {
 }
 
 // Interlocked functions
+inline LONGLONG InterlockedExchange64(
+    volatile LONGLONG* Target,
+    LONGLONG Value
+) {
+    return __sync_lock_test_and_set(Target, Value);
+}
+
 inline LONG InterlockedExchange(volatile LONG* Target, LONG Value) {
     return __sync_lock_test_and_set(Target, Value);
 }
@@ -172,6 +224,9 @@ inline DWORD ResumeThread(pthread_t hThread) { (void)hThread; return 0; }
     (void)dwExitCode;
     // pthread_cancel não existe no Android Bionic
     return TRUE;
+}
+inline void SwitchToThread() {
+    sched_yield();
 }
 
 // Critical section -> pthread_mutex

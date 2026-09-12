@@ -17,25 +17,18 @@
     "{LIST_OF_TARGETS_TO_BUILD}"
   ],
   "libraries": {
+    "client::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "client",
+      "output": "C:\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\armeabi-v7a\\libclient.so",
+      "runtimeFiles": []
+    },
     "daemon::@6890427a1f51a3e7e1df": {
       "toolchain": "toolchain",
       "abi": "armeabi-v7a",
       "artifactName": "daemon",
       "output": "C:\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\armeabi-v7a\\libdaemon.so",
-      "runtimeFiles": []
-    },
-    "panel::@6890427a1f51a3e7e1df": {
-      "toolchain": "toolchain",
-      "abi": "armeabi-v7a",
-      "artifactName": "panel",
-      "output": "C:\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\armeabi-v7a\\libpanel.so",
-      "runtimeFiles": []
-    },
-    "stormdaemon::@6890427a1f51a3e7e1df": {
-      "toolchain": "toolchain",
-      "abi": "armeabi-v7a",
-      "artifactName": "stormdaemon",
-      "output": "C:\\zimo-external-mobile\\app\\src\\main\\assets\\bin\\armeabi-v7a\\stormdaemon",
       "runtimeFiles": []
     }
   },

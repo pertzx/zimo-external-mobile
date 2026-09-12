@@ -1,4 +1,9 @@
 #pragma once
+
+#include <imgui.h>
+
+#include <vector>
+
 #include "Includes.hpp"
 
 // ═══════════════════════════════════════════════════════════════════════════════

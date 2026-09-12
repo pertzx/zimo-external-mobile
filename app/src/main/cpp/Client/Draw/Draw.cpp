@@ -1,5 +1,7 @@
 #include "Draw.hpp"
 #include "Silent.hpp"
+#include <imgui_internal.h>
+#include "../AndroidInput.hpp"
 #include <algorithm>
 #include <unordered_set>
 #include <cmath>
@@ -12,6 +14,10 @@
 #include <Math/Quaternion/Quaternion.hpp>
 #include <Math/MathUtils.hpp>
 #include "Skeleton.hpp"
+#include <android/log.h>
+#include <cstdarg>
+#include <cstdint>
+#include <pthread.h>
 
 #ifndef __ANDROID__
 #include <DynamicStub/DynamicStub.hpp>
@@ -22,9 +28,30 @@ std::vector<PlayerData> Data::m_Players;
 GameContext Data::m_Context{ };
 std::mutex Data::m_Mutex;
 std::atomic<bool> Data::m_Running{ false };
-HANDLE Data::m_ThreadHandle = nullptr;
+pthread_t Data::m_ThreadHandle{};
+bool Data::m_ThreadValid = false;
+
 bool Data::m_SnapshotFresh = false;
-std::atomic<LONGLONG> Data::m_LastFreshTick{ 0 };
+
+std::atomic<int64_t> Data::m_LastFreshTick{ 0 };
+
+static void DiagLog(
+    const char* format,
+    ...
+)
+{
+    va_list args;
+    va_start(args, format);
+
+    __android_log_vprint(
+        ANDROID_LOG_DEBUG,
+        "StormDiag",
+        format,
+        args
+    );
+
+    va_end(args);
+}
 
 // Uma view-projection matrix valida tem elementos finitos e magnitude normal.
 // Uma leitura "rasgada" (o jogo escreve os 64 bytes enquanto lemos) ou de um
@@ -202,50 +229,90 @@ static void DrawEspEntityOverlay( const PlayerData& p, ImDrawList* DL, const str
 // ==================== Read Thread ====================
 
 template <bool N32, bool V31>
-DWORD WINAPI Data::ReadLoopWrapper( LPVOID )
+void* Data::ReadLoopWrapper(void*)
 {
-	ReadLoop<N32, V31>( );
-	return 0;
+    ReadLoop<N32, V31>();
+    return nullptr;
 }
 
-void Data::StartReadThread( )
+void Data::StartReadThread()
 {
-	if ( m_Running.load( ) ) return;
-	m_Running.store( true );
+    if (m_Running.load())
+        return;
 
-	bool N32 = g_Globals.General.N32;
-	bool V31 = g_Globals.General.V31;
+    m_Running.store(true);
 
-	// HANDLE h = nullptr;
-	pthread_t thread;
-pthread_create(&thread, nullptr, ReadLoopWrapper, nullptr);
-	/* if ( N32 && V31 ) h = DynamicStub::CreateThreadWithDynamicStub( ReadLoopWrapper<true, true>, nullptr );
-	else if ( N32 && !V31 ) h = DynamicStub::CreateThreadWithDynamicStub( ReadLoopWrapper<true, false>, nullptr );
-	else if ( !N32 && !V31 ) h = DynamicStub::CreateThreadWithDynamicStub( ReadLoopWrapper<false, false>, nullptr );
-	else if ( !N32 && V31 ) h = DynamicStub::CreateThreadWithDynamicStub( ReadLoopWrapper<false, true>, nullptr ); */
+    const bool N32 =
+        g_Globals.General.N32;
 
-	if ( !thread )
-	{
-		// Falha ao criar a thread: nao deixa m_Running travado em true,
-		// senao nenhum restart futuro conseguiria recriar a ReadLoop.
-		m_ThreadHandle = nullptr;
-		m_Running.store( false );
-		return;
-	}
+    const bool V31 =
+        g_Globals.General.V31;
 
-	m_ThreadHandle = thread;
+    pthread_t thread{};
+
+    int result = 0;
+
+    if (N32 && V31)
+    {
+        result = pthread_create(
+            &thread,
+            nullptr,
+            &ReadLoopWrapper<true, true>,
+            nullptr
+        );
+    }
+    else if (N32 && !V31)
+    {
+        result = pthread_create(
+            &thread,
+            nullptr,
+            &ReadLoopWrapper<true, false>,
+            nullptr
+        );
+    }
+    else if (!N32 && V31)
+    {
+        result = pthread_create(
+            &thread,
+            nullptr,
+            &ReadLoopWrapper<false, true>,
+            nullptr
+        );
+    }
+    else
+    {
+        result = pthread_create(
+            &thread,
+            nullptr,
+            &ReadLoopWrapper<false, false>,
+            nullptr
+        );
+    }
+
+    if (result != 0)
+    {
+        m_ThreadValid = false;
+        m_Running.store(false);
+        return;
+    }
+
+    m_ThreadHandle = thread;
+    m_ThreadValid = true;
 }
 
-void Data::StopReadThread( )
+void Data::StopReadThread()
 {
-	m_Running.store( false );
-	HANDLE h = m_ThreadHandle;
-	m_ThreadHandle = nullptr;
-	if ( h )
-	{
-		WaitForSingleObject( h, INFINITE );
-		CloseHandle( h );
-	}
+    m_Running.store(false);
+
+    if (!m_ThreadValid)
+        return;
+
+    pthread_join(
+        m_ThreadHandle,
+        nullptr
+    );
+
+    m_ThreadValid = false;
 }
 
 template <bool N32, bool V31>
@@ -711,11 +778,6 @@ template void Data::ReadLoop<false, false>( );   // v24.1 64-bit
 template void Data::ReadLoop<true, true>( );     // v31 32-bit
 template void Data::ReadLoop<false, true>( );    // v31 64-bit
 
-template DWORD WINAPI Data::ReadLoopWrapper<true, false>( LPVOID );
-template DWORD WINAPI Data::ReadLoopWrapper<false, false>( LPVOID );
-template DWORD WINAPI Data::ReadLoopWrapper<true, true>( LPVOID );
-template DWORD WINAPI Data::ReadLoopWrapper<false, true>( LPVOID );
-
 GameContext Data::GetContext( )
 {
 	std::lock_guard<std::mutex> lock( m_Mutex );
@@ -778,7 +840,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 		g_FreeFireMemory.RestartAsync( );
 
 		static LONGLONG lastBaseLog = 0;
-		LONGLONG now = (LONGLONG)(clock_gettime_ns() / 1000000);
+		LONGLONG now = GetTickCount64();
 		if ( now - lastBaseLog > 1000 )
 		{
 			lastBaseLog = now;
@@ -991,16 +1053,20 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 					Memory::RefreshCR3( );
 				}
 			}
-			if ( m_ThreadHandle )
+			if (m_ThreadValid && !m_Running.load())
 			{
-				if ( WaitForSingleObject( m_ThreadHandle, 0 ) == WAIT_OBJECT_0 )
-				{
-					DiagLog( "[diag] watchdog: thread de leitura morta — recriando" );
-					CloseHandle( m_ThreadHandle );
-					m_ThreadHandle = nullptr;
-					m_Running.store( false );
-					StartReadThread( );
-				}
+				pthread_join(
+					m_ThreadHandle,
+					nullptr
+				);
+
+				m_ThreadValid = false;
+
+				DiagLog(
+					"[diag] watchdog: thread de leitura morta — recriando"
+				);
+
+				StartReadThread();
 			}
 		}
 	}
@@ -1406,8 +1472,8 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 		static uintptr_t lockedMatrixAddr = 0;
 		static std::thread magnetThread;
 
-		extern IPC_STATE g_DaemonIPCState;
-bool keyPressed = g_DaemonIPCState.AimKeyPressed;
+		const bool keyPressed =
+    AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind);
 
 		if ( keyPressed && !isHolding && ClosestEntity != 0 )
 		{
@@ -1482,9 +1548,16 @@ bool keyPressed = g_DaemonIPCState.AimKeyPressed;
 			{
 				magnetThread = std::thread( [ posWriteOffset ] ( )
 				{
-					HANDLE hThread = GetCurrentThread( );
-					SetThreadAffinityMask( hThread, 1 << 0 );
-					SetThreadPriority( hThread, THREAD_PRIORITY_TIME_CRITICAL );
+					#ifdef __ANDROID__
+    					// Android: pthread é usado diretamente.
+					#else
+						HANDLE hThread = GetCurrentThread();
+						SetThreadAffinityMask(hThread, 1 << 0);
+						SetThreadPriority(
+							hThread,
+							THREAD_PRIORITY_TIME_CRITICAL
+						);
+					#endif
 
 					while ( isHolding && lockedMatrixAddr )
 					{
@@ -1588,7 +1661,7 @@ bool keyPressed = g_DaemonIPCState.AimKeyPressed;
 		{
 			static bool s_AimFloodRunning = false;
 
-			bool isShooting = ( GetAsyncKeyState( VK_LBUTTON ) & 0x8000 );
+			bool isShooting = ImGui::GetIO().MouseDown[0];
 			bool keyCurrentlyPressed = ( GetAsyncKeyState( AimCfg.KeyBind ) & 0x8000 );
 
 			if ( isShooting && keyCurrentlyPressed && !IsCursorVisibleNow( ) )
@@ -1638,7 +1711,7 @@ bool keyPressed = g_DaemonIPCState.AimKeyPressed;
 							aimAssistModified = true;
 						}
 
-						if ( !( GetAsyncKeyState( VK_LBUTTON ) & 0x8000 ) || !( GetAsyncKeyState( g_Globals.AimBot.KeyBind ) & 0x8000 ) || IsCursorVisibleNow( ) )
+						if ( !ImGui::GetIO().MouseDown[0] || !AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind) || IsCursorVisibleNow() ) 
 						{
 							if ( aimAssistModified )
 								g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
@@ -1651,7 +1724,7 @@ bool keyPressed = g_DaemonIPCState.AimKeyPressed;
 							if ( IsCursorVisibleNow( ) )
 								break;
 
-							bool isStillShooting = ( GetAsyncKeyState( VK_LBUTTON ) & 0x8000 );
+							bool isStillShooting = ImGui::GetIO().MouseDown[0];
 							bool isKeyStillPressed = ( GetAsyncKeyState( g_Globals.AimBot.KeyBind ) & 0x8000 );
 							if ( !( isStillShooting && isKeyStillPressed ) )
 								break;
@@ -1685,35 +1758,62 @@ bool keyPressed = g_DaemonIPCState.AimKeyPressed;
 								if ( hp <= 0 || ( g_Globals.AimBot.IgnoreKnocked && isKnocked ) )
 								{
 									// PraCima
-									if ( g_Globals.AimBot.PraCima && g_Globals.AimBot.PraCimaValor > 0.f && g_Globals.AimBot.PraCimaTempo > 0 )
+								if (
+									g_Globals.AimBot.PraCima &&
+									g_Globals.AimBot.PraCimaValor > 0.f &&
+									g_Globals.AimBot.PraCimaTempo > 0
+								)
+								{
+									Quaternion qCurrent =
+										g_FreeFireMemory.Read<Quaternion>(
+											localPlayer +
+											Offsets::Player::m_AimRotation
+										);
+
+									const float totalPitchUp =
+										-g_Globals.AimBot.PraCimaValor;
+
+									const int totalTimeMs =
+										g_Globals.AimBot.PraCimaTempo;
+
+									const float pitchPerMs =
+										totalPitchUp /
+										static_cast<float>(totalTimeMs);
+
+									const Quaternion qDelta =
+										Quaternion::FromEuler(
+											pitchPerMs,
+											0.0f,
+											0.0f
+										);
+
+									for (int elapsedMs = 0;
+										elapsedMs < totalTimeMs;
+										++elapsedMs)
 									{
-										DirectX::XMFLOAT4 qOriginal = g_FreeFireMemory.Read<DirectX::XMFLOAT4>( localPlayer + Offsets::Player::m_AimRotation );
-										DirectX::XMVECTOR qCurrent = DirectX::XMLoadFloat4( &qOriginal );
+										qCurrent =
+											Quaternion::Normalized(
+												qDelta * qCurrent
+											);
 
-										float totalPitchUp = -g_Globals.AimBot.PraCimaValor;
-										int totalTimeMs = g_Globals.AimBot.PraCimaTempo;
-										float pitchPerMs = totalPitchUp / static_cast< float >( totalTimeMs );
+										g_FreeFireMemory.Write<Quaternion>(
+											localPlayer +
+											Offsets::Player::m_AimRotation,
+											qCurrent
+										);
 
-										for ( int elapsed = 0; elapsed < totalTimeMs; ++elapsed )
-										{
-											DirectX::XMVECTOR qDelta = DirectX::XMQuaternionRotationRollPitchYaw( pitchPerMs, 0.f, 0.f );
-											qCurrent = DirectX::XMQuaternionMultiply( qDelta, qCurrent );
-											qCurrent = DirectX::XMQuaternionNormalize( qCurrent );
-
-											DirectX::XMFLOAT4 qOut;
-											DirectX::XMStoreFloat4( &qOut, qCurrent );
-											g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AimRotation, qOut );
-											g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AuxAimRotation, qOut );
-
-											std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-										}
-
-										qCurrent = DirectX::XMQuaternionNormalize( qCurrent );
-										DirectX::XMFLOAT4 qOutFinal;
-										DirectX::XMStoreFloat4( &qOutFinal, qCurrent );
-										g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AimRotation, qOutFinal );
-										g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AuxAimRotation, qOutFinal );
+										usleep(1000);
 									}
+
+									qCurrent =
+										Quaternion::Normalized(qCurrent);
+
+									g_FreeFireMemory.Write<Quaternion>(
+										localPlayer +
+										Offsets::Player::m_AimRotation,
+										qCurrent
+									);
+								}
 
 									Sleep( 300 );
 									break;
@@ -2226,7 +2326,7 @@ void Data::SpinBot( uintptr_t LocalPlayer, bool N32 )
 
 	if ( !matrixList || !matrixIndices ) return;
 
-	bool isShooting = ( GetAsyncKeyState( VK_LBUTTON ) & 0x8000 );
+	bool isShooting = ImGui::GetIO().MouseDown[0];
 	uintptr_t userControl = ReadPtr( LocalPlayer + Offsets::Player::m_UserControl );
 	if ( userControl != 0 )
 	{

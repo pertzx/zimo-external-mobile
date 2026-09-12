@@ -1,5 +1,7 @@
 #include "Notify.hpp"
 
+#include <imgui_internal.h>
+
 namespace NotifyManager
 {
     std::vector<NotifyClass> NotifyList;

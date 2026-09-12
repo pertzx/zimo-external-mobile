@@ -4,6 +4,7 @@ project("stormcheats")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 find_library(log-lib log)
 find_library(android-lib android)
@@ -33,128 +34,187 @@ set(IMGUI_SOURCES
 )
 
 # ============================================================
-# SHARED
+# CLIENT
 # ============================================================
 
-set(SHARED_SOURCES
+file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
+    ${CPP_DIR}/Client/*.cpp
+)
 
-    ${CPP_DIR}/Shared/Globals.hpp
+# O Client não deve compilar o backend do daemon.
+# O daemon possui sua própria cópia das rotinas backend.
+list(FILTER CLIENT_SOURCES EXCLUDE REGEX
+    ".*/Client/Memory/.*\\.cpp$"
+)
 
-    ${CPP_DIR}/Shared/Utils/Utils.cpp
-    ${CPP_DIR}/Shared/Utils/Utils.hpp
+list(FILTER CLIENT_SOURCES EXCLUDE REGEX
+    ".*/Client/Offsets/.*\\.cpp$"
+)
 
-    ${CPP_DIR}/Shared/Utils/AndroidUtils.cpp
-    ${CPP_DIR}/Shared/Utils/AndroidUtils.hpp
+list(FILTER CLIENT_SOURCES EXCLUDE REGEX
+    ".*/Client/Unity/.*\\.cpp$"
+)
 
-    ${CPP_DIR}/Shared/Config/saveconfig.cpp
+list(FILTER CLIENT_SOURCES EXCLUDE REGEX
+    ".*/Client/Draw/.*\\.cpp$"
+)
 
-    ${CPP_DIR}/Shared/IPC/IPCProtocol.hpp
+add_library(client SHARED
+    ${CLIENT_SOURCES}
 
-    ${CPP_DIR}/Shared/Math/Math.cpp
-    ${CPP_DIR}/Shared/Math/Math.hpp
-    ${CPP_DIR}/Shared/Math/MathUtils.hpp
-
-    ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.cpp
-    ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.hpp
-
-    ${CPP_DIR}/Shared/Math/Vectors/Vector2.cpp
-    ${CPP_DIR}/Shared/Math/Vectors/Vector2.hpp
-
-    ${CPP_DIR}/Shared/Math/Vectors/Vector3.cpp
-    ${CPP_DIR}/Shared/Math/Vectors/Vector3.hpp
-
-    ${CPP_DIR}/Shared/Math/Vectors/Vector4.cpp
-    ${CPP_DIR}/Shared/Math/Vectors/Vector4.hpp
+    ${IMGUI_SOURCES}
 
     ${EXTERNAL_DIR}/Notify/Notify.cpp
-    ${EXTERNAL_DIR}/Notify/Notify.hpp
+)
+
+target_include_directories(client PRIVATE
+
+    ${CPP_DIR}/Client
+    ${CPP_DIR}/Client/Config
+    ${CPP_DIR}/Client/Draw
+    ${CPP_DIR}/Client/Fonts
+    ${CPP_DIR}/Client/IPC
+    ${CPP_DIR}/Client/Interface
+    ${CPP_DIR}/Client/Math
+    ${CPP_DIR}/Client/Memory
+    ${CPP_DIR}/Client/Offsets
+    ${CPP_DIR}/Client/Unity
+    ${CPP_DIR}/Client/Utils
+
+    ${CPP_DIR}/Shared
+
+    ${CPP_DIR}
+
+    ${IMGUI_DIR}
+    ${FREETYPE_INCLUDE_DIR}
+    ${EXTERNAL_DIR}
+)
+
+target_compile_definitions(client PRIVATE
+    IMGUI_DEFINE_MATH_OPERATORS
+)
+
+target_compile_options(client PRIVATE
+    -fdata-sections
+    -ffunction-sections
+)
+
+target_link_options(client PRIVATE
+    -Wl,--gc-sections
+)
+
+target_link_libraries(client
+    ${log-lib}
+    ${android-lib}
+    ${EGL-lib}
+    ${GLESv3-lib}
 )
 
 # ============================================================
-# PANEL
+# DAEMON BACKEND
+#
+# IMPORTANTE:
+# Aqui NÃO usamos add_library(SHARED).
+#
+# O resultado é um ELF executável chamado "daemon".
 # ============================================================
 
-set(PANEL_SOURCES
+set(DAEMON_SOURCES
 
-    ${CPP_DIR}/Panel/main.cpp
-
-    ${CPP_DIR}/Panel/PanelApp.cpp
-    ${CPP_DIR}/Panel/PanelApp.hpp
-
-    ${CPP_DIR}/Panel/AndroidOverlay.cpp
-    ${CPP_DIR}/Panel/AndroidOverlay.hpp
-
-    ${CPP_DIR}/Panel/AndroidInput.cpp
-    ${CPP_DIR}/Panel/AndroidInput.hpp
-
-    ${CPP_DIR}/Panel/IPC/IPCClient.cpp
-    ${CPP_DIR}/Panel/IPC/IPCClient.hpp
-
-    ${CPP_DIR}/Panel/Interface/Interface.cpp
-    ${CPP_DIR}/Panel/Interface/Interface.hpp
-    ${CPP_DIR}/Panel/Interface/unpacker.h
-
-    ${CPP_DIR}/Panel/Fonts/Fonts.cpp
-    ${CPP_DIR}/Panel/Fonts/Fonts.hpp
-)
-
-# ============================================================
-# DAEMON CORE
-# ============================================================
-
-set(DAEMON_CORE_SOURCES
-
-    ${CPP_DIR}/Daemon/DaemonApp.cpp
-    ${CPP_DIR}/Daemon/DaemonApp.hpp
-
-    ${CPP_DIR}/Daemon/IPC/IPCServer.cpp
-    ${CPP_DIR}/Daemon/IPC/IPCServer.hpp
-
-    ${CPP_DIR}/Daemon/Memory/Memory.cpp
-    ${CPP_DIR}/Daemon/Memory/Memory.hpp
-
-    ${CPP_DIR}/Daemon/Memory/EmulatorEnv.cpp
-    ${CPP_DIR}/Daemon/Memory/EmulatorEnv.hpp
-
-    ${CPP_DIR}/Daemon/Data.cpp
-    ${CPP_DIR}/Daemon/Data.hpp
-
-    ${CPP_DIR}/Daemon/Draw/Skeleton.cpp
-    ${CPP_DIR}/Daemon/Draw/Skeleton.hpp
-
-    ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.cpp
-    ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.h
-
-    ${CPP_DIR}/Daemon/Unity/Unity.cpp
-    ${CPP_DIR}/Daemon/Unity/Unity.hpp
-
-    ${CPP_DIR}/Daemon/Unity/UTF/UTF8.cpp
-    ${CPP_DIR}/Daemon/Unity/UTF/UTF8.hpp
-
-    ${CPP_DIR}/Shared/Offsets/Offsets.cpp
-    ${CPP_DIR}/Shared/Offsets/Offsets.hpp
-)
-
-# ============================================================
-# DAEMON JNI LIBRARY
-# ============================================================
-
-add_library(daemon SHARED
+    # --------------------------------------------------------
+    # Entry point
+    # --------------------------------------------------------
 
     ${CPP_DIR}/Daemon/daemon_main.cpp
 
-    ${DAEMON_CORE_SOURCES}
+    # --------------------------------------------------------
+    # Backend
+    # --------------------------------------------------------
 
-    ${SHARED_SOURCES}
+    ${CPP_DIR}/Daemon/DaemonApp.cpp
+    ${CPP_DIR}/Daemon/IPC/IPCServer.cpp
 
-    ${IMGUI_SOURCES}
+    # --------------------------------------------------------
+    # Memory
+    #
+    # Essas fontes foram movidas para Client durante a
+    # reorganização, mas continuam pertencendo ao backend.
+    # --------------------------------------------------------
+
+    ${CPP_DIR}/Client/Memory/Memory.cpp
+    ${CPP_DIR}/Client/Memory/MemoryExternal.cpp
+    ${CPP_DIR}/Client/Memory/EmulatorEnv.cpp
+
+    # --------------------------------------------------------
+    # Offsets
+    # --------------------------------------------------------
+
+    ${CPP_DIR}/Client/Offsets/Offsets.cpp
+
+    # --------------------------------------------------------
+    # Unity / UTF
+    # --------------------------------------------------------
+
+    ${CPP_DIR}/Client/Unity/Unity.cpp
+    ${CPP_DIR}/Client/Unity/UTF/UTF8.cpp
+
+    # --------------------------------------------------------
+    # Data / leitura / entidades
+    #
+    # O Data.cpp deve ser colocado aqui caso esteja dentro
+    # de Client/Draw depois da reorganização.
+    # --------------------------------------------------------
+
+    ${CPP_DIR}/Client/Draw/Draw.cpp
+    ${CPP_DIR}/Client/Draw/Silent.cpp
+    ${CPP_DIR}/Client/Draw/Skeleton.cpp
+)
+
+# ============================================================
+# DAEMON EXECUTABLE
+# ============================================================
+
+add_executable(daemon
+    ${DAEMON_SOURCES}
 )
 
 target_include_directories(daemon PRIVATE
 
+    # --------------------------------------------------------
+    # cpp root
+    # --------------------------------------------------------
+
+    ${CPP_DIR}
+
+    # --------------------------------------------------------
+    # Shared
+    # --------------------------------------------------------
+
     ${CPP_DIR}/Shared
+
+    # --------------------------------------------------------
+    # Client headers usados pelo backend
+    # --------------------------------------------------------
+
+    ${CPP_DIR}/Client
+    ${CPP_DIR}/Client/Draw
+    ${CPP_DIR}/Client/Memory
+    ${CPP_DIR}/Client/Offsets
+    ${CPP_DIR}/Client/Unity
+    ${CPP_DIR}/Client/Unity/UTF
+    ${CPP_DIR}/Client/Utils
+    ${CPP_DIR}/Client/Math
+
+    # --------------------------------------------------------
+    # Daemon
+    # --------------------------------------------------------
+
     ${CPP_DIR}/Daemon
-    ${CPP_DIR}/Panel
+    ${CPP_DIR}/Daemon/IPC
+
+    # --------------------------------------------------------
+    # External
+    # --------------------------------------------------------
 
     ${IMGUI_DIR}
     ${FREETYPE_INCLUDE_DIR}
@@ -162,125 +222,71 @@ target_include_directories(daemon PRIVATE
 )
 
 target_compile_definitions(daemon PRIVATE
-
     DAEMON_BUILD
     IMGUI_DEFINE_MATH_OPERATORS
+)
+
+target_compile_options(daemon PRIVATE
+    -fdata-sections
+    -ffunction-sections
+)
+
+target_link_options(daemon PRIVATE
+    -Wl,--gc-sections
 )
 
 target_link_libraries(daemon
 
     ${log-lib}
     ${android-lib}
+
     ${EGL-lib}
     ${GLESv3-lib}
 )
 
 # ============================================================
-# PANEL LIBRARY
+# DAEMON OUTPUT
+#
+# O Gradle/CMake gera:
+#
+# assets/bin/arm64-v8a/daemon
+# assets/bin/armeabi-v7a/daemon
+#
+# O DaemonService depois copia esse arquivo para:
+#
+# /data/local/tmp/daemon
 # ============================================================
 
-add_library(panel SHARED
-
-    ${PANEL_SOURCES}
-
-    ${SHARED_SOURCES}
-
-    ${IMGUI_SOURCES}
-)
-
-target_include_directories(panel PRIVATE
-
-    ${CPP_DIR}/Shared
-    ${CPP_DIR}/Panel
-    ${CPP_DIR}/Daemon
-
-    ${IMGUI_DIR}
-    ${FREETYPE_INCLUDE_DIR}
-    ${EXTERNAL_DIR}
-)
-
-target_compile_definitions(panel PRIVATE
-
-    IMGUI_DEFINE_MATH_OPERATORS
-)
-
-target_link_libraries(panel
-
-    ${log-lib}
-    ${android-lib}
-    ${EGL-lib}
-    ${GLESv3-lib}
-)
-
-# ============================================================
-# ROOT STORMDAEMON EXECUTABLE
-# ============================================================
-
-add_executable(stormdaemon
-
-    ${CPP_DIR}/Daemon/daemon_root_main.cpp
-
-    ${DAEMON_CORE_SOURCES}
-
-    ${SHARED_SOURCES}
-)
-
-target_include_directories(stormdaemon PRIVATE
-
-    ${CPP_DIR}/Shared
-    ${CPP_DIR}/Daemon
-
-    # Shared/Includes.hpp inclui imgui.h
-    # Skeleton.hpp tambem usa ImDrawList
-    ${IMGUI_DIR}
-
-    ${FREETYPE_INCLUDE_DIR}
-    ${EXTERNAL_DIR}
-)
-
-target_compile_definitions(stormdaemon PRIVATE
-
-    DAEMON_ROOT_BUILD
-    IMGUI_DEFINE_MATH_OPERATORS
-)
-
-target_link_libraries(stormdaemon
-
-    ${log-lib}
-    ${android-lib}
-    ${EGL-lib}
-    ${GLESv3-lib}
-)
-
-# ============================================================
-# STORMDAEMON OUTPUT
-# ============================================================
-
-set(STORM_ASSET_DIR
+set(DAEMON_ASSET_DIR
     ${CMAKE_SOURCE_DIR}/../assets/bin/${ANDROID_ABI}
 )
 
 file(MAKE_DIRECTORY
-    ${STORM_ASSET_DIR}
+    ${DAEMON_ASSET_DIR}
 )
 
-set_target_properties(stormdaemon PROPERTIES
+set_target_properties(daemon PROPERTIES
+
+    OUTPUT_NAME "daemon"
 
     RUNTIME_OUTPUT_DIRECTORY
-        ${STORM_ASSET_DIR}
+        ${DAEMON_ASSET_DIR}
+
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG
+        ${DAEMON_ASSET_DIR}
+
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE
+        ${DAEMON_ASSET_DIR}
 )
 
 # ============================================================
-# STORMDAEMON FLAGS
+# ARCHITECTURE LOG
 # ============================================================
 
-target_compile_options(stormdaemon PRIVATE
-
-    -fdata-sections
-    -ffunction-sections
-)
-
-target_link_options(stormdaemon PRIVATE
-
-    -Wl,--gc-sections
-)
+message(STATUS "========================================")
+message(STATUS "Storm Cheats native build")
+message(STATUS "ANDROID_ABI = ${ANDROID_ABI}")
+message(STATUS "CLIENT      = libclient.so")
+message(STATUS "DAEMON      = executable")
+message(STATUS "DAEMON_DIR  = ${DAEMON_ASSET_DIR}")
+message(STATUS "========================================")

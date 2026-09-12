@@ -3,6 +3,11 @@
 #include "AndroidInput.hpp"
 #include "Interface/Interface.hpp"
 #include "IPC/IPCClient.hpp"
+
+#include <imgui_internal.h>
+#include <imgui_impl_android.h>
+#include <imgui_impl_opengl3.h>
+
 #include <android/log.h>
 #include <thread>
 #include <Notify/Notify.hpp>
