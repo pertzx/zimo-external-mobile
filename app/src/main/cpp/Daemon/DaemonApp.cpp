@@ -1,100 +1,251 @@
 #include "DaemonApp.hpp"
 #include "IPC/IPCServer.hpp"
 #include "Memory/Memory.hpp"
-#include "Draw/Draw.hpp"
+#include "Data.hpp"
+
 #include <android/log.h>
+
 #include <thread>
 #include <chrono>
+#include <cmath>
+#include <cstring>
 
-// LOGI/LOGE are already defined in Shared/Includes.hpp
-// Only define if not already defined
 #ifndef LOGI
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormDaemon", __VA_ARGS__)
+#define LOGI(...) \
+    __android_log_print( \
+        ANDROID_LOG_INFO, \
+        "StormDaemon", \
+        __VA_ARGS__ \
+    )
 #endif
+
 #ifndef LOGE
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormDaemon", __VA_ARGS__)
+#define LOGE(...) \
+    __android_log_print( \
+        ANDROID_LOG_ERROR, \
+        "StormDaemon", \
+        __VA_ARGS__ \
+    )
 #endif
 
-namespace DaemonApp {
+namespace DaemonApp
+{
 
-void Run() {
+void Run()
+{
+    g_Globals.General.ShutDown = false;
+
     LOGI("Daemon Storm Cheats iniciado");
 
-    // Inicializar memoria
-    if (!g_FreeFireMemory.Initialize()) {
-        LOGE("Falha ao inicializar memoria");
+    /*
+     * PRIMEIRO:
+     * encontra PID + ELF + libil2cpp + offsets.
+     */
+    if (!g_FreeFireMemory.Initialize())
+    {
+        LOGE(
+            "Memory.Initialize() falhou"
+        );
+
         return;
     }
 
-    // Iniciar servidor IPC
-    IPCServer::Start("/data/local/tmp/storm_daemon.sock");
+    LOGI(
+        "PID alvo: %d",
+        g_FreeFireMemory.GetTargetPid()
+    );
 
-    // Iniciar thread de leitura de dados do jogo (mesmo padrao do original)
+    LOGI(
+        "libil2cpp: 0x%lX",
+        static_cast<unsigned long>(
+            g_FreeFireMemory.GetLibIl2Cpp()
+        )
+    );
+
+    /*
+     * IPC.
+     */
+    if (!IPCServer::Start(
+            "/data/local/tmp/storm_daemon.sock"
+        ))
+    {
+        LOGE(
+            "Falha iniciando IPC"
+        );
+
+        g_FreeFireMemory.Shutdown();
+        return;
+    }
+
+    /*
+     * Agora o leitor pode usar:
+     *
+     * Offsets::LibIl2Cpp
+     * g_Globals.General.N32
+     * offsets FF v7a
+     */
     Data::StartReadThread();
 
-    // Loop principal do daemon
-    while (!g_Globals.General.ShutDown) {
-        // Processar comandos do painel (configuracoes)
+    uint32_t sequence = 0;
+
+    while (!g_Globals.General.ShutDown)
+    {
         IPCServer::ProcessCommands();
 
-        // Preparar estado do jogo para enviar ao painel
-        IPC_GAME_STATE state;
-        memset(&state, 0, sizeof(state));
-        state.Magic = IPC_MAGIC_PLAYERS;
-        state.Seq++;
+        IPC_GAME_STATE state{};
+        state.Magic =
+            IPC_MAGIC_PLAYERS;
 
-        // Preencher dados dos jogadores a partir de Data::GetPlayers()
+        state.Seq =
+            ++sequence;
+
+        state.PlayerCount = 0;
+        state.MaxPlayers = 64;
+
         {
-            std::lock_guard<std::mutex> lock(Data::GetMutex());
-            auto& players = Data::GetPlayers();
-            state.PlayerCount = 0;
-            for (size_t i = 0; i < players.size() && state.PlayerCount < state.MaxPlayers; i++) {
-                const PlayerData& src = players[i];
-                IPC_PLAYER_DATA& dst = state.Players[state.PlayerCount];
+            std::lock_guard<std::mutex> lock(
+                Data::GetMutex()
+            );
 
-                dst.ScreenPos[0] = src.ScreenPos.X;
-                dst.ScreenPos[1] = src.ScreenPos.Y;
-                dst.Box[0] = src.HeadScreen.X;  // Using HeadScreen as Box.x
-                dst.Box[1] = src.HeadScreen.Y;  // Using HeadScreen as Box.y
-                dst.Box[2] = src.FeetScreen.X;  // Using FeetScreen as Box.z
-                dst.Box[3] = src.FeetScreen.Y;  // Using FeetScreen as Box.w
-                dst.Health = src.CurrentHealth;
-                dst.MaxHealth = src.MaxHealth;
-                dst.IsTeam = src.IsTeammate;
-                dst.IsVisible = src.IsVisible;
-                dst.IsKnocked = src.IsKnocked;
-                dst.IsBot = src.IsBot;
-                dst.Distance = src.Distance;
-                strncpy(dst.Name, src.Name.c_str(), sizeof(dst.Name) - 1);
-                strncpy(dst.Weapon, src.Weapon.c_str(), sizeof(dst.Weapon) - 1);
+            const auto& players =
+                Data::GetPlayers();
 
-                // Skeleton simplificado
+            state.PlayerCount =
+                static_cast<uint32_t>(
+                    std::min<size_t>(
+                        players.size(),
+                        64
+                    )
+                );
+
+            for (
+                uint32_t i = 0;
+                i < state.PlayerCount;
+                ++i
+            )
+            {
+                const PlayerData& src =
+                    players[i];
+
+                IPC_PLAYER_DATA& dst =
+                    state.Players[i];
+
+                dst.ScreenPos[0] =
+                    src.HeadScreen.X;
+
+                dst.ScreenPos[1] =
+                    src.HeadScreen.Y;
+
+                float left =
+                    src.HeadScreen.X -
+                    std::fabs(
+                        src.FeetScreen.Y -
+                        src.HeadScreen.Y
+                    ) *
+                    0.25f;
+
+                float top =
+                    src.HeadScreen.Y;
+
+                float height =
+                    std::fabs(
+                        src.FeetScreen.Y -
+                        src.HeadScreen.Y
+                    );
+
+                if (height < 2.0f)
+                    height = 2.0f;
+
+                float width =
+                    height * 0.5f;
+
+                dst.Box[0] = left;
+                dst.Box[1] = top;
+                dst.Box[2] = width;
+                dst.Box[3] = height;
+
+                dst.Health =
+                    static_cast<float>(
+                        src.CurrentHealth
+                    );
+
+                dst.MaxHealth =
+                    static_cast<float>(
+                        src.MaxHealth
+                    );
+
+                dst.IsTeam =
+                    src.IsTeammate;
+
+                dst.IsVisible =
+                    src.IsVisible;
+
+                dst.IsKnocked =
+                    src.IsKnocked;
+
+                dst.IsBot =
+                    src.IsBot;
+
+                dst.Distance =
+                    src.Distance;
+
+                std::memset(
+                    dst.Name,
+                    0,
+                    sizeof(dst.Name)
+                );
+
+                std::strncpy(
+                    dst.Name,
+                    src.Name.c_str(),
+                    sizeof(dst.Name) - 1
+                );
+
+                std::memset(
+                    dst.Weapon,
+                    0,
+                    sizeof(dst.Weapon)
+                );
+
+                std::strncpy(
+                    dst.Weapon,
+                    src.Weapon.c_str(),
+                    sizeof(dst.Weapon) - 1
+                );
+
                 dst.SkeletonPointCount = 0;
-                for (size_t s = 0; s < src.Skeleton.size() && dst.SkeletonPointCount < 20; s++) {
-                    dst.SkeletonPoints[dst.SkeletonPointCount][0] = src.Skeleton[s].X;
-                    dst.SkeletonPoints[dst.SkeletonPointCount][1] = src.Skeleton[s].Y;
-                    dst.SkeletonPointCount++;
-                }
-
-                state.PlayerCount++;
             }
         }
 
-        // Info geral
-        auto& context = Data::GetContextRef();
-        state.ClosestEnemyDist = context.ClosestEnemyDist;
-        state.LocalYaw = context.LocalYaw;
+        GameContext context =
+            Data::GetContext();
 
-        IPCServer::UpdateGameState(state);
+        state.ClosestEnemyDist =
+            context.ClosestEnemyDist;
+
+        state.LocalYaw =
+            context.LocalYaw;
+
+        IPCServer::UpdateGameState(
+            state
+        );
+
         IPCServer::SyncState();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(2)
+        );
     }
 
-    // Cleanup
     Data::StopReadThread();
+
     IPCServer::Stop();
+
     g_FreeFireMemory.Shutdown();
+
+    LOGI(
+        "Daemon encerrado"
+    );
 }
 
-} // namespace DaemonApp
+}

@@ -514,140 +514,193 @@ void Interface::RenderGui()
 		ImVec2 Size = ImGui::GetWindowSize();
 
 		// ═══════════════════════════════════════════════════════════════════════════
-		// WINDOW DRAGGING
-		// ═══════════════════════════════════════════════════════════════════════════
+// WINDOW DRAGGING - ANDROID
+//
+// O painel usa g_WindowPos para calcular scaledPos antes de ImGui::Begin().
+// Portanto o drag deve alterar g_WindowPos diretamente.
+//
+// A área de drag é SOMENTE o header:
+// [ LOGO | TAB ATUAL | USER ]
+//
+// Não usa:
+//   - activeCombo
+//   - activeSlider
+//   - PanelApp
+//   - SetWindowPos()
+//
+// Isso evita conflito de escopo e conflito com o SetNextWindowPos().
+// ═══════════════════════════════════════════════════════════════════════════
 
-		static ImGuiID lastFrameHoveredId = 0;
-		ImGuiContext& gc = *GImGui;
+static ImGuiID lastFrameHoveredId = 0;
 
-		bool scrollbarActive = false;
-		if (gc.ActiveId != 0)
-		{
-			ImGuiWindow* activeWindow = gc.ActiveIdWindow;
-			if (activeWindow)
-			{
-				ImGuiID scrollYId = ImGui::GetWindowScrollbarID(activeWindow, ImGuiAxis_Y);
-				ImGuiID scrollXId = ImGui::GetWindowScrollbarID(activeWindow, ImGuiAxis_X);
-				if (gc.ActiveId == scrollYId || gc.ActiveId == scrollXId)
-				{
-					scrollbarActive = true;
-				}
-			}
-		}
+ImGuiContext& gc = *GImGui;
 
-		bool canStartDrag = false;
+bool scrollbarActive = false;
 
-		if (CurrentTab == 0)
-		{
-			float headerHeight = 60.0f;
-			bool inHeader = io.MousePos.y >= Pos.y && io.MousePos.y <= Pos.y + headerHeight &&
-				io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x;
+if (gc.ActiveId != 0)
+{
+    ImGuiWindow* activeWindow = gc.ActiveIdWindow;
 
-			float formLeft = Pos.x + (Size.x - 320) * 0.5f - 20;
-			float formRight = formLeft + 360;
-			float formTop = Pos.y + 130;
-			float formBottom = Pos.y + 340;
+    if (activeWindow)
+    {
+        ImGuiID scrollYId =
+            ImGui::GetWindowScrollbarID(
+                activeWindow,
+                ImGuiAxis_Y
+            );
 
-			bool inForm = io.MousePos.x >= formLeft && io.MousePos.x <= formRight &&
-				io.MousePos.y >= formTop && io.MousePos.y <= formBottom;
+        ImGuiID scrollXId =
+            ImGui::GetWindowScrollbarID(
+                activeWindow,
+                ImGuiAxis_X
+            );
 
-			bool inWindow = io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x &&
-				io.MousePos.y >= Pos.y && io.MousePos.y <= Pos.y + Size.y;
+        if (
+            gc.ActiveId == scrollYId ||
+            gc.ActiveId == scrollXId
+        )
+        {
+            scrollbarActive = true;
+        }
+    }
+}
 
-			canStartDrag = inWindow && (inHeader || !inForm);
-		}
-		else
-		{
-			float headerHeight = 55.0f;
+/*
+ * O header real usado pela interface principal possui 55px.
+ *
+ * No login não existe o mesmo header da interface principal,
+ * então mantemos 60px para não quebrar o login.
+ */
+const float dragHeaderHeight =
+    (CurrentTab == 0) ? 60.0f : 55.0f;
 
-			// Mobile: drag from full header area (top 55px)
-			bool inHeader = io.MousePos.y >= Pos.y && io.MousePos.y <= Pos.y + headerHeight &&
-				io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x;
+const bool inHeader =
+    io.MousePos.x >= Pos.x &&
+    io.MousePos.x <= Pos.x + Size.x &&
+    io.MousePos.y >= Pos.y &&
+    io.MousePos.y <= Pos.y + dragHeaderHeight;
 
-			const float dockHeight = 56.0f;
-			const float dockPadding = 12.0f;
-			const float itemSz = 44.0f;
-			const float itemSpacing = 14.0f;
-			const int numItems = 5;
+/*
+ * Em login, não queremos que o campo de license
+ * seja tratado como área de drag.
+ */
+bool blockDrag = false;
 
-			float dockWidth = (itemSz + itemSpacing) * numItems - itemSpacing + dockPadding * 2;
-			float dockX = Pos.x + (Size.x - dockWidth) * 0.5f;
-			float dockY = Pos.y + Size.y - dockHeight - 16.0f;
+if (CurrentTab == 0)
+{
+    const float formLeft =
+        Pos.x + (Size.x - 320.0f) * 0.5f - 20.0f;
 
-			bool inDockArea = io.MousePos.y >= dockY - 10 && io.MousePos.y <= Pos.y + Size.y;
-			bool inDockButtons = false;
+    const float formRight =
+        formLeft + 360.0f;
 
-			if (inDockArea)
-			{
-				float startX = dockX + dockPadding;
-				float itmY = dockY + (dockHeight - itemSz) * 0.5f;
+    const float formTop =
+        Pos.y + 130.0f;
 
-				for (int i = 0; i < numItems; i++)
-				{
-					float itemX = startX + i * (itemSz + itemSpacing);
-					if (io.MousePos.x >= itemX && io.MousePos.x <= itemX + itemSz &&
-						io.MousePos.y >= itmY && io.MousePos.y <= itmY + itemSz)
-					{
-						inDockButtons = true;
-						break;
-					}
-				}
-			}
+    const float formBottom =
+        Pos.y + 340.0f;
 
-			bool inDockBackground = inDockArea && !inDockButtons;
+    const bool inForm =
+        io.MousePos.x >= formLeft &&
+        io.MousePos.x <= formRight &&
+        io.MousePos.y >= formTop &&
+        io.MousePos.y <= formBottom;
 
-			float contentTop = Pos.y + headerHeight;
-			float contentBottom = dockY - 10;
-			bool inContentArea = io.MousePos.y >= contentTop && io.MousePos.y <= contentBottom &&
-				io.MousePos.x >= Pos.x && io.MousePos.x <= Pos.x + Size.x;
+    blockDrag = inForm;
+}
 
-			// Allow scroll in content area when not over interactive elements
-			bool overInteractive = (lastFrameHoveredId != 0) || scrollbarActive ||
-				io.WantCaptureMouse || io.WantCaptureKeyboard;
+/*
+ * No menu principal:
+ * - header = pode arrastar
+ *
+ * No login:
+ * - header = pode arrastar
+ * - form = não pode arrastar
+ */
+const bool canStartDrag =
+    inHeader &&
+    !blockDrag &&
+    !scrollbarActive &&
+    !io.WantTextInput;
 
-			// Mobile: drag from header OR dock background, NOT from content area
-			canStartDrag = (inHeader || inDockBackground) && !overInteractive;
-		}
+/*
+ * Quando o dedo começa no header,
+ * guarda a diferença entre o ponto tocado
+ * e a posição lógica g_WindowPos.
+ *
+ * Não usamos Pos aqui porque Pos é scaledPos.
+ */
+if (
+    canStartDrag &&
+    ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+    !g_Dragging
+)
+{
+    g_Dragging = true;
 
-		extern ImGuiID activeSlider;
-		extern ImGuiID activeColorPicker;
+    g_DragOffset =
+        ImVec2(
+            io.MousePos.x - g_WindowPos.x,
+            io.MousePos.y - g_WindowPos.y
+        );
+}
 
-		if (scrollbarActive)
-		{
-			canStartDrag = false;
-		}
+/*
+ * Enquanto o dedo estiver pressionado,
+ * atualiza g_WindowPos.
+ */
+if (g_Dragging)
+{
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        ImVec2 newWindowPos(
+            io.MousePos.x - g_DragOffset.x,
+            io.MousePos.y - g_DragOffset.y
+        );
 
-		if (canStartDrag && ImGui::IsMouseClicked(0) && !g_Dragging && activeSlider == 0 && activeColorPicker == 0)
-		{
-			g_Dragging = true;
-			g_DragOffset = ImVec2(io.MousePos.x - g_WindowPos.x, io.MousePos.y - g_WindowPos.y);
-		}
+        /*
+         * Limites usando o tamanho lógico da janela.
+         *
+         * O cálculo de scaledPos abaixo continuará
+         * fazendo a escala normalmente.
+         */
+        const float minVisible = 40.0f;
 
-		if (CustomDrag::WantDrag && !g_Dragging && activeSlider == 0 && activeColorPicker == 0 && !scrollbarActive)
-		{
-			g_Dragging = true;
-			g_DragOffset = ImVec2(CustomDrag::DragClickPos.x - g_WindowPos.x, CustomDrag::DragClickPos.y - g_WindowPos.y);
-		}
-		CustomDrag::WantDrag = false;
+        newWindowPos.x =
+            ImClamp(
+                newWindowPos.x,
+                -windowSize.x + minVisible,
+                displaySize.x - minVisible
+            );
 
-		if (g_Dragging && (activeSlider != 0 || activeColorPicker != 0 || scrollbarActive))
-		{
-			g_Dragging = false;
-		}
+        newWindowPos.y =
+            ImClamp(
+                newWindowPos.y,
+                0.0f,
+                displaySize.y - minVisible
+            );
 
-		if (g_Dragging)
-		{
-			if (ImGui::IsMouseDown(0))
-			{
-				g_WindowPos = ImVec2(io.MousePos.x - g_DragOffset.x, io.MousePos.y - g_DragOffset.y);
-			}
-			else
-			{
-				g_Dragging = false;
-			}
-		}
+        g_WindowPos = newWindowPos;
+    }
+    else
+    {
+        g_Dragging = false;
+    }
+}
 
-		lastFrameHoveredId = gc.HoveredId;
+/*
+ * Se algum controle interno assumir o mouse,
+ * encerra o drag.
+ */
+if (
+    scrollbarActive ||
+    io.WantTextInput
+)
+{
+    g_Dragging = false;
+}
+
+lastFrameHoveredId = gc.HoveredId;
 
 		DrawList->AddRect(Pos, Pos + Size, IM_COL32(50, 50, 58, (int)(150 * g_WindowAlpha)), 14.0f, 0, 1.0f);
 

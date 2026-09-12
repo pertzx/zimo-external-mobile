@@ -36,21 +36,6 @@
 },
 {
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
-  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Daemon\\Unity\\UTF\\UTF8.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Unity\\UTF\\UTF8.cpp",
-  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Unity\\UTF\\UTF8.cpp"
-},
-{
-  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
-  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Daemon\\Memory\\Memory.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Memory\\Memory.cpp",
-  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Memory\\Memory.cpp"
-},
-{
-  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
-  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Daemon\\Memory\\EmulatorEnv.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Memory\\EmulatorEnv.cpp",
-  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Daemon\\Memory\\EmulatorEnv.cpp"
-},
-{
-  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
   "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Shared\\Utils\\Utils.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Utils\\Utils.cpp",
   "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Utils\\Utils.cpp"
 },
@@ -88,11 +73,6 @@
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
   "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Shared\\Math\\Vectors\\Vector4.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Math\\Vectors\\Vector4.cpp",
   "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Math\\Vectors\\Vector4.cpp"
-},
-{
-  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
-  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DIMGUI_DEFINE_MATH_OPERATORS -Dpanel_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Panel -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\panel.dir\\Shared\\Offsets\\Offsets.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp",
-  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp"
 },
 {
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
@@ -196,6 +176,11 @@
 },
 {
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
+  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDAEMON_BUILD -DIMGUI_DEFINE_MATH_OPERATORS -Ddaemon_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\daemon.dir\\Shared\\Offsets\\Offsets.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp",
+  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp"
+},
+{
+  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
   "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDAEMON_BUILD -DIMGUI_DEFINE_MATH_OPERATORS -Ddaemon_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\daemon.dir\\Shared\\Utils\\Utils.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Utils\\Utils.cpp",
   "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Utils\\Utils.cpp"
 },
@@ -233,11 +218,6 @@
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
   "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDAEMON_BUILD -DIMGUI_DEFINE_MATH_OPERATORS -Ddaemon_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\daemon.dir\\Shared\\Math\\Vectors\\Vector4.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Math\\Vectors\\Vector4.cpp",
   "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Math\\Vectors\\Vector4.cpp"
-},
-{
-  "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",
-  "command": "C:\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android28 --sysroot=C:/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -DDAEMON_BUILD -DIMGUI_DEFINE_MATH_OPERATORS -Ddaemon_EXPORTS -IC:/zimo-external-mobile/app/src/main/cpp/Shared -IC:/zimo-external-mobile/app/src/main/cpp/Daemon -IC:/zimo-external-mobile/app/src/main/cpp/../External/ImGui -IC:/zimo-external-mobile/app/src/main/cpp/../External/FreeType/Include -IC:/zimo-external-mobile/app/src/main/cpp/../External -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O2 -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\daemon.dir\\Shared\\Offsets\\Offsets.cpp.o -c C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp",
-  "file": "C:\\zimo-external-mobile\\app\\src\\main\\cpp\\Shared\\Offsets\\Offsets.cpp"
 },
 {
   "directory": "C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a",

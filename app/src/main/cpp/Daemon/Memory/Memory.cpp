@@ -1,950 +1,950 @@
 ﻿#include "Memory.hpp"
-#include <Notify/Notify.hpp>
-#include "EmulatorEnv.hpp"
+
 #include <Globals.hpp>
-#include <Unity/UTF/UTF8.hpp>
+#include <Offsets/Offsets.hpp>
+
+#include <android/log.h>
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/uio.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <errno.h>
+
+#include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <mutex>
+#include <sstream>
+#include <string>
 #include <thread>
-#include <cstdarg>
-#include <XorStr.hpp>
+#include <vector>
 
-// VEH Capture is Windows-only, disabled on Android
-#ifndef __ANDROID__
-#include <VehPGDHook/Vehpageguardhook.hpp>
-#endif
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormMemory", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormMemory", __VA_ARGS__)
 
-#define LI_RESOLVE(name, type, mod) \
-    FrameWork::LazyImporter::li::detail::lazy_function< \
-        LAZY_IMPORTER_KHASH(#name), void(*)()>().template in_safe<type>(mod)
+Memory g_FreeFireMemory;
 
-bool CanCheckHook = false;
+uintptr_t libAddress = 0;
 
-// Anti-tamper NUNCA pode derrubar o jogo. Antes, um byte de prologo divergente
-// (ex.: emulador atualizado / build nova do VBox com prologo diferente) fazia
-// __ud2() — instrucao ilegal que nenhum VEH trata (só SINGLE_STEP) → crash do
-// processo inteiro ao injetar / no meio da partida. Agora loga 1x e segue em
-// modo degradado: se os ponteiros forem realmente invalidos, as leituras
-// falham sozinhas (ESP congela) sem derrubar o jogo.
-#define VALIDATE()                                          \
-    if (CanCheckHook) {                                     \
-        static bool s_HookMismatchLogged = false;           \
-        if (!s_HookMismatchLogged) {                        \
-            BYTE b1 = ( PGMR3PhysRead ) ? *( BYTE* )PGMR3PhysRead : 0xFF; \
-            BYTE b2 = ( PGMPhysGCPtr ) ? *( BYTE* )PGMPhysGCPtr : 0xFF; \
-            BYTE b3 = ( GCPhys2CCPtrRO ) ? *( BYTE* )GCPhys2CCPtrRO : 0xFF; \
-            BYTE b4 = ( GCPhys2CCPtr ) ? *( BYTE* )GCPhys2CCPtr : 0xFF; \
-            if ( b1 != 0x48 || b2 != 0x48 || b3 != 0x48 || b4 != 0x48 ) { \
-                s_HookMismatchLogged = true;                \
-                CanCheckHook = false;                       \
-                DiagLog( "[diag] VALIDATE: prologos VMM divergentes (%02x %02x %02x %02x) — seguindo degradado", b1, b2, b3, b4 ); \
-            }                                               \
-        }                                                   \
+pid_t Memory::s_TargetPid = -1;
+uintptr_t Memory::s_LibIl2Cpp = 0;
+bool Memory::s_Target32Bit = false;
+int Memory::s_ProcMemFd = -1;
+bool Memory::s_Initialized = false;
+volatile bool Memory::s_RestartInProgress = false;
+
+namespace
+{
+    static bool IsNumeric(const char* text)
+    {
+        if (!text || !*text)
+            return false;
+
+        for (const char* p = text; *p; ++p)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(*p)))
+                return false;
+        }
+
+        return true;
     }
 
-// ============================================================
-// Static members
-// ============================================================
-void* Memory::VmInstancePtr = nullptr;
-uintptr_t Memory::GuestCR3 = 0;
+    static std::string ReadCmdline(pid_t pid)
+    {
+        char path[64];
+        std::snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
 
-Memory::PGMR3PhysReadExternalType  Memory::PGMR3PhysRead = nullptr;
-Memory::PGMR3PhysWriteExternalType Memory::PGMR3PhysWrite = nullptr;
-Memory::PGMR3PhysTlbGCPhys2PtrType Memory::PhysTlbToPtr = nullptr;
-Memory::PGMPhysGCPtr2GCPhysType    Memory::PGMPhysGCPtr = nullptr;
-Memory::VMMGetCpuByIdType          Memory::VMMGetCpu = nullptr;
-Memory::GCPhys2CCPtrROExternalType Memory::GCPhys2CCPtrRO = nullptr;
-Memory::GCPhys2CCPtrExternalType   Memory::GCPhys2CCPtr = nullptr;
-Memory::ReleasePageMappingLockType Memory::ReleaseLock = nullptr;
+        int fd = ::open(path, O_RDONLY | O_CLOEXEC);
+        if (fd < 0)
+            return {};
 
-volatile LONG Memory::s_GlobalGen = 0;
-volatile LONG Memory::s_RestartPending = 0;
-volatile LONGLONG Memory::s_LastRestartTick = 0;
+        char buffer[512]{};
+        ssize_t n = ::read(fd, buffer, sizeof(buffer) - 1);
+        ::close(fd);
 
-#ifdef __ANDROID__
-int         Memory::s_TlsIndex = -1;
-int         Memory::memFd = -1;
-#else
-DWORD         Memory::s_TlsIndex = TLS_OUT_OF_INDEXES;
-#endif
+        if (n <= 0)
+            return {};
 
-// ============================================================
-// DiagLog — log diagnostico em %TEMP%\HwMon.log (Windows only)
-// ============================================================
-#ifndef __ANDROID__
-void DiagLog( const char* fmt, ... )
-{
-	char buf [ 512 ];
-	va_list args;
-	va_start( args, fmt );
-	vsnprintf( buf, sizeof( buf ), fmt, args );
-	va_end( args );
+        buffer[n] = '\0';
 
-	char tmp [ MAX_PATH ];
-	if ( !GetTempPathA( MAX_PATH, tmp ) ) return;
+        for (ssize_t i = 0; i < n; ++i)
+        {
+            if (buffer[i] == '\0')
+                buffer[i] = ' ';
+        }
 
-	char path [ MAX_PATH ];
-	sprintf_s( path, "%sHwMon.log", tmp );
+        return std::string(buffer, static_cast<size_t>(n));
+    }
 
-	HANDLE h = CreateFileA( path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr );
-	if ( h == INVALID_HANDLE_VALUE ) return;
+    static bool ContainsIgnoreCase(const std::string& value, const char* needle)
+    {
+        if (!needle || !*needle)
+            return false;
 
-	if ( GetFileSize( h, nullptr ) > 256 * 1024 )
-	{
-		// Mantem o arquivo pequeno: trunca no primeiro 128KB.
-		CloseHandle( h );
-		h = CreateFileA( path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr );
-		if ( h == INVALID_HANDLE_VALUE ) return;
-	}
+        std::string a = value;
+        std::string b = needle;
 
-	char line [ 640 ];
-	int n = sprintf_s( line, "[%llu] %s\r\n", ( unsigned long long )GetTickCount64( ), buf );
-	DWORD written = 0;
-	if ( n > 0 ) WriteFile( h, line, ( DWORD )n, &written, nullptr );
-	CloseHandle( h );
-}
-#else
-void DiagLog( const char* fmt, ... )
-{
-	// Android stub - use android log instead
-	va_list args;
-	va_start( args, fmt );
-	char buf[512];
-	vsnprintf(buf, sizeof(buf), fmt, args);
-	va_end(args);
-	__android_log_print(ANDROID_LOG_INFO, "StormDiag", "%s", buf);
-}
-#endif
+        std::transform(a.begin(), a.end(), a.begin(),
+                       [](unsigned char c)
+                       {
+                           return static_cast<char>(std::tolower(c));
+                       });
 
-// ============================================================
-// SoftTLB — dynamic TLS (manual mapper safe) - Windows only
-// ============================================================
-#ifndef __ANDROID__
-Memory::ThreadTLB* Memory::GetThreadTLB( )
-{
-	// s_TlsIndex deve ter sido alocado no Initialize
-	if ( s_TlsIndex == TLS_OUT_OF_INDEXES )
-		return nullptr;
+        std::transform(b.begin(), b.end(), b.begin(),
+                       [](unsigned char c)
+                       {
+                           return static_cast<char>(std::tolower(c));
+                       });
 
-	auto* tlb = ( ThreadTLB* )TlsGetValue( s_TlsIndex );
-	if ( !tlb )
-	{
-		// Primeiro acesso nessa thread — aloca via HeapAlloc (sem CRT)
-		tlb = ( ThreadTLB* )HeapAlloc( GetProcessHeap( ), HEAP_ZERO_MEMORY, sizeof( ThreadTLB ) );
-		if ( !tlb ) return nullptr;
-		TlsSetValue( s_TlsIndex, tlb );
-	}
-	return tlb;
+        return a.find(b) != std::string::npos;
+    }
+
+    static std::vector<std::string> GetTargetNames()
+    {
+        std::vector<std::string> names;
+
+        const char* envPackage = std::getenv("STORM_TARGET_PACKAGE");
+        if (envPackage && *envPackage)
+            names.emplace_back(envPackage);
+
+        /*
+         * Free Fire normal.
+         */
+        names.emplace_back("com.dts.freefireth");
+
+        /*
+         * Free Fire MAX.
+         */
+        names.emplace_back("com.dts.freefiremax");
+
+        return names;
+    }
 }
 
-void Memory::FlushTLB( )
+pid_t Memory::FindTargetPid()
 {
-	ThreadTLB* tlb = GetThreadTLB( );
-	if ( !tlb ) return;
-	memset( tlb->entries, 0, sizeof( tlb->entries ) );
-	tlb->localGen = InterlockedCompareExchange( &s_GlobalGen, 0, 0 );
+    const std::vector<std::string> names = GetTargetNames();
+
+    DIR* proc = ::opendir("/proc");
+    if (!proc)
+    {
+        LOGE("Nao foi possivel abrir /proc: %s", strerror(errno));
+        return -1;
+    }
+
+    pid_t result = -1;
+
+    while (dirent* entry = ::readdir(proc))
+    {
+        if (!IsNumeric(entry->d_name))
+            continue;
+
+        pid_t pid = static_cast<pid_t>(std::strtol(entry->d_name, nullptr, 10));
+        if (pid <= 0)
+            continue;
+
+        std::string cmdline = ReadCmdline(pid);
+        if (cmdline.empty())
+            continue;
+
+        for (const std::string& target : names)
+        {
+            if (ContainsIgnoreCase(cmdline, target.c_str()))
+            {
+                result = pid;
+                break;
+            }
+        }
+
+        if (result > 0)
+            break;
+    }
+
+    ::closedir(proc);
+
+    if (result > 0)
+    {
+        LOGI("PID encontrado: %d", result);
+    }
+    else
+    {
+        LOGE("Nenhum processo alvo encontrado");
+    }
+
+    return result;
 }
 
-void Memory::FlushAllTLB( )
+uintptr_t Memory::FindModuleBase(pid_t pid, const char* moduleName)
 {
-	InterlockedIncrement( &s_GlobalGen );
-}
-#else
-// Android stubs
-Memory::ThreadTLB* Memory::GetThreadTLB( ) { return nullptr; }
-void Memory::FlushTLB( ) {}
-void Memory::FlushAllTLB( ) {}
-#endif
+    if (pid <= 0 || !moduleName || !*moduleName)
+        return 0;
 
-// ============================================================
-// Linux kernel offsets
-// ============================================================
-static uintptr_t KVA_INIT_TASK_64 = 0x0;
-static uintptr_t OFFSET_TASKS_64 = 0x470;
-static uintptr_t OFFSET_COMM_64 = 0x720;
-static uintptr_t OFFSET_MM_64 = 0x4C0;
-static uintptr_t OFFSET_MM_PGD_64 = 0x50;
-static uintptr_t OFFSET_VMA_END_64 = 0x8;
-static uintptr_t OFFSET_VMA_NEXT_64 = 0x10;
-static uintptr_t OFFSET_VMA_FILE_64 = 0xA0;
-static uintptr_t OFFSET_FILE_DENTRY_64 = 0x18;
-static uintptr_t OFFSET_DENTRY_NAME_64 = 0x38;
+    char path[64];
+    std::snprintf(path, sizeof(path), "/proc/%d/maps", pid);
 
-static uint32_t KVA_INIT_TASK_32 = 0x0;
-static uint32_t OFFSET_TASKS_32 = 0x2F4;
-static uint32_t OFFSET_COMM_32 = 0x478;
-static uint32_t OFFSET_MM_32 = 0x31C;
-static uint32_t OFFSET_MM_PGD_32 = 0x20;
-static uint32_t OFFSET_VMA_END_32 = 0x4;
-static uint32_t OFFSET_VMA_NEXT_32 = 0x8;
-static uint32_t OFFSET_VMA_FILE_32 = 0x50;
-static uint32_t OFFSET_FILE_DENTRY_32 = 0x0C;
-static uint32_t OFFSET_DENTRY_NAME_32 = 0x1C;
+    FILE* file = std::fopen(path, "r");
+    if (!file)
+    {
+        LOGE("Falha abrindo %s: %s", path, strerror(errno));
+        return 0;
+    }
 
-// ============================================================
-// PageMapping
-// ============================================================
+    char line[4096];
 
-const void* PageMapping::ResolveRead( uint64_t GCPhys )
-{
-	uint64_t page = GCPhys & ~0xFFFULL;
-	uint64_t off = GCPhys & 0xFFF;
-	if ( m_valid && page == m_pageBase && !m_writable )
-		return ( const uint8_t* )m_hostPtr + off;
-	Release( );
-	void* pVM = Memory::GetVM( );
-	if ( !pVM || !Memory::GCPhys2CCPtrRO ) return nullptr;
-	const void* ptr = nullptr;
-	int rc = Memory::GCPhys2CCPtrRO( pVM, page, &ptr, &m_lock );
-	if ( rc < 0 || !ptr ) return nullptr;
-	m_pageBase = page;
-	m_hostPtr = ptr;
-	m_valid = true;
-	m_writable = false;
-	return ( const uint8_t* )ptr + off;
-}
+    while (std::fgets(line, sizeof(line), file))
+    {
+        unsigned long long start = 0;
+        unsigned long long end = 0;
+        unsigned long long offset = 0;
+        char perms[8]{};
+        char mappedPath[PATH_MAX]{};
 
-void* PageMapping::ResolveWrite( uint64_t GCPhys )
-{
-	uint64_t page = GCPhys & ~0xFFFULL;
-	uint64_t off = GCPhys & 0xFFF;
-	if ( m_valid && page == m_pageBase && m_writable )
-		return ( uint8_t* )const_cast< void* >( m_hostPtr ) + off;
-	Release( );
-	void* pVM = Memory::GetVM( );
-	if ( !pVM || !Memory::GCPhys2CCPtr ) return nullptr;
-	void* ptr = nullptr;
-	int rc = Memory::GCPhys2CCPtr( pVM, page, &ptr, &m_lock );
-	if ( rc < 0 || !ptr ) return nullptr;
-	m_pageBase = page;
-	m_hostPtr = ptr;
-	m_valid = true;
-	m_writable = true;
-	return ( uint8_t* )ptr + off;
+        int parsed = std::sscanf(
+            line,
+            "%llx-%llx %7s %llx %*s %*s %4095[^\n]",
+            &start,
+            &end,
+            perms,
+            &offset,
+            mappedPath
+        );
+
+        if (parsed < 5)
+            continue;
+
+        if (offset != 0)
+            continue;
+
+        if (std::strstr(mappedPath, moduleName) == nullptr)
+            continue;
+
+        std::fclose(file);
+
+        LOGI(
+            "Modulo %s encontrado: 0x%llX",
+            moduleName,
+            start
+        );
+
+        return static_cast<uintptr_t>(start);
+    }
+
+    std::fclose(file);
+
+    LOGE(
+        "Modulo %s nao encontrado no PID %d",
+        moduleName,
+        pid
+    );
+
+    return 0;
 }
 
-void PageMapping::Release( )
+bool Memory::DetectTarget32Bit(pid_t pid)
 {
-	if ( !m_valid ) return;
-	void* pVM = Memory::GetVM( );
-	if ( pVM && Memory::ReleaseLock )
-		Memory::ReleaseLock( pVM, &m_lock );
-	m_valid = false;
-	m_hostPtr = nullptr;
-	m_pageBase = 0;
-	m_writable = false;
-	m_lock = { };
-}
+    if (pid <= 0)
+        return false;
 
-bool PageMapping::ReadArray( uint64_t GCPhys, void* out, size_t size )
-{
-	uint8_t* dst = ( uint8_t* )out;
-	while ( size > 0 )
-	{
-		size_t chunkSize = 0x1000 - ( size_t )( GCPhys & 0xFFF );
-		if ( chunkSize > size ) chunkSize = size;
-		const void* src = ResolveRead( GCPhys );
-		if ( !src ) return false;
-		memcpy( dst, src, chunkSize );
-		dst += chunkSize;
-		GCPhys += chunkSize;
-		size -= chunkSize;
-	}
-	return true;
-}
+    char path[64];
+    std::snprintf(path, sizeof(path), "/proc/%d/exe", pid);
 
-bool PageMapping::WriteArray( uint64_t GCPhys, const void* src, size_t size )
-{
-	const uint8_t* s = ( const uint8_t* )src;
-	while ( size > 0 )
-	{
-		size_t chunkSize = 0x1000 - ( size_t )( GCPhys & 0xFFF );
-		if ( chunkSize > size ) chunkSize = size;
-		void* dst = ResolveWrite( GCPhys );
-		if ( !dst ) return false;
-		memcpy( dst, s, chunkSize );
-		s += chunkSize;
-		GCPhys += chunkSize;
-		size -= chunkSize;
-	}
-	return true;
-}
+    char exePath[PATH_MAX]{};
 
-// ============================================================
-// ReadBuffer — fallback chain: CCPtr → TlbToPtr → PGMR3PhysRead
-// ============================================================
-bool Memory::ReadBuffer(uintptr_t address, void* buffer, size_t size) {
-#ifdef __ANDROID__
-    if (memFd < 0) return false;
-    lseek64(memFd, address, SEEK_SET);
-    return read(memFd, buffer, size) == (ssize_t)size;
-#else
-    // Windows implementation
+    ssize_t len = ::readlink(
+        path,
+        exePath,
+        sizeof(exePath) - 1
+    );
+
+    if (len <= 0)
+    {
+        LOGE("readlink(%s) falhou: %s", path, strerror(errno));
+        return false;
+    }
+
+    exePath[len] = '\0';
+
+    int fd = ::open(exePath, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+    {
+        LOGE("Nao foi possivel abrir ELF do processo: %s", strerror(errno));
+        return false;
+    }
+
+    unsigned char ident[5]{};
+
+    ssize_t readBytes = ::pread(
+        fd,
+        ident,
+        sizeof(ident),
+        0
+    );
+
+    ::close(fd);
+
+    if (readBytes != sizeof(ident))
+    {
+        LOGE("Falha lendo ELF");
+        return false;
+    }
+
+    if (ident[0] != 0x7F ||
+        ident[1] != 'E' ||
+        ident[2] != 'L' ||
+        ident[3] != 'F')
+    {
+        LOGE("ELF invalido");
+        return false;
+    }
+
+    /*
+     * ELFCLASS32 = 1
+     * ELFCLASS64 = 2
+     */
+    if (ident[4] == 1)
+    {
+        LOGI("Target ELF = 32-bit");
+        return true;
+    }
+
+    if (ident[4] == 2)
+    {
+        LOGI("Target ELF = 64-bit");
+        return false;
+    }
+
+    LOGE("ELF class desconhecida: %u", ident[4]);
     return false;
-#endif
 }
 
-// ============================================================
-// WriteBuffer — fallback chain: CCPtr → TlbToPtr → PGMR3PhysWrite
-// ============================================================
-bool Memory::WriteBuffer(uintptr_t address, const void* buffer, size_t size) {
-#ifdef __ANDROID__
-    if (memFd < 0) return false;
-    lseek64(memFd, address, SEEK_SET);
-    return write(memFd, buffer, size) == (ssize_t)size;
-#else
-    // Windows implementation
+bool Memory::OpenProcessMemory(pid_t pid)
+{
+    CloseProcessMemory();
+
+    if (pid <= 0)
+        return false;
+
+    char path[64];
+    std::snprintf(path, sizeof(path), "/proc/%d/mem", pid);
+
+    /*
+     * Nao fazemos deste FD uma dependencia obrigatoria.
+     * process_vm_* sera tentado primeiro.
+     */
+    s_ProcMemFd = ::open(
+        path,
+        O_RDWR | O_CLOEXEC
+    );
+
+    if (s_ProcMemFd < 0)
+    {
+        LOGE(
+            "Nao abriu %s: %s",
+            path,
+            strerror(errno)
+        );
+
+        /*
+         * process_vm_readv/process_vm_writev ainda podem funcionar.
+         */
+        s_ProcMemFd = -1;
+        return true;
+    }
+
+    LOGI("/proc/%d/mem aberto", pid);
+    return true;
+}
+
+void Memory::CloseProcessMemory()
+{
+    if (s_ProcMemFd >= 0)
+    {
+        ::close(s_ProcMemFd);
+        s_ProcMemFd = -1;
+    }
+}
+
+bool Memory::ReadProcessVm(
+    uintptr_t address,
+    void* buffer,
+    size_t size
+)
+{
+#if defined(SYS_process_vm_readv)
+
+    if (s_TargetPid <= 0 || !buffer || size == 0)
+        return false;
+
+    iovec local{};
+    local.iov_base = buffer;
+    local.iov_len = size;
+
+    iovec remote{};
+    remote.iov_base = reinterpret_cast<void*>(address);
+    remote.iov_len = size;
+
+    errno = 0;
+
+    ssize_t result = static_cast<ssize_t>(
+        ::syscall(
+            SYS_process_vm_readv,
+            s_TargetPid,
+            &local,
+            1,
+            &remote,
+            1,
+            0
+        )
+    );
+
+    if (result == static_cast<ssize_t>(size))
+        return true;
+
     return false;
-#endif
-}
 
-// ============================================================
-// Page table walks
-// ============================================================
-
-bool Memory::Translate32( uintptr_t GuestVA, uintptr_t CR3, uintptr_t& GuestPA )
-{
-	GuestPA = 0;
-	uint32_t PD_index = ( GuestVA >> 22 ) & 0x3FF;
-	uint32_t PT_index = ( GuestVA >> 12 ) & 0x3FF;
-	uint32_t page_offset = GuestVA & 0xFFF;
-
-	uint32_t pd_entry = 0;
-	if ( PGMR3PhysRead( VmInstancePtr, CR3 + PD_index * 4, &pd_entry, sizeof( pd_entry ) ) != 0 ) return false;
-	if ( !( pd_entry & 1 ) ) return false;
-
-	if ( pd_entry & ( 1 << 7 ) )
-	{
-		GuestPA = ( pd_entry & 0xFFC00000U ) + ( GuestVA & 0x3FFFFF );
-		return true;
-	}
-
-	uint32_t pt_entry = 0;
-	uintptr_t pt_base = static_cast< uintptr_t >( pd_entry & 0xFFFFF000U );
-	if ( PGMR3PhysRead( VmInstancePtr, pt_base + PT_index * 4, &pt_entry, sizeof( pt_entry ) ) != 0 ) return false;
-	if ( !( pt_entry & 1 ) ) return false;
-
-	GuestPA = static_cast< uintptr_t >( pt_entry & 0xFFFFF000U ) + page_offset;
-	return true;
-}
-
-bool Memory::Translate64( uintptr_t GuestVA, uintptr_t CR3, uintptr_t& GuestPA )
-{
-	GuestPA = 0;
-	if ( CR3 < 0x1000 ) return false;
-
-	const uintptr_t pml4_base = CR3 & 0xFFFFFFFFFFFFF000ULL;
-	uint64_t PML4_index = ( GuestVA >> 39 ) & 0x1FF;
-	uint64_t PDPT_index = ( GuestVA >> 30 ) & 0x1FF;
-	uint64_t PD_index = ( GuestVA >> 21 ) & 0x1FF;
-	uint64_t PT_index = ( GuestVA >> 12 ) & 0x1FF;
-	uint64_t page_off = GuestVA & 0xFFF;
-	uint64_t entry = 0;
-	uintptr_t table = 0;
-
-	if ( PGMR3PhysRead( VmInstancePtr, pml4_base + PML4_index * 8, &entry, sizeof( entry ) ) != 0 ) return false;
-	if ( !( entry & 1 ) ) return false;
-	table = static_cast< uintptr_t >( entry & 0xFFFFFFFFF000ULL );
-
-	if ( PGMR3PhysRead( VmInstancePtr, table + PDPT_index * 8, &entry, sizeof( entry ) ) != 0 ) return false;
-	if ( !( entry & 1 ) ) return false;
-	if ( entry & ( 1ULL << 7 ) )
-	{
-		GuestPA = static_cast< uintptr_t >( entry & 0xFFFFFC0000000ULL ) + ( GuestVA & 0x3FFFFFFFULL );
-		return true;
-	}
-	table = static_cast< uintptr_t >( entry & 0xFFFFFFFFF000ULL );
-
-	if ( PGMR3PhysRead( VmInstancePtr, table + PD_index * 8, &entry, sizeof( entry ) ) != 0 ) return false;
-	if ( !( entry & 1 ) ) return false;
-	if ( entry & ( 1ULL << 7 ) )
-	{
-		GuestPA = static_cast< uintptr_t >( entry & 0xFFFFFFE00000ULL ) + ( GuestVA & 0x1FFFFFULL );
-		return true;
-	}
-	table = static_cast< uintptr_t >( entry & 0xFFFFFFFFF000ULL );
-
-	if ( PGMR3PhysRead( VmInstancePtr, table + PT_index * 8, &entry, sizeof( entry ) ) != 0 ) return false;
-	if ( !( entry & 1 ) ) return false;
-
-	GuestPA = static_cast< uintptr_t >( entry & 0x000FFFFFFFFFF000ULL ) + page_off;
-	return true;
-}
-
-// Dispatch por ABI
-bool Memory::ConvertCR3( uintptr_t GuestVA, uintptr_t CR3, uintptr_t& GuestPA )
-{
-	GuestPA = 0;
-	if ( !VmInstancePtr || GuestVA <= 0x1000 )
-		return false;
-
-	ABIType abi = GetEmulatorEnv( ).Abi( );
-	switch ( abi )
-	{
-		case ABIType::X86: 
-			return Translate32( GuestVA, CR3, GuestPA );
-		case ABIType::X86_64:
-			return Translate64( GuestVA, CR3, GuestPA );
-		default: return false;
-	}
-}
-
-bool Memory::ConvertGCPtr( uintptr_t GuestVA, uintptr_t& GuestPA )
-{
-	GuestPA = 0;
-	if ( !VmInstancePtr || !VMMGetCpu || !PGMPhysGCPtr || GuestVA <= 0x1000 )
-		return false;
-
-	for ( int i = 0; i < 4; ++i )
-	{
-		void* cpu = VMMGetCpu( VmInstancePtr, i );
-		if ( !cpu ) continue;
-		uintptr_t temp = 0;
-		if ( PGMPhysGCPtr( cpu, GuestVA, &temp ) == 0 && temp != 0 )
-		{
-			GuestPA = temp;
-			return true;
-		}
-	}
-	return false;
-}
-
-// ============================================================
-// CachedCR3Convert — SoftTLB via TlsAlloc (manual mapper safe)
-// ============================================================
-bool Memory::CachedCR3Convert( uintptr_t GuestVA, uintptr_t& GuestPA )
-{
-	GuestPA = 0;
-	if ( GuestVA <= 0x1000 || GuestCR3 == 0 )
-		return false;
-
-	ThreadTLB* tlb = GetThreadTLB( );
-
-	// Se TLS falhou (TlsAlloc não rodou, ou HeapAlloc falhou)
-	// cai direto pro page table walk sem cache
-	if ( !tlb )
-		return ConvertCR3( GuestVA, GuestCR3, GuestPA );
-
-	// Check geração global → auto-flush se divergiu
-	LONG curGen = InterlockedCompareExchange( &s_GlobalGen, 0, 0 );
-	if ( tlb->localGen != curGen )
-	{
-		memset( tlb->entries, 0, sizeof( tlb->entries ) );
-		tlb->localGen = curGen;
-	}
-
-	uintptr_t vpn = GuestVA >> 12;
-	uint32_t slot = static_cast< uint32_t >( vpn % TLB_SIZE );
-
-	// TLB hit
-	if ( tlb->entries [ slot ].vpn == vpn && tlb->entries [ slot ].ppn != 0 && tlb->entries [ slot ].gen == curGen )
-	{
-		GuestPA = tlb->entries [ slot ].ppn | ( GuestVA & 0xFFF );
-		return true;
-	}
-
-	// TLB miss → full page table walk
-	if ( !ConvertCR3( GuestVA, GuestCR3, GuestPA ) )
-		return false;
-
-	// Insere no TLB
-	tlb->entries [ slot ].vpn = vpn;
-	tlb->entries [ slot ].ppn = GuestPA & ~0xFFFULL;
-	tlb->entries [ slot ].gen = curGen;
-
-	return true;
-}
-
-// ============================================================
-// String
-// ============================================================
-std::string Memory::String( uintptr_t Address, int MaxLength )
-{
-	if ( !Address || MaxLength <= 0 ) return "";
-
-	constexpr int BLOCK_SIZE = 128;
-	std::string Output;
-	Output.reserve( MaxLength );
-	int Remaining = MaxLength;
-	uintptr_t Current = Address;
-
-	while ( Remaining > 0 )
-	{
-		char block [ BLOCK_SIZE ];
-		int toRead = std::min( Remaining, BLOCK_SIZE );
-
-		if ( !ReadBuffer( Current, block, toRead ) )
-			break;
-
-		for ( int i = 0; i < toRead; i++ )
-		{
-			if ( block [ i ] == '\0' ) return Output;
-			Output.push_back( block [ i ] );
-		}
-
-		Remaining -= toRead;
-		Current += toRead;
-	}
-	return Output;
-}
-
-// ============================================================
-// RefreshCR3 — revalidacao periodica do CR3 (task walk leve)
-// ============================================================
-bool Memory::RefreshCR3( )
-{
-	if ( !VmInstancePtr ) return false;
-
-	auto& env = GetEmulatorEnv( );
-	bool N32 = ( env.Abi( ) == ABIType::X86 );
-
-	auto xs_proc = xorstr( "com.dts.freefir" );
-	const char* processBaseName = xs_proc.crypt_get( );
-
-	const auto ProcessName = [ ] ( const char* comm, const char* pattern ) -> bool
-	{
-		if ( !comm || !pattern ) return false;
-		if ( std::strstr( comm, pattern ) != nullptr ) return true;
-		const char* core = pattern;
-		if ( std::strncmp( core, "com.", 4 ) == 0 ) core += 4;
-		const char* c2 = comm;
-		if ( *c2 == '.' ) ++c2;
-		return ( std::strstr( c2, core ) != nullptr );
-	};
-
-	// Mesmo padrao do GetModuleAddress — chain de task_structs em memoria
-	// fisica, sem depender do CR3 (que e exatamente o que estamos revalidando).
-	auto ReadPtr = [ N32 ] ( uintptr_t a ) -> uintptr_t {
-		return N32 ? ReadPA<uint32_t>( a ) : ReadPA<uint64_t>( a );
-	};
-	auto BadPtr = [ N32 ] ( uintptr_t v ) -> bool {
-		return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
-	};
-
-	size_t OFF_TASKS = N32 ? OFFSET_TASKS_32 : OFFSET_TASKS_64;
-	size_t OFF_COMM = N32 ? OFFSET_COMM_32 : OFFSET_COMM_64;
-	size_t OFF_MM = N32 ? OFFSET_MM_32 : OFFSET_MM_64;
-	size_t OFF_MM_PGD = N32 ? OFFSET_MM_PGD_32 : OFFSET_MM_PGD_64;
-	uintptr_t KVA_INIT = N32 ? ( uintptr_t )KVA_INIT_TASK_32 : KVA_INIT_TASK_64;
-
-	uintptr_t init_task_phys = 0;
-	if ( !ConvertGCPtr( KVA_INIT, init_task_phys ) || init_task_phys == 0 )
-		return false;
-
-	uintptr_t current_phys = init_task_phys;
-	do
-	{
-		char comm [ 16 ] = { 0 };
-		ReadPhysical( current_phys + OFF_COMM, comm, 15 );
-		comm [ 15 ] = '\0';
-		if ( ProcessName( comm, processBaseName ) )
-		{
-			uintptr_t mm = ReadPtr( current_phys + OFF_MM );
-			if ( BadPtr( mm ) ) return false;
-
-			uintptr_t pgd_va = N32 ? ( uintptr_t )ReadVirtual<uint32_t>( mm + OFF_MM_PGD )
-			                       : ReadVirtual<uintptr_t>( mm + OFF_MM_PGD );
-			if ( BadPtr( pgd_va ) ) return false;
-
-			uintptr_t pgd_phys = 0;
-			if ( !ConvertGCPtr( pgd_va, pgd_phys ) || pgd_phys == 0 )
-				return false;
-
-			if ( pgd_phys == GuestCR3 )
-				return false;
-
-			// CR3 mudou (processo reiniciou / trocou de pgd): recaptura e
-			// invalida os TLBs de todas as threads — a proxima leitura em
-			// qualquer thread re-caminha na tabela nova.
-			GuestCR3 = pgd_phys;
-			FlushAllTLB( );
-			Console::LogHex( XorStr( "[Memory] CR3 renovada: " ), pgd_phys );
-			DiagLog( "[diag] CR3 renovada: %llx", ( unsigned long long )pgd_phys );
-			return true;
-		}
-
-		uintptr_t next_kva = ReadPtr( current_phys + OFF_TASKS );
-		uintptr_t next_list_phys = 0;
-		if ( !ConvertGCPtr( next_kva, next_list_phys ) || next_list_phys == 0 )
-			return false;
-		current_phys = next_list_phys - OFF_TASKS;
-	}
-	while ( current_phys != init_task_phys );
-
-	return false;
-}
-
-// ============================================================
-// GetModuleAddress (bootstrap — usa PhysRead direto, ternary N32)
-// ============================================================
-std::vector<uintptr_t> Memory::GetModuleAddress( bool N32 )
-{
-	std::vector<uintptr_t> results;
-
-	if ( !VmInstancePtr )
-	{
-		Console::Log( XorStr( "[FindLibraryBase] Memory nao inicializado (VmInstancePtr nulo)." ) );
-		return results;
-	}
-
-	auto xs_proc = xorstr( "com.dts.freefir" );
-	const char* processBaseName = xs_proc.crypt_get( );
-	auto xs_module = xorstr( "libil2cpp.so" );
-	const char* ModuleName = xs_module.crypt_get( );
-
-	const auto ProcessName = [ ] ( const char* comm, const char* pattern ) -> bool
-	{
-		if ( !comm || !pattern ) return false;
-		if ( std::strstr( comm, pattern ) != nullptr ) return true;
-		const char* core = pattern;
-		if ( std::strncmp( core, "com.", 4 ) == 0 ) core += 4;
-		const char* c2 = comm;
-		if ( *c2 == '.' ) ++c2;
-		return ( std::strstr( c2, core ) != nullptr );
-	};
-
-	// Ternary lambdas — um unico bloco para 32/64
-	auto ReadPtr = [ N32 ] ( uintptr_t a ) -> uintptr_t {
-		return N32 ? ReadPA<uint32_t>( a ) : ReadPA<uint64_t>( a );
-	};
-	auto BadPtr = [ N32 ] ( uintptr_t v ) -> bool {
-		return !v || ( N32 ? ( uint32_t )v == UINT32_MAX : v == UINT64_MAX );
-	};
-
-	size_t OFF_TASKS = N32 ? OFFSET_TASKS_32 : OFFSET_TASKS_64;
-	size_t OFF_COMM = N32 ? OFFSET_COMM_32 : OFFSET_COMM_64;
-	size_t OFF_MM = N32 ? OFFSET_MM_32 : OFFSET_MM_64;
-	size_t OFF_MM_PGD  = N32 ? OFFSET_MM_PGD_32 : OFFSET_MM_PGD_64;
-	size_t OFF_VMA_END  = N32 ? OFFSET_VMA_END_32 : OFFSET_VMA_END_64;
-	size_t OFF_VMA_NEXT = N32 ? OFFSET_VMA_NEXT_32 : OFFSET_VMA_NEXT_64;
-	size_t OFF_VMA_FILE = N32 ? OFFSET_VMA_FILE_32 : OFFSET_VMA_FILE_64;
-	size_t OFF_FILE_DENTRY = N32 ? OFFSET_FILE_DENTRY_32 : OFFSET_FILE_DENTRY_64;
-	size_t OFF_DENTRY_NAME = N32 ? OFFSET_DENTRY_NAME_32 : OFFSET_DENTRY_NAME_64;
-	uintptr_t KVA_INIT = N32 ? ( uintptr_t )KVA_INIT_TASK_32 : KVA_INIT_TASK_64;
-
-	uintptr_t init_task_phys = 0;
-	ConvertGCPtr( KVA_INIT, init_task_phys );
-	uintptr_t current_phys = init_task_phys;
-	uintptr_t target_task = 0;
-	do
-	{
-		char comm [ 16 ] = { 0 };
-		ReadPhysical( current_phys + OFF_COMM, comm, 15 );
-		comm [ 15 ] = '\0';
-		if ( ProcessName( comm, processBaseName ) )
-		{
-			target_task = current_phys; break;
-		}
-		uintptr_t next_kva = ReadPtr( current_phys + OFF_TASKS );
-		uintptr_t next_list_phys = 0;
-		ConvertGCPtr( next_kva, next_list_phys );
-		current_phys = next_list_phys - OFF_TASKS;
-	}
-	while ( current_phys != init_task_phys );
-
-	if ( !target_task )
-	{
-		std::printf( "[GetModuleAddress] process not found\n" );
-		return results;
-	}
-
-	uintptr_t mm = ReadPtr( target_task + OFF_MM );
-	uintptr_t pgd_va = N32 ? ( uintptr_t )ReadVirtual<uint32_t>( mm + OFF_MM_PGD ) : ReadVirtual<uintptr_t>( mm + OFF_MM_PGD );
-	if ( !BadPtr( pgd_va ) )
-	{
-		uintptr_t pgd_phys = 0;
-		if ( ConvertGCPtr( pgd_va, pgd_phys ) )
-		{
-			GuestCR3 = pgd_phys;
-			std::printf( XorStr( "[GetModuleAddress] pgd_va=%p pgd_phys=%p\n" ), ( void* )pgd_va, ( void* )pgd_phys );
-		}
-	}
-
-	uintptr_t mmap = N32 ? ( uintptr_t )ReadVirtual<uint32_t>( mm ) : ReadVirtual<uintptr_t>( mm );
-	uintptr_t mmap_phys = 0;
-	ConvertGCPtr( mmap, mmap_phys );
-	uintptr_t vma_phys = mmap_phys;
-
-	while ( vma_phys )
-	{
-		uintptr_t start = ReadPtr( vma_phys );
-		uintptr_t next  = ReadPtr( vma_phys + OFF_VMA_NEXT );
-		uintptr_t vm_file_va = ReadPtr( vma_phys + OFF_VMA_FILE );
-
-		if ( !BadPtr( vm_file_va ) )
-		{
-			uintptr_t dentry = N32 ? ( uintptr_t )ReadVirtual<uint32_t>( vm_file_va + OFF_FILE_DENTRY ) : ReadVirtual<uintptr_t>( vm_file_va + OFF_FILE_DENTRY );
-			if ( !BadPtr( dentry ) )
-			{
-				char name [ 64 ] = { 0 };
-				if ( N32 )
-				{
-					uint32_t Name_va = ReadVirtual<uint32_t>( dentry + OFF_DENTRY_NAME );
-					if ( Name_va && Name_va != 0xFFFFFFFF )
-						ReadVirtualBuffer( Name_va, name, 48 );
-				}
-				else
-				{
-					ReadVirtualBuffer( dentry + OFF_DENTRY_NAME, name, 48 );
-				}
-
-				if ( std::strstr( name, ModuleName ) != nullptr )
-				{
-					std::printf( XorStr( "[GetModuleAddress] FOUND %s at %p\n" ), ModuleName, ( void* )start );
-					results.push_back( start );
-				}
-			}
-		}
-		if ( !next ) break;
-		ConvertGCPtr( next, vma_phys );
-	}
-
-	if ( results.empty( ) )
-		std::printf( XorStr( "[GetModuleAddress] module '%s' not found\n" ), ModuleName );
-
-	return results;
-}
-
-// ============================================================
-// CaptureVmInstancePtr — VEH page guard hook (Windows only)
-// ============================================================
-bool Memory::CaptureVmInstancePtr( )
-{
-	if ( VmInstancePtr != nullptr )
-		return true;
-
-#ifndef __ANDROID__
-	if ( !VEHCapture::Install( ( uintptr_t )PGMR3PhysRead ) )
-	{
-		Console::Log( XorStr( "[Memory] Failed to install VEH capture on PGMR3PhysReadExternal" ) );
-		return false;
-	}
-
-	Console::Log( XorStr( "[Memory] VEH capture installed, waiting for PGMR3PhysReadExternal call..." ) );
-
-	while ( !VEHCapture::WasCaptured( ) )
-		Sleep( 1 );
-
-	VEHCapture::Remove( );
-
-	VmInstancePtr = VEHCapture::GetCaptured( );
-	Console::LogHex( XorStr( "[Memory] VmInstancePtr captured via VEH: " ), ( uintptr_t )VmInstancePtr );
-	return VmInstancePtr != nullptr;
 #else
-	// On Android, we don't use VEH capture - VmInstancePtr should be obtained differently
-	Console::Log( XorStr( "[Memory] Android: VEH capture skipped" ) );
-	return false;
+
+    (void)address;
+    (void)buffer;
+    (void)size;
+    return false;
+
 #endif
 }
 
-// ============================================================
-// Initialize - Windows implementation
-// ============================================================
-#ifndef __ANDROID__
-bool Memory::Initialize( )
+bool Memory::WriteProcessVm(
+    uintptr_t address,
+    const void* buffer,
+    size_t size
+)
 {
-	HMODULE bstkVMM = xorstr( "BstkVMM.dll" ).use( [ ] ( const char* s )
-	{
-		return lzimpLI_FN( GetModuleHandleA ).get<decltype( &GetModuleHandleA )>( )( s );
-	} );
-	if ( !bstkVMM )
-	{
-		Console::Log( XorStr( "[Memory] Error: BstkVMM.dll not found" ) );
-		return false;
-	}
+#if defined(SYS_process_vm_writev)
 
-	// Aloca TLS slot ANTES de qualquer coisa — precisa estar pronto
-	// quando as threads começarem a usar CachedCR3Convert
-	s_TlsIndex = TlsAlloc( );
-	if ( s_TlsIndex == TLS_OUT_OF_INDEXES )
-	{
-		Console::Log( XorStr( "[Memory] Error: TlsAlloc failed" ) );
-		return false;
-	}
+    if (s_TargetPid <= 0 || !buffer || size == 0)
+        return false;
 
-	PGMR3PhysRead = LI_RESOLVE( PGMR3PhysReadExternal, PGMR3PhysReadExternalType, bstkVMM );
-	PGMR3PhysWrite = LI_RESOLVE( PGMR3PhysWriteExternal, PGMR3PhysWriteExternalType, bstkVMM );
-	VMMGetCpu = LI_RESOLVE( VMMGetCpuById, VMMGetCpuByIdType, bstkVMM );
-	PGMPhysGCPtr = LI_RESOLVE( PGMPhysGCPtr2GCPhys, PGMPhysGCPtr2GCPhysType, bstkVMM );
-	PhysTlbToPtr = LI_RESOLVE( PGMR3PhysTlbGCPhys2Ptr, PGMR3PhysTlbGCPhys2PtrType, bstkVMM );
+    iovec local{};
+    local.iov_base = const_cast<void*>(buffer);
+    local.iov_len = size;
 
-	if ( !PGMR3PhysRead || !PGMR3PhysWrite || !VMMGetCpu || !PGMPhysGCPtr )
-	{
-		Console::Log( XorStr( "[Memory] Error: Failed to resolve base exports" ) );
-		if ( !PGMR3PhysRead )  Console::Log( XorStr( "[Memory]   -> PGMR3PhysReadExternal is NULL" ) );
-		if ( !PGMR3PhysWrite ) Console::Log( XorStr( "[Memory]   -> PGMR3PhysWriteExternal is NULL" ) );
-		if ( !VMMGetCpu )      Console::Log( XorStr( "[Memory]   -> VMMGetCpuById is NULL" ) );
-		if ( !PGMPhysGCPtr )   Console::Log( XorStr( "[Memory]   -> PGMPhysGCPtr2GCPhys is NULL" ) );
-		return false;
-	}
+    iovec remote{};
+    remote.iov_base = reinterpret_cast<void*>(address);
+    remote.iov_len = size;
 
-	GCPhys2CCPtrRO = LI_RESOLVE( PGMR3PhysGCPhys2CCPtrReadOnlyExternal, GCPhys2CCPtrROExternalType, bstkVMM );
-	GCPhys2CCPtr = LI_RESOLVE( PGMR3PhysGCPhys2CCPtrExternal, GCPhys2CCPtrExternalType, bstkVMM );
-	ReleaseLock = LI_RESOLVE( PGMPhysReleasePageMappingLock, ReleasePageMappingLockType, bstkVMM );
+    errno = 0;
 
-	if ( !GCPhys2CCPtrRO || !GCPhys2CCPtr || !ReleaseLock )
-	{
-		Console::Log( XorStr( "[Memory] Warning: CCPtr exports not found, fallback to TLB/PhysRead mode" ) );
-	}
-	else
-	{
-		Console::Log( XorStr( "[Memory] CCPtr exports resolved" ) );
-		Console::LogHex( XorStr( "[Memory] GCPhys2CCPtrRO @ " ), ( uintptr_t )GCPhys2CCPtrRO );
-		Console::LogHex( XorStr( "[Memory] GCPhys2CCPtr   @ " ), ( uintptr_t )GCPhys2CCPtr );
-		Console::LogHex( XorStr( "[Memory] ReleaseLock    @ " ), ( uintptr_t )ReleaseLock );
-	}
+    ssize_t result = static_cast<ssize_t>(
+        ::syscall(
+            SYS_process_vm_writev,
+            s_TargetPid,
+            &local,
+            1,
+            &remote,
+            1,
+            0
+        )
+    );
 
-	Console::Log( XorStr( "[Memory] Functions resolved successfully" ) );
-	Console::LogHex( XorStr( "[Memory] PGMR3PhysRead  @ " ), ( uintptr_t )PGMR3PhysRead );
-	Console::LogHex( XorStr( "[Memory] PGMR3PhysWrite @ " ), ( uintptr_t )PGMR3PhysWrite );
-	Console::LogHex( XorStr( "[Memory] PhysTlbToPtr   @ " ), ( uintptr_t )PhysTlbToPtr );
+    if (result == static_cast<ssize_t>(size))
+        return true;
 
-	if ( !CaptureVmInstancePtr( ) )
-	{
-		Console::Log( XorStr( "[Memory] Error: Failed to capture VmInstancePtr" ) );
-		return false;
-	}
+    return false;
 
-	GetEmulatorEnv( ).Refresh( );
-
-	if ( !KernelOffsetSelector::ApplyInitTaskOffsets( GetEmulatorEnv( ), KVA_INIT_TASK_32, KVA_INIT_TASK_64 ) )
-		Console::Log( XorStr( "[Offsets] Nao foi possivel selecionar KVA_INIT_TASK para essa versao." ) );
-	else
-	{
-		Console::LogHex( XorStr( "[Offsets] KVA_INIT_TASK_32 = " ), ( uintptr_t )KVA_INIT_TASK_32 );
-		if ( KVA_INIT_TASK_64 )
-			Console::LogHex( XorStr( "[Offsets] KVA_INIT_TASK_64 = " ), ( uintptr_t )KVA_INIT_TASK_64 );
-	}
-
-	Console::Log( std::string( XorStr( "[ENV] Emulator=" ) ) + GetEmulatorEnv( ).EmulatorName( ) +
-		" Version=" + GetEmulatorEnv( ).Version( ) +
-		" ABI=" + EmulatorEnvironment::ABIToString( GetEmulatorEnv( ).Abi( ) ) );
-
-	CanCheckHook = true;
-
-	auto& env = GetEmulatorEnv( );
-	bool N32 = ( env.Abi( ) == ABIType::X86 );
-	auto modules = GetModuleAddress( N32 );
-	uintptr_t il2cppBase = modules.empty( ) ? 0 : modules [ 0 ];
-
-	// Passa todas as candidates para o Offsets (GameConfig itera sobre elas)
-	Offsets::LibIl2CppCandidates = modules;
-
-	if ( il2cppBase != 0 && GuestCR3 != 0 )
-	{
-		uintptr_t physAddr = 0;
-		if ( ConvertCR3( il2cppBase, GuestCR3, physAddr ) )
-		{
-			int ELFHeader = 0;
-			if ( PGMR3PhysRead( VmInstancePtr, physAddr, &ELFHeader, sizeof( ELFHeader ) ) == 0 )
-			{
-				Console::LogHex( XorStr( "[Memory] CR3 from mm->pgd OK, ELFHeader = 0x" ), ELFHeader );
-				Offsets::GameConfig( );
-				Data::StartReadThread( );
-			}
-			else Console::Log( XorStr( "[Memory] PGMR3PhysRead failed when checking ELF with GuestCR3" ) );
-		}
-		else Console::Log( XorStr( "[Memory] ConvertCR3(il2cppBase, GuestCR3) failed" ) );
-	}
-	else
-	{
-		if ( GuestCR3 == 0 ) Console::Log( XorStr( "[Memory] Warning: GuestCR3 is 0" ) );
-	}
-
-	g_Globals.General.EnableFuncs = true;
-	std::thread( [ & ] ( )
-	{
-		NotifyManager::Send( XorStr( "Started" ), 4000 );
-	} ).detach( );
-	return ( VmInstancePtr != nullptr && Offsets::LibIl2Cpp != 0 );
-}
 #else
-// ============================================================
-// Initialize - Android implementation (stub)
-// ============================================================
-bool Memory::Initialize( )
+
+    (void)address;
+    (void)buffer;
+    (void)size;
+    return false;
+
+#endif
+}
+
+bool Memory::ReadExactFile(
+    int fd,
+    uintptr_t address,
+    void* buffer,
+    size_t size
+)
 {
-	// Android implementation - open /dev/mem or similar
-	Console::Log( XorStr( "[Memory] Android: Memory Initialize stub" ) );
+    if (fd < 0 || !buffer || size == 0)
+        return false;
 
-	// Open /dev/mem for direct memory access (requires root)
-	memFd = open("/dev/mem", O_RDWR | O_SYNC);
-	if (memFd < 0)
-	{
-		Console::Log( XorStr( "[Memory] Failed to open /dev/mem" ) );
-		return false;
-	}
+    size_t total = 0;
 
-	// TODO: Implement proper Android memory initialization
-	// For now, return true to allow build to proceed
-	return true;
+    while (total < size)
+    {
+        ssize_t n = ::pread64(
+            fd,
+            static_cast<char*>(buffer) + total,
+            size - total,
+            static_cast<off64_t>(address + total)
+        );
+
+        if (n <= 0)
+            return false;
+
+        total += static_cast<size_t>(n);
+    }
+
+    return true;
 }
-#endif
 
-// Windows-specific implementation code
-#ifndef __ANDROID__
+bool Memory::WriteExactFile(
+    int fd,
+    uintptr_t address,
+    const void* buffer,
+    size_t size
+)
+{
+    if (fd < 0 || !buffer || size == 0)
+        return false;
 
-	if ( il2cppBase )
-	{
-		Offsets::LibIl2Cpp = il2cppBase;
-		Console::LogHex( XorStr( "[Memory] Il2Cpp located at " ), il2cppBase );
-	}
-	else
-	{
-		Console::Log( XorStr( "[Memory] Failed to locate libil2cpp.so by any method." ) );
-	}
+    size_t total = 0;
 
-	if ( il2cppBase != 0 && GuestCR3 != 0 )
-	{
-		uintptr_t physAddr = 0;
-		if ( ConvertCR3( il2cppBase, GuestCR3, physAddr ) )
-		{
-			int ELFHeader = 0;
-			if ( PGMR3PhysRead( VmInstancePtr, physAddr, &ELFHeader, sizeof( ELFHeader ) ) == 0 )
-			{
-				Console::LogHex( XorStr( "[Memory] CR3 from mm->pgd OK, ELFHeader = 0x" ), ELFHeader );
-				Offsets::GameConfig( );
-				Data::StartReadThread( );
-			}
-			else Console::Log( XorStr( "[Memory] PGMR3PhysRead failed when checking ELF with GuestCR3" ) );
-		}
-		else Console::Log( XorStr( "[Memory] ConvertCR3(il2cppBase, GuestCR3) failed" ) );
-	}
-	else
-	{
-		if ( GuestCR3 == 0 ) Console::Log( XorStr( "[Memory] Warning: GuestCR3 is 0" ) );
-	}
+    while (total < size)
+    {
+        ssize_t n = ::pwrite64(
+            fd,
+            static_cast<const char*>(buffer) + total,
+            size - total,
+            static_cast<off64_t>(address + total)
+        );
 
-	g_Globals.General.EnableFuncs = true;
-	std::thread( [ & ] ( )
-	{
-		NotifyManager::Send( XorStr( "Started" ), 4000 );
-	} ).detach( );
-	return ( VmInstancePtr != nullptr && Offsets::LibIl2Cpp != 0 );
+        if (n <= 0)
+            return false;
+
+        total += static_cast<size_t>(n);
+    }
+
+    return true;
 }
-#else
-// Android stub implementations
-bool Memory::Restart() { return false; }
-bool Memory::RestartAsync() { return false; }
 
-#endif
+bool Memory::ReadProcMem(
+    uintptr_t address,
+    void* buffer,
+    size_t size
+)
+{
+    if (s_ProcMemFd < 0)
+        return false;
+
+    return ReadExactFile(
+        s_ProcMemFd,
+        address,
+        buffer,
+        size
+    );
+}
+
+bool Memory::WriteProcMem(
+    uintptr_t address,
+    const void* buffer,
+    size_t size
+)
+{
+    if (s_ProcMemFd < 0)
+        return false;
+
+    return WriteExactFile(
+        s_ProcMemFd,
+        address,
+        buffer,
+        size
+    );
+}
+
+bool Memory::Read(
+    uintptr_t address,
+    void* outValue,
+    size_t size
+)
+{
+    if (!s_Initialized ||
+        s_TargetPid <= 0 ||
+        address == 0 ||
+        !outValue ||
+        size == 0)
+    {
+        return false;
+    }
+
+    /*
+     * Primeiro método:
+     * process_vm_readv
+     */
+    if (ReadProcessVm(address, outValue, size))
+        return true;
+
+    /*
+     * Fallback:
+     * /proc/<pid>/mem
+     */
+    if (ReadProcMem(address, outValue, size))
+        return true;
+
+    return false;
+}
+
+bool Memory::Write(
+    uintptr_t address,
+    const void* value,
+    size_t size
+)
+{
+    if (!s_Initialized ||
+        s_TargetPid <= 0 ||
+        address == 0 ||
+        !value ||
+        size == 0)
+    {
+        return false;
+    }
+
+    /*
+     * Primeiro método:
+     * process_vm_writev
+     */
+    if (WriteProcessVm(address, value, size))
+        return true;
+
+    /*
+     * Fallback:
+     * /proc/<pid>/mem
+     */
+    if (WriteProcMem(address, value, size))
+        return true;
+
+    return false;
+}
+
+std::string Memory::String(
+    uintptr_t address,
+    int maxLength
+)
+{
+    if (address == 0 || maxLength <= 0)
+        return {};
+
+    if (maxLength > 256)
+        maxLength = 256;
+
+    /*
+     * IL2CPP string:
+     *
+     * 32-bit:
+     * +0x08 = length
+     * +0x0C = UTF-16 chars
+     *
+     * 64-bit:
+     * +0x10 = length
+     * +0x14 = UTF-16 chars
+     */
+    const uintptr_t lengthAddress =
+        s_Target32Bit ? address + 0x8 : address + 0x10;
+
+    const uintptr_t charsAddress =
+        s_Target32Bit ? address + 0xC : address + 0x14;
+
+    int32_t length = 0;
+
+    if (!Read(lengthAddress, length))
+        return {};
+
+    if (length <= 0 || length > maxLength)
+        return {};
+
+    std::vector<uint16_t> chars(
+        static_cast<size_t>(length) + 1
+    );
+
+    if (!Read(
+            charsAddress,
+            chars.data(),
+            static_cast<size_t>(length) * sizeof(uint16_t)))
+    {
+        return {};
+    }
+
+    std::string result;
+    result.reserve(static_cast<size_t>(length));
+
+    for (int i = 0; i < length; ++i)
+    {
+        uint16_t c = chars[static_cast<size_t>(i)];
+
+        if (c == 0)
+            break;
+
+        if (c < 0x80)
+        {
+            result.push_back(static_cast<char>(c));
+        }
+        else if (c < 0x800)
+        {
+            result.push_back(
+                static_cast<char>(0xC0 | (c >> 6))
+            );
+
+            result.push_back(
+                static_cast<char>(0x80 | (c & 0x3F))
+            );
+        }
+        else
+        {
+            result.push_back(
+                static_cast<char>(0xE0 | (c >> 12))
+            );
+
+            result.push_back(
+                static_cast<char>(0x80 | ((c >> 6) & 0x3F))
+            );
+
+            result.push_back(
+                static_cast<char>(0x80 | (c & 0x3F))
+            );
+        }
+    }
+
+    return result;
+}
+
+uintptr_t Memory::GetModuleAddress(
+    const char* moduleName
+)
+{
+    if (s_TargetPid <= 0)
+        return 0;
+
+    return FindModuleBase(
+        s_TargetPid,
+        moduleName
+    );
+}
+
+std::vector<uintptr_t> Memory::GetModuleAddress(
+    bool N32
+)
+{
+    (void)N32;
+
+    std::vector<uintptr_t> result;
+
+    uintptr_t base = GetModuleAddress(
+        "libil2cpp.so"
+    );
+
+    if (base != 0)
+        result.push_back(base);
+
+    return result;
+}
+
+pid_t Memory::GetTargetPid()
+{
+    return s_TargetPid;
+}
+
+bool Memory::IsTarget32Bit()
+{
+    return s_Target32Bit;
+}
+
+uintptr_t Memory::GetLibIl2Cpp()
+{
+    return s_LibIl2Cpp;
+}
+
+bool Memory::Initialize()
+{
+    if (s_Initialized)
+        return true;
+
+    pid_t pid = FindTargetPid();
+
+    if (pid <= 0)
+    {
+        LOGE("Initialize: PID nao encontrado");
+        return false;
+    }
+
+    bool target32 = DetectTarget32Bit(pid);
+
+    uintptr_t il2cpp = FindModuleBase(
+        pid,
+        "libil2cpp.so"
+    );
+
+    if (il2cpp == 0)
+    {
+        LOGE("Initialize: libil2cpp.so nao encontrada");
+        return false;
+    }
+
+    s_TargetPid = pid;
+    s_Target32Bit = target32;
+    s_LibIl2Cpp = il2cpp;
+
+    libAddress = il2cpp;
+
+    OpenProcessMemory(pid);
+
+    Offsets::LibIl2Cpp = il2cpp;
+    Offsets::LibIl2CppCandidates.clear();
+    Offsets::LibIl2CppCandidates.push_back(il2cpp);
+
+    /*
+     * Para o FF v7a, isso seleciona os offsets
+     * FFTHV7A75/76 existentes no projeto.
+     */
+    Offsets::GameConfig();
+
+    if (Offsets::LibIl2Cpp == 0)
+        Offsets::LibIl2Cpp = il2cpp;
+
+    g_Globals.General.N32 = s_Target32Bit;
+
+    LOGI(
+        "Memory OK: pid=%d abi=%s libil2cpp=0x%lX",
+        pid,
+        s_Target32Bit ? "32-bit" : "64-bit",
+        static_cast<unsigned long>(s_LibIl2Cpp)
+    );
+
+    s_Initialized = true;
+    return true;
+}
+
+bool Memory::Restart()
+{
+    Shutdown();
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(100)
+    );
+
+    return Initialize();
+}
+
+bool Memory::RestartAsync()
+{
+    if (s_RestartInProgress)
+        return false;
+
+    s_RestartInProgress = true;
+
+    std::thread(
+        []
+        {
+            Memory::Restart();
+            s_RestartInProgress = false;
+        }
+    ).detach();
+
+    return true;
+}
+
+bool Memory::RefreshCR3()
+{
+    /*
+     * O backend Android nao utiliza CR3/VirtualBox.
+     *
+     * Revalidamos PID + libil2cpp pelo /proc.
+     */
+    pid_t currentPid = FindTargetPid();
+
+    if (currentPid <= 0)
+        return false;
+
+    uintptr_t currentLib = FindModuleBase(
+        currentPid,
+        "libil2cpp.so"
+    );
+
+    if (currentLib == 0)
+        return false;
+
+    bool changed =
+        currentPid != s_TargetPid ||
+        currentLib != s_LibIl2Cpp;
+
+    if (changed)
+    {
+        Shutdown();
+
+        s_TargetPid = currentPid;
+        s_Target32Bit = DetectTarget32Bit(currentPid);
+        s_LibIl2Cpp = currentLib;
+
+        libAddress = currentLib;
+
+        OpenProcessMemory(currentPid);
+
+        Offsets::LibIl2Cpp = currentLib;
+        Offsets::LibIl2CppCandidates.clear();
+        Offsets::LibIl2CppCandidates.push_back(currentLib);
+
+        Offsets::GameConfig();
+
+        if (Offsets::LibIl2Cpp == 0)
+            Offsets::LibIl2Cpp = currentLib;
+
+        g_Globals.General.N32 = s_Target32Bit;
+
+        s_Initialized = true;
+
+        LOGI(
+            "Target atualizado: PID=%d lib=0x%lX",
+            currentPid,
+            static_cast<unsigned long>(currentLib)
+        );
+    }
+
+    return changed;
+}
 
 void Memory::Shutdown()
 {
-    // Cleanup TLB
-    FlushAllTLB();
+    CloseProcessMemory();
 
-    // Reset static members
-    VmInstancePtr = nullptr;
-    GuestCR3 = 0;
+    s_Initialized = false;
+    s_TargetPid = -1;
+    s_LibIl2Cpp = 0;
+    s_Target32Bit = false;
 
-    // Reset function pointers
-    PGMR3PhysRead = nullptr;
-    PGMR3PhysWrite = nullptr;
-    GCPhys2CCPtrRO = nullptr;
-    GCPhys2CCPtr = nullptr;
-    ReleaseLock = nullptr;
-    PhysTlbToPtr = nullptr;
-    PGMPhysGCPtr = nullptr;
-    VMMGetCpu = nullptr;
+    libAddress = 0;
 }
 
-Memory g_FreeFireMemory;
+void Memory::FlushTLB()
+{
+    /*
+     * Sem TLB de page-table nesse backend.
+     */
+}
+
+void Memory::FlushAllTLB()
+{
+    /*
+     * Sem TLB de page-table nesse backend.
+     */
+}
+
+bool Memory::TranslateVA(
+    uintptr_t guestVA,
+    uintptr_t& physicalOut
+)
+{
+    /*
+     * O novo backend trabalha diretamente com VA
+     * do processo alvo.
+     */
+    physicalOut = guestVA;
+    return guestVA != 0;
+}

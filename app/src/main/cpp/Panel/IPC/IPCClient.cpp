@@ -65,6 +65,14 @@ void SyncConfigToDaemon() {
     state.Magic = IPC_MAGIC_STATE;
     state.Seq = ++g_ConfigSeq;
 
+    ImGuiIO& io = ImGui::GetIO();
+
+state.ScreenWidth =
+    static_cast<int>(io.DisplaySize.x);
+
+state.ScreenHeight =
+    static_cast<int>(io.DisplaySize.y);
+
     state.AimBot_Enabled = g_Globals.AimBot.Enabled;
     state.AimBot_Fov = g_Globals.AimBot.Fov;
     state.AimBot_MaxDistance = g_Globals.AimBot.MaxDistance;

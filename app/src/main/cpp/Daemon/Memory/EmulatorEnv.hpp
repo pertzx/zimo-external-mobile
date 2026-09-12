@@ -2,7 +2,15 @@
 #include <string>
 #include <cstdint>
 
-enum class ABIType { Unknown, X86_64, X86 };
+// enum class ABIType { Unknown, X86_64, X86 };
+enum class ABIType
+{
+    ARM32,
+    ARM64,
+    X86,
+    X86_64,
+    Unknown
+};
 enum class EmulatorType { Unknown, Msi4, BlueStacks4, BlueStacks5, BlueStacks5Beta, Bluestacks5China, Msi5 };
 
 class EmulatorEnvironment {

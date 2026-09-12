@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.18.1)
+
 project("stormcheats")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,109 +11,142 @@ find_library(EGL-lib EGL)
 find_library(GLESv3-lib GLESv3)
 
 set(CPP_DIR ${CMAKE_SOURCE_DIR})
-set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/../External)  # <-- CORRIGIDO: era ../../External
+set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/../External)
+
 set(IMGUI_DIR ${EXTERNAL_DIR}/ImGui)
 set(FREETYPE_INCLUDE_DIR ${EXTERNAL_DIR}/FreeType/Include)
 
-# ==== ImGui ====
+# ============================================================
+# IMGUI
+# ============================================================
+
 set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/imgui_stdlib.cpp
-    # ${IMGUI_DIR}/imgui_freetype.cpp  # Excluded: FreeType not available in NDK
     ${IMGUI_DIR}/imgui_impl_opengl3.cpp
     ${IMGUI_DIR}/imgui_impl_android.cpp
     ${IMGUI_DIR}/Custom.cpp
     ${IMGUI_DIR}/stb_image.cpp
 )
 
-# ==== Sources compartilhados ====
+# ============================================================
+# SHARED - somente código realmente compartilhado
+# ============================================================
+
 set(SHARED_SOURCES
+
     ${CPP_DIR}/Shared/Globals.hpp
+
     ${CPP_DIR}/Shared/Utils/Utils.cpp
     ${CPP_DIR}/Shared/Utils/Utils.hpp
+
     ${CPP_DIR}/Shared/Utils/AndroidUtils.cpp
     ${CPP_DIR}/Shared/Utils/AndroidUtils.hpp
+
     ${CPP_DIR}/Shared/Config/saveconfig.cpp
+
     ${CPP_DIR}/Shared/IPC/IPCProtocol.hpp
+
     ${CPP_DIR}/Shared/Math/Math.cpp
     ${CPP_DIR}/Shared/Math/Math.hpp
     ${CPP_DIR}/Shared/Math/MathUtils.hpp
+
     ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.cpp
     ${CPP_DIR}/Shared/Math/Quaternion/Quaternion.hpp
+
     ${CPP_DIR}/Shared/Math/Vectors/Vector2.cpp
     ${CPP_DIR}/Shared/Math/Vectors/Vector2.hpp
+
     ${CPP_DIR}/Shared/Math/Vectors/Vector3.cpp
     ${CPP_DIR}/Shared/Math/Vectors/Vector3.hpp
+
     ${CPP_DIR}/Shared/Math/Vectors/Vector4.cpp
     ${CPP_DIR}/Shared/Math/Vectors/Vector4.hpp
-    ${CPP_DIR}/Shared/Offsets/Offsets.cpp
-    ${CPP_DIR}/Shared/Offsets/Offsets.hpp
+
     ${EXTERNAL_DIR}/Notify/Notify.cpp
     ${EXTERNAL_DIR}/Notify/Notify.hpp
-    ${CPP_DIR}/Daemon/Memory/Memory.cpp
-    ${CPP_DIR}/Daemon/Memory/Memory.hpp
 )
 
-# ==== Sources do Painel ====
+# ============================================================
+# PANEL
+# ============================================================
+
 set(PANEL_SOURCES
+
     ${CPP_DIR}/Panel/main.cpp
+
     ${CPP_DIR}/Panel/PanelApp.cpp
     ${CPP_DIR}/Panel/PanelApp.hpp
+
     ${CPP_DIR}/Panel/AndroidOverlay.cpp
     ${CPP_DIR}/Panel/AndroidOverlay.hpp
+
     ${CPP_DIR}/Panel/AndroidInput.cpp
     ${CPP_DIR}/Panel/AndroidInput.hpp
+
     ${CPP_DIR}/Panel/IPC/IPCClient.cpp
     ${CPP_DIR}/Panel/IPC/IPCClient.hpp
+
     ${CPP_DIR}/Panel/Interface/Interface.cpp
     ${CPP_DIR}/Panel/Interface/Interface.hpp
     ${CPP_DIR}/Panel/Interface/unpacker.h
+
     ${CPP_DIR}/Panel/Fonts/Fonts.cpp
     ${CPP_DIR}/Panel/Fonts/Fonts.hpp
-    ${CPP_DIR}/Daemon/Unity/UTF/UTF8.cpp
-    ${CPP_DIR}/Daemon/Memory/Memory.cpp
-    ${CPP_DIR}/Daemon/Memory/EmulatorEnv.cpp
 )
 
-# ==== Sources do Daemon ====
+# ============================================================
+# DAEMON
+# ============================================================
+
 set(DAEMON_SOURCES
+
     ${CPP_DIR}/Daemon/daemon_main.cpp
+
     ${CPP_DIR}/Daemon/DaemonApp.cpp
     ${CPP_DIR}/Daemon/DaemonApp.hpp
+
     ${CPP_DIR}/Daemon/IPC/IPCServer.cpp
     ${CPP_DIR}/Daemon/IPC/IPCServer.hpp
+
     ${CPP_DIR}/Daemon/Memory/Memory.cpp
     ${CPP_DIR}/Daemon/Memory/Memory.hpp
+
     ${CPP_DIR}/Daemon/Memory/EmulatorEnv.cpp
     ${CPP_DIR}/Daemon/Memory/EmulatorEnv.hpp
+
     ${CPP_DIR}/Daemon/Data.cpp
-    # ${CPP_DIR}/Daemon/Draw/Draw.cpp      # Excluded: Windows-specific code
-    # ${CPP_DIR}/Daemon/Draw/Draw.hpp      # Excluded: Windows-specific code
-    # ${CPP_DIR}/Daemon/Draw/Silent.cpp    # Excluded: Windows-specific code
-    # ${CPP_DIR}/Daemon/Draw/Silent.hpp    # Excluded: Windows-specific code
+    ${CPP_DIR}/Daemon/Data.hpp
+
     ${CPP_DIR}/Daemon/Draw/Skeleton.cpp
     ${CPP_DIR}/Daemon/Draw/Skeleton.hpp
+
     ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.cpp
     ${CPP_DIR}/Daemon/Draw/Weapon/NameGun.h
+
     ${CPP_DIR}/Daemon/Unity/Unity.cpp
     ${CPP_DIR}/Daemon/Unity/Unity.hpp
+
     ${CPP_DIR}/Daemon/Unity/UTF/UTF8.cpp
     ${CPP_DIR}/Daemon/Unity/UTF/UTF8.hpp
+
+    ${CPP_DIR}/Shared/Offsets/Offsets.cpp
+    ${CPP_DIR}/Shared/Offsets/Offsets.hpp
 )
 
-# Windows-specific sources (excluded from Android build)
-# ${CPP_DIR}/External/DynamicStub/DynamicStub.cpp
-# ${CPP_DIR}/External/DynamicStub/DynamicStub.hpp
-# ${CPP_DIR}/External/VehPGDHook/Vehpageguardhook.cpp
-# ${CPP_DIR}/External/VehPGDHook/Vehpageguardhook.hpp
-# ${CPP_DIR}/Daemon/WebPanel/WebPanel.cpp
-# ${CPP_DIR}/Daemon/WebPanel/WebPanel.hpp
+# ============================================================
+# PANEL LIBRARY
+# ============================================================
 
-# ==== Biblioteca do Painel ====
-add_library(panel SHARED ${PANEL_SOURCES} ${SHARED_SOURCES} ${IMGUI_SOURCES})
+add_library(panel SHARED
+    ${PANEL_SOURCES}
+    ${SHARED_SOURCES}
+    ${IMGUI_SOURCES}
+)
+
 target_include_directories(panel PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Panel
@@ -120,7 +154,11 @@ target_include_directories(panel PRIVATE
     ${IMGUI_DIR}
     ${EXTERNAL_DIR}
 )
-target_compile_definitions(panel PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
+
+target_compile_definitions(panel PRIVATE
+    IMGUI_DEFINE_MATH_OPERATORS
+)
+
 target_link_libraries(panel
     ${log-lib}
     ${android-lib}
@@ -128,8 +166,16 @@ target_link_libraries(panel
     ${GLESv3-lib}
 )
 
-# ==== Biblioteca do Daemon ====
-add_library(daemon SHARED ${DAEMON_SOURCES} ${SHARED_SOURCES} ${IMGUI_SOURCES})
+# ============================================================
+# DAEMON LIBRARY
+# ============================================================
+
+add_library(daemon SHARED
+    ${DAEMON_SOURCES}
+    ${SHARED_SOURCES}
+    ${IMGUI_SOURCES}
+)
+
 target_include_directories(daemon PRIVATE
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Daemon
@@ -137,10 +183,15 @@ target_include_directories(daemon PRIVATE
     ${FREETYPE_INCLUDE_DIR}
     ${EXTERNAL_DIR}
 )
+
+target_compile_definitions(daemon PRIVATE
+    DAEMON_BUILD
+    IMGUI_DEFINE_MATH_OPERATORS
+)
+
 target_link_libraries(daemon
     ${log-lib}
     ${android-lib}
     ${EGL-lib}
     ${GLESv3-lib}
 )
-target_compile_definitions(daemon PRIVATE DAEMON_BUILD IMGUI_DEFINE_MATH_OPERATORS)

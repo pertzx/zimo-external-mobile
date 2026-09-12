@@ -1,4 +1,6 @@
 #include "IPCServer.hpp"
+#include "../Unity/Unity.hpp"
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -95,6 +97,12 @@ void ProcessCommands() {
     if (n == sizeof(config) && config.Magic == IPC_MAGIC_STATE) {
         if (config.Seq != g_LastConfig.Seq) {
             g_LastConfig = config;
+
+            ScreenWidth =
+    config.ScreenWidth;
+
+ScreenHeight =
+    config.ScreenHeight;
 
             // Mapear IPC_CONFIG_STATE de volta para g_Globals
             g_Globals.AimBot.Enabled = config.AimBot_Enabled;

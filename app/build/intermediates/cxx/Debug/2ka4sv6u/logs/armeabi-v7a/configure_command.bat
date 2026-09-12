@@ -1,0 +1,20 @@
+@echo off
+"C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\cmake.exe" ^
+  "-HC:\\zimo-external-mobile\\app\\src\\main\\cpp" ^
+  "-DCMAKE_SYSTEM_NAME=Android" ^
+  "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON" ^
+  "-DCMAKE_SYSTEM_VERSION=28" ^
+  "-DANDROID_PLATFORM=android-28" ^
+  "-DANDROID_ABI=armeabi-v7a" ^
+  "-DCMAKE_ANDROID_ARCH_ABI=armeabi-v7a" ^
+  "-DANDROID_NDK=C:\\Android\\Sdk\\ndk\\25.1.8937393" ^
+  "-DCMAKE_ANDROID_NDK=C:\\Android\\Sdk\\ndk\\25.1.8937393" ^
+  "-DCMAKE_TOOLCHAIN_FILE=C:\\Android\\Sdk\\ndk\\25.1.8937393\\build\\cmake\\android.toolchain.cmake" ^
+  "-DCMAKE_MAKE_PROGRAM=C:\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe" ^
+  "-DCMAKE_CXX_FLAGS=-std=c++17 -O2" ^
+  "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\armeabi-v7a" ^
+  "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\\zimo-external-mobile\\app\\build\\intermediates\\cxx\\Debug\\2ka4sv6u\\obj\\armeabi-v7a" ^
+  "-DCMAKE_BUILD_TYPE=Debug" ^
+  "-BC:\\zimo-external-mobile\\app\\.cxx\\Debug\\2ka4sv6u\\armeabi-v7a" ^
+  -GNinja ^
+  "-DANDROID_STL=c++_shared"
