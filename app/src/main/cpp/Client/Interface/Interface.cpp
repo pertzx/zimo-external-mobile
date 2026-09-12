@@ -1235,6 +1235,22 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         ImGui::Dummy(ImVec2(0, 8));
 
+                                                        /*
+                                                         * Perfil de offsets: AUTO roda a probe de versao;
+                                                         * os modos FORCAR aplicam seu perfil direto, sem
+                                                         * validar a versao do jogo (bypass da probe).
+                                                         */
+                                                        Custom::Combo(XorStr("Offsets Profile"), &g_Globals.General.ForceProfile,
+                                                                XorStr("Auto (probe)\0Forcar v7a b75\0Forcar v7a b76\0"));
+
+                                                        if (Custom::Button(XorStr("Apply + Restart"), ImVec2(ImGui::GetWindowSize().x - 28, 36)))
+                                                        {
+                                                                std::thread([]{ g_FreeFireMemory.Restart(); }).detach();
+                                                                NotifyManager::Send(XorStr("Reiniciando com o perfil selecionado..."), 4000);
+                                                        }
+
+                                                        ImGui::Dummy(ImVec2(0, 8));
+
                                                         Custom::Checkbox(XorStr("Web Remote"), &g_Globals.General.WebRemote);
                                                         if (g_Globals.General.WebRemote)
                                                         {
@@ -1243,22 +1259,7 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                                 if (Custom::Button(XorStr("Copy Link"), ImVec2(ImGui::GetWindowSize().x - 28, 30)))
                                                                 {
-                                                                        // REMOVIDO PRA PORTAR ANDROID: Copy Link
-                                                                        // REMOVIDO PRA PORTAR ANDROID: Copy Link
                                                                         NotifyManager::Send(XorStr("Feature removida, corrije e adapte pra android."), 2500);
-                                                                        /* if (OpenClipboard(nullptr))
-                                                                        {
-                                                                                EmptyClipboard();
-                                                                                HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, url.size() + 1);
-                                                                                if (mem)
-                                                                                {
-                                                                                        memcpy(GlobalLock(mem), url.c_str(), url.size() + 1);
-                                                                                        GlobalUnlock(mem);
-                                                                                        SetClipboardData(CF_TEXT, mem);
-                                                                                        NotifyManager::Send(XorStr("Link Copiado!"), 2500);
-                                                                                }
-                                                                                CloseClipboard();
-                                                                        } */
                                                                 }
                                                         }
 
@@ -1290,20 +1291,6 @@ lastFrameHoveredId = gc.HoveredId;
                                                         {
                                                                 std::thread([]{ g_FreeFireMemory.Restart(); }).detach();
                                                                 NotifyManager::Send(XorStr("Restarted"), 4000);
-                                                        }
-                                                }
-                                                Custom::EndCustomChild();
-
-                                                ImGui::SetCursorPos(ImVec2(cardWidth + 10 + AnimaTab, 0));
-                                                Custom::CustomChild(XorStr("Extra"), ImVec2(cardWidth, cardHeight));
-                                                {
-                                                        Custom::KeyBind(XorStr("Menu Key"), &g_Globals.General.MenuKey, false);
-
-                                                        ImGui::Dummy(ImVec2(0, 8));
-
-                                                        if (Custom::Button(XorStr("Unload"), ImVec2(ImGui::GetWindowSize().x - 28, 36)))
-                                                        {
-                                                                g_WantShutdown = true;
                                                         }
                                                 }
                                                 Custom::EndCustomChild();

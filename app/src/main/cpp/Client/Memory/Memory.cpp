@@ -1,4 +1,4 @@
-#include "Memory.hpp"
+﻿#include "Memory.hpp"
 
 #include "BridgeClient.hpp"
 
@@ -60,6 +60,7 @@ bool Memory::s_Target32Bit = false;
 int Memory::s_ProcMemFd = -1;
 bool Memory::s_Initialized = false;
 volatile bool Memory::s_RestartInProgress = false;
+const char* Memory::s_LastInitError = "nao inicializado";
 
 namespace
 {
@@ -600,14 +601,18 @@ uintptr_t Memory::FindModuleBase(
 }
 
 bool Memory::DetectTarget32Bit(
-    pid_t pid
+    pid_t pid,
+    bool& outIs32
 )
 {
+    outIs32 = false;
+
     if (pid <= 0)
         return false;
 
     /*
      * CAMINHO 1: ponte (daemon lê /proc/<pid>/exe com privilegio root).
+     * Este é o caminho confiável — autoritativo.
      */
     if (BridgeClient::IsConnected())
     {
@@ -623,12 +628,22 @@ bool Memory::DetectTarget32Bit(
                 is32 ? "32-bit" : "64-bit"
             );
 
-            return is32;
+            outIs32 = is32;
+
+            return true;
         }
+
+        LOGW(
+            "Ponte conectada mas IS_32BIT falhou (daemon antigo/protocolo diferente?)"
+        );
     }
 
     /*
      * CAMINHO 2: leitura local do ELF (fallback).
+     *
+     * ATENÇÃO: sem root, readlink(/proc/<pid>/exe) de OUTRO app falha
+     * com EACCES. Nesse caso a resposta é "DESCONHECIDO" — e NUNCA
+     * mais "false = 64-bit" (era isso que detectava FF 32-bit como 64).
      */
     char path[64];
 
@@ -651,7 +666,7 @@ bool Memory::DetectTarget32Bit(
     if (len <= 0)
     {
         LOGE(
-            "readlink(%s) falhou: %s",
+            "readlink(%s) falhou: %s (sem root nao da pra ler o ELF localmente)",
             path,
             strerror(errno)
         );
@@ -718,8 +733,10 @@ bool Memory::DetectTarget32Bit(
     if (ident[4] == 1)
     {
         LOGI(
-            "Target ELF = 32-bit"
+            "Target ELF = 32-bit (local)"
         );
+
+        outIs32 = true;
 
         return true;
     }
@@ -727,10 +744,12 @@ bool Memory::DetectTarget32Bit(
     if (ident[4] == 2)
     {
         LOGI(
-            "Target ELF = 64-bit"
+            "Target ELF = 64-bit (local)"
         );
 
-        return false;
+        outIs32 = false;
+
+        return true;
     }
 
     LOGE(
@@ -1433,6 +1452,16 @@ void Memory::EnableOpLogging(
     );
 }
 
+bool Memory::IsInitialized()
+{
+    return s_Initialized;
+}
+
+const char* Memory::GetLastInitError()
+{
+    return s_LastInitError;
+}
+
 bool Memory::IsBridgeConnected()
 {
     return BridgeClient::IsConnected();
@@ -1487,6 +1516,8 @@ bool Memory::Initialize()
             "[INIT] FALHA: PID nao encontrado"
         );
 
+        s_LastInitError = "jogo nao encontrado (FF aberto? daemon rodando?)";
+
         return false;
     }
 
@@ -1495,10 +1526,20 @@ bool Memory::Initialize()
         pid
     );
 
-    bool target32 =
-        DetectTarget32Bit(
-            pid
+    bool target32 = false;
+
+    if (!DetectTarget32Bit(pid, target32))
+    {
+        LOGE(
+            "[INIT] Arquitetura do alvo DESCONHECIDA (ponte offline + leitura local sem permissao)."
         );
+
+        LOGE(
+            "[INIT] NAO vou chutar 64-bit: abortando init. O watchdog tenta de novo quando a ponte subir."
+        );
+
+        return false;
+    }
 
     LOGI(
         "[INIT] Arquitetura alvo: %s",
@@ -1519,6 +1560,8 @@ bool Memory::Initialize()
             "[INIT] FALHA: libil2cpp.so nao encontrada no PID %d",
             pid
         );
+
+        s_LastInitError = "libil2cpp.so nao encontrada no processo";
 
         return false;
     }
@@ -1558,6 +1601,8 @@ bool Memory::Initialize()
         LOGE(
             "[INIT] FALHA abrindo memoria do processo"
         );
+
+        s_LastInitError = "falha abrindo memoria do processo (ponte/local)";
 
         Shutdown();
 
@@ -1599,26 +1644,37 @@ bool Memory::Initialize()
         "[INIT] Chamando Offsets::GameConfig()..."
     );
 
-    Offsets::GameConfig();
+        Offsets::GameConfig();
 
 LOGI("[INIT] GameConfig terminou");
 LOGI("[INIT] LibIl2Cpp = 0x%lX",
      static_cast<unsigned long>(Offsets::LibIl2Cpp));
 
-if (Offsets::LibIl2Cpp == 0) {
-    LOGI("[INIT] Nenhuma configuracao de offsets foi identificada.");
-    LOGI("[INIT] Continuando mesmo assim: a base de libil2cpp permanece valida.");
+/*
+ * FIX CRITICO: antes este bloco "continuava mesmo assim" quando o
+ * GameConfig() nao casava nenhuma versao — restaurava a base da lib e
+ * declarava SUCCESS com TODOS os offsets em 0. O ReadLoop entao lia o
+ * proprio header ELF da lib como se fosse ponteiro (0x464C457F /
+ * 0x00010101464C457F no log da ponte = bytes "\x7FELF\x01\x01\x01")
+ * e falhava eternamente. Agora: offsets zerados = init FALHOU.
+ */
+if (!Offsets::Loaded())
+{
+    LOGE("[INIT] ==================================================");
+    LOGE("[INIT] GameConfig NAO carregou offsets reais!");
+    LOGE("[INIT] Causa provavel: a versao do seu FF nao casou com");
+    LOGE("[INIT] nenhuma probe (OB54 b75/b76). Veja os logs da tag");
+    LOGE("[INIT] StormOffsets para descobrir a versao que apareceu.");
+    LOGE("[INIT] ==================================================");
 
-    Offsets::LibIl2Cpp = libAddress;
-}
+    s_LastInitError = "versao do jogo nao suportada — offsets nao encontrados";
 
-if (Offsets::LibIl2Cpp == 0) {
-    LOGE("[INIT] LibIl2Cpp continua invalida apos fallback");
+    Shutdown();
+
     return false;
 }
 
-LOGI("[INIT] LibIl2Cpp final = 0x%lX",
-     static_cast<unsigned long>(Offsets::LibIl2Cpp));
+LOGI("[INIT] Offsets::Loaded() = true — offsets reais carregados");
 
     LOGI(
         "[INIT] Teste de offsets principais:"
@@ -1748,10 +1804,20 @@ bool Memory::RefreshCR3()
     s_TargetPid =
         currentPid;
 
-    s_Target32Bit =
-        DetectTarget32Bit(
-            currentPid
+        bool target32 = false;
+
+    if (!DetectTarget32Bit(currentPid, target32))
+    {
+        LOGE(
+            "[REFRESH] arquitetura do alvo desconhecida (ponte offline?) - abortando refresh"
         );
+
+        Shutdown();
+
+        return false;
+    }
+
+    s_Target32Bit = target32;
 
     s_LibIl2Cpp =
         currentLib;
@@ -1780,9 +1846,7 @@ bool Memory::RefreshCR3()
 
     Offsets::GameConfig();
 
-    if (
-        Offsets::LibIl2Cpp == 0
-    )
+    if (!Offsets::Loaded())
     {
         LOGE(
             "RefreshCR3: GameConfig falhou"

@@ -330,7 +330,16 @@ public:
 		TValue GetValue(int Index);
 	};
 
-	static void GameConfig();
+	    static void GameConfig();
+
+        /*
+         * true somente quando um conjunto de offsets REAL foi carregado pelo
+         * GameConfig(). Se qualquer offset-chave continuar em 0, a busca inicial
+         * nao casou com nenhuma versao suportada — e o ReadLoop NAO PODE rodar:
+         * com GameFacade_TypeInfo=0 ele le o proprio header ELF da lib como se
+         * fosse ponteiro (0x464C457F / 0x00010101464C457F no log da ponte).
+         */
+        static bool Loaded();
 private:
 	static void FFTHV7A75();
 	static void FFTHV7A76();

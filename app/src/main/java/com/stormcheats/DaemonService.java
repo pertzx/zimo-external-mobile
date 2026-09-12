@@ -83,6 +83,9 @@ public class DaemonService extends Service {
     // Backoff do watchdog: 3s, 5s, 10s, 15s, 20s, 20s...
     private long restartBackoffMs = 3000;
 
+    // Retry da instalação (zombie daemon, root demorando, etc)
+    private int installRetries = 0;
+
     // ------------------------------------------------------------------
     // CICLO DE VIDA DO SERVIÇO
     // ------------------------------------------------------------------
@@ -159,12 +162,12 @@ public class DaemonService extends Service {
             if (!checkRoot()) {
                 Log.e(TAG, "SEM ROOT: su não retornou uid=0. O daemon-ponte não pode iniciar.");
                 Log.e(TAG, "Dica: conceda acesso su ao app no seu gerenciador root (Magisk/SuperSU).");
-                installing.set(false);
+                scheduleInstallRetry();
                 return;
             }
 
-            // Para qualquer instância anterior antes de sobrescrever arquivos
-            stopStormDaemon();
+            // Mata QUALQUER stormdaemon antigo antes de mexer nos arquivos
+            killAllDaemons();
 
             String abi = chooseAbi();
             Log.i(TAG, "ABI do daemon: " + abi);
@@ -177,7 +180,7 @@ public class DaemonService extends Service {
 
             if (!installFiles(localDaemon, localCppShared)) {
                 Log.e(TAG, "Falha instalando arquivos em " + REMOTE_DIR);
-                installing.set(false);
+                scheduleInstallRetry();
                 return;
             }
 
@@ -186,6 +189,7 @@ public class DaemonService extends Service {
 
             started = true;
             installing.set(false);
+            installRetries = 0;
 
             Log.i(TAG, "────────────────────────────────────────");
             Log.i(TAG, "Daemon-ponte pronto. Socket: " + BRIDGE_SOCKET);
@@ -194,8 +198,164 @@ public class DaemonService extends Service {
 
         } catch (Throwable e) {
             Log.e(TAG, "Falha no installAndStart", e);
-            installing.set(false);
+            scheduleInstallRetry();
         }
+    }
+
+    // ==================================================================
+    // 1.1) KILL ROBUSTO: mata qualquer instância antiga do daemon
+    //
+    //      - kill via pidfile (pode estar desatualizado)
+    //      - killall + pkill por NOME (comm do processo é "stormdaemon")
+    //      - kill -9 final via pgrep
+    //
+    //      Importante: NÃO usar "pkill -f" (o -f casa com a linha de
+    //      comando e mataria o próprio shell do su que roda o comando).
+    // ==================================================================
+
+    private void killAllDaemons() {
+        Log.i(TAG, "Matando qualquer stormdaemon antigo (pidfile + killall + pkill)");
+
+        try {
+            String command =
+                    "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
+                    "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+                    "fi; " +
+                    "killall stormdaemon 2>/dev/null; " +
+                    "pkill stormdaemon 2>/dev/null; " +
+                    "sleep 0.5; " +
+                    "kill -9 $(pgrep stormdaemon) 2>/dev/null; " +
+                    "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET);
+
+            runAsRoot(command);
+
+        } catch (Throwable e) {
+            Log.w(TAG, "Erro no killAllDaemons: " + e.getMessage());
+        }
+
+        if (rootProcess != null) {
+            try {
+                rootProcess.destroy();
+            } catch (Throwable ignored) {
+            }
+            rootProcess = null;
+        }
+    }
+
+    // ==================================================================
+    // 1.2) RETRY DA INSTALAÇÃO
+    // ==================================================================
+
+    private void scheduleInstallRetry() {
+        installRetries++;
+
+        if (installRetries > 5) {
+            Log.e(TAG, "Desistindo do retry de instalação após 5 tentativas");
+            installing.set(false);
+            return;
+        }
+
+        Log.w(TAG, "Agendando reinstalação em 15s (tentativa " + installRetries + "/5)");
+        installing.set(false);
+
+        new Thread(() -> {
+            try {
+                Thread.sleep(15000);
+            } catch (InterruptedException e) {
+                return;
+            }
+
+            if (installing.compareAndSet(false, true)) {
+                Log.i(TAG, "RETRY de instalação do daemon (" + installRetries + "/5)");
+                installAndStart();
+            }
+        }, "StormDaemonRetry").start();
+    }
+
+    // ==================================================================
+    // 4) INSTALAÇÃO EM /data/local/tmp (via su)
+    //
+    //    A correção do "Text file busy": rm -f ANTES do cat.
+    //    Não se pode ESCREVER num binário em execução (ETXTBSY), mas
+    //    pode REMOVER a entrada dele (rm) e criar um arquivo novo no
+    //    lugar — o cat cria um inode novo e o ETXTBSY desaparece.
+    // ==================================================================
+
+    private boolean installFiles(File localDaemon, File localCppShared) {
+        killAllDaemons();
+
+        String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
+        String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
+        String qDaemon = shellQuote(REMOTE_DAEMON);
+        String qCpp = shellQuote(REMOTE_CPP_SHARED);
+
+        String command =
+                "mkdir -p " + shellQuote(REMOTE_DIR) +
+                " && rm -f " + qDaemon + " " + qCpp +
+                " && cat " + qLocalDaemon + " > " + qDaemon +
+                " && chmod 755 " + qDaemon +
+                " && chown root:root " + qDaemon +
+                " && cat " + qLocalCpp + " > " + qCpp +
+                " && chmod 644 " + qCpp +
+                " && chmod 771 " + shellQuote(REMOTE_DIR) +
+                " && ls -l " + qDaemon;
+
+        boolean installed = false;
+        String output = "";
+
+        for (int attempt = 1; attempt <= 3 && !installed; attempt++) {
+            if (attempt > 1) {
+                Log.w(TAG, "Tentativa " + attempt + " de instalação (kill again + retry)");
+                killAllDaemons();
+            }
+
+            output = runAsRoot(command);
+
+            if (output.contains("Text file busy")) {
+                Log.e(TAG, "Text file busy - daemon antigo ainda rodando, matando e tentando de novo");
+                continue;
+            }
+
+            installed = true;
+        }
+
+        if (!installed) {
+            Log.e(TAG, "Instalação falhou após 3 tentativas. Última saída: " + output);
+            return false;
+        }
+
+        if (output.contains("Permission denied")) {
+            Log.e(TAG, "Permission denied instalando em " + REMOTE_DIR);
+            return false;
+        }
+
+        // Confirma tamanho instalado = tamanho extraído
+        try {
+            long expected = localDaemon.length();
+            String check = runAsRoot("stat -c %s " + qDaemon);
+
+            if (!check.isEmpty()) {
+                long installedSize = Long.parseLong(check.trim());
+                if (installedSize != expected) {
+                    Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installedSize);
+                    return false;
+                }
+                Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installedSize + " bytes)");
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
+        }
+
+        return true;
+    }
+
+    // ==================================================================
+    // 8) PARAR O DAEMON
+    // ==================================================================
+
+    private void stopStormDaemon() {
+        Log.i(TAG, "Parando daemon (kill robusto + limpeza de socket/pid)");
+        killAllDaemons();
     }
 
     // ==================================================================
@@ -377,43 +537,43 @@ public class DaemonService extends Service {
     // 4) INSTALAÇÃO EM /data/local/tmp (via su)
     // ==================================================================
 
-    private boolean installFiles(File localDaemon, File localCppShared) {
-        String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
-        String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
-        String qDaemon = shellQuote(REMOTE_DAEMON);
-        String qCpp = shellQuote(REMOTE_CPP_SHARED);
+//     private boolean installFiles(File localDaemon, File localCppShared) {
+//         String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
+//         String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
+//         String qDaemon = shellQuote(REMOTE_DAEMON);
+//         String qCpp = shellQuote(REMOTE_CPP_SHARED);
 
-        String command =
-                "mkdir -p " + shellQuote(REMOTE_DIR) +
-                " && cat " + qLocalDaemon + " > " + qDaemon +
-                " && chmod 755 " + qDaemon +
-                " && chown root:root " + qDaemon +
-                " && cat " + qLocalCpp + " > " + qCpp +
-                " && chmod 644 " + qCpp +
-                " && chmod 771 " + shellQuote(REMOTE_DIR) +
-                " && ls -l " + qDaemon;
+//         String command =
+//                 "mkdir -p " + shellQuote(REMOTE_DIR) +
+//                 " && cat " + qLocalDaemon + " > " + qDaemon +
+//                 " && chmod 755 " + qDaemon +
+//                 " && chown root:root " + qDaemon +
+//                 " && cat " + qLocalCpp + " > " + qCpp +
+//                 " && chmod 644 " + qCpp +
+//                 " && chmod 771 " + shellQuote(REMOTE_DIR) +
+//                 " && ls -l " + qDaemon;
 
-        String output = runAsRoot(command);
+//         String output = runAsRoot(command);
 
-        // Confirma tamanho instalado = tamanho extraído
-        try {
-            long expected = localDaemon.length();
-            String check = runAsRoot("stat -c %s " + qDaemon);
+//         // Confirma tamanho instalado = tamanho extraído
+//         try {
+//             long expected = localDaemon.length();
+//             String check = runAsRoot("stat -c %s " + qDaemon);
 
-            if (!check.isEmpty()) {
-                long installed = Long.parseLong(check.trim());
-                if (installed != expected) {
-                    Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installed);
-                    return false;
-                }
-                Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installed + " bytes)");
-            }
-        } catch (Throwable e) {
-            Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
-        }
+//             if (!check.isEmpty()) {
+//                 long installed = Long.parseLong(check.trim());
+//                 if (installed != expected) {
+//                     Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installed);
+//                     return false;
+//                 }
+//                 Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installed + " bytes)");
+//             }
+//         } catch (Throwable e) {
+//             Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
+//         }
 
-        return !output.contains("Permission denied");
-    }
+//         return !output.contains("Permission denied");
+//     }
 
     // ==================================================================
     // 5) INICIAR O DAEMON COMO ROOT
@@ -643,31 +803,31 @@ public class DaemonService extends Service {
     // 8) PARAR O DAEMON
     // ==================================================================
 
-    private void stopStormDaemon() {
-        Log.i(TAG, "Parando daemon (kill via su + limpeza de socket/pid)");
+//     private void stopStormDaemon() {
+//         Log.i(TAG, "Parando daemon (kill via su + limpeza de socket/pid)");
 
-        try {
-            runAsRoot(
-                    "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
-                    "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
-                    "sleep 0.5; " +
-                    "kill -KILL $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
-                    "fi; " +
-                    "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET));
+//         try {
+//             runAsRoot(
+//                     "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
+//                     "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+//                     "sleep 0.5; " +
+//                     "kill -KILL $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+//                     "fi; " +
+//                     "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET));
 
-        } catch (Throwable e) {
-            Log.w(TAG, "Erro no stop via su: " + e.getMessage());
-        }
+//         } catch (Throwable e) {
+//             Log.w(TAG, "Erro no stop via su: " + e.getMessage());
+//         }
 
-        if (rootProcess != null) {
-            try {
-                rootProcess.destroy();
-            } catch (Throwable ignored) {
-            }
+//         if (rootProcess != null) {
+//             try {
+//                 rootProcess.destroy();
+//             } catch (Throwable ignored) {
+//             }
 
-            rootProcess = null;
-        }
-    }
+//             rootProcess = null;
+//         }
+//     }
 
     // ==================================================================
     // 9) LOG DA SAÍDA DO PROCESSO ROOT

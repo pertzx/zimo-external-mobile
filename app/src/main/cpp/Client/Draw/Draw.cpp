@@ -53,6 +53,9 @@ static void DiagLog(
     va_end(args);
 }
 
+bool Data::m_ThreadN32 = false;
+bool Data::m_ThreadV31 = false;
+
 // Uma view-projection matrix valida tem elementos finitos e magnitude normal.
 // Uma leitura "rasgada" (o jogo escreve os 64 bytes enquanto lemos) ou de um
 // camera invalida costuma vir com NaN/Inf, tudo ~0 ou valores absurdos.
@@ -240,6 +243,9 @@ void Data::StartReadThread()
     if (m_Running.load())
         return;
 
+	// ENABLE: LIGA o READ/WRITE de cada operacao do daemon
+	Memory::EnableOpLogging(true);
+
     m_Running.store(true);
 
     const bool N32 =
@@ -384,22 +390,30 @@ if ( ++failCount > 20 )
 			};
 
 			uintptr_t GameFacade = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo );
+			DiagLog("[Data] GAMEFACADE: %p", GameFacade);
 			if ( GameFacade == 0 ) break;
-
+			
 			uintptr_t AccessClass = ReadPtr( GameFacade + Offsets::AccessClass );
+			DiagLog("[Data] AccessClass: %p", AccessClass);
 			if ( AccessClass == 0 ) break;
-
+			
 			uintptr_t MatchGame = ReadPtr( AccessClass + Offsets::GameFacade::CurrentMatchGame );
+			DiagLog("[Data] MatchGame: %p", MatchGame);
 			if ( MatchGame == 0 ) break;
-
+			
 			uintptr_t Match = ReadPtr( MatchGame + Offsets::MatchGame::m_Match );
+			DiagLog("[Data] Match: %p", Match);
 			if ( Match == 0 ) break;
 			matchRead = true;
-
+			
 			int MatchRaw = g_FreeFireMemory.Read<int>( Match + Offsets::Match::m_State );
+			DiagLog("[Data] MatchRaw: %p", MatchRaw);
 			auto MatchState = static_cast< Offsets::MatchState >( MatchRaw );
+			DiagLog("[Data] MatchState: %p", MatchState);
 			readMatchState = true;
 			if ( !Offsets::IsMatchActive( MatchState ) ) break;
+			DiagLog("[Data] PARTIDA ATIVA!");
+			
 			matchActive = true;
 
 			uintptr_t LocalObserver = ReadPtr( Match + Offsets::Match::m_LocalObserver );
@@ -786,69 +800,107 @@ GameContext Data::GetContext( )
 
 void Data::Draw( int width, int height, bool N32, bool V31 )
 {
-	Memory::FlushTLB( );
+        Memory::FlushTLB( );
 
-	if ( g_Globals.General.EnableFuncs == 0 ) return;
+        /*
+         * ============================================================
+         * INIT/DETECCAO — roda ANTES do gate de EnableFuncs.
+         *
+         * Antes: sem login (EnableFuncs=0) isso aqui retornava na hora
+         * e NADA inicializava — nem PID, nem ponte, nem v7a/v8a.
+         * Agora: procurar o jogo, conectar na ponte e detectar a
+         * arquitetura acontece assim que o painel sobe, com FF aberto
+         * ou nao. O gate continua valendo para ESP/aim/exploits.
+         * ============================================================
+         */
+        if ( Offsets::LibIl2Cpp == 0 )
+        {
+                g_FreeFireMemory.RestartAsync( );
+                StartReadThread( );
 
-	// Globals de projecao atualizados ANTES de qualquer desenho (inclusive o
-	// path de base==0 abaixo) — W2S nunca usa dimensoes de um frame antigo.
-	ScreenWidth = width;
-	ScreenHeight = height;
+                static LONGLONG lastInitLog = 0;
+                LONGLONG nowI = GetTickCount64( );
+                if ( nowI - lastInitLog > 1000 )
+                {
+                        lastInitLog = nowI;
+                        DiagLog( "[init] base==0: procurando jogo via ponte (EnableFuncs=%d)", ( int )g_Globals.General.EnableFuncs );
+                }
+        }
+        else if ( !m_Running.load( ) )
+        {
+                /*
+                 * Base valida mas a thread de leitura nunca existiu
+                 * (StartReadThread so era chamado no watchdog, que por
+                 * sua vez exigia m_ThreadValid=true — ou seja, nunca
+                 * subia). Sobe agora.
+                 */
+                StartReadThread( );
+        }
 
-	// Corpo inteiro protegido: uma excecao (bad_alloc do snapshot, leitura
-	// lixo) nao pode derrubar o frame de render — sem isso o overlay inteiro
-	// congela e a ESP morre junto. Captura e segue o proximo frame.
-	try
-	{
+		// BYPASS pra sem auth
+		g_Globals.General.EnableFuncs = 1;
+        if ( g_Globals.General.EnableFuncs == 0 )
+        {
+                static LONGLONG lastGateLog = 0;
+                LONGLONG nowG = GetTickCount64( );
+                if ( nowG - lastGateLog > 2000 )
+                {
+                        lastGateLog = nowG;
+                        DiagLog( "[gate] EnableFuncs=0 (faca login no painel) - ESP/aim/exploits pausados" );
+                }
+                return;
+        }
 
-	// Sempre que a base/contexto nao permitir leituras vivas, desenha o overlay
-	// do ultimo snapshot congelado (posicoes de tela) para o ESP nunca sumir.
-	// O skeleton e desativado nesse caminho pois precisa de memoria ao vivo.
-	// liveMatrix: view matrix atual (releitura ao vivo ou ultima boa). Se
-	// valida, reprojeta os mundos do snapshot — o ESP SEGUE a camera mesmo
-	// sem leitura fresca, em vez de ficar grudado na tela.
-	auto DrawFrozenEsp = [ ] ( const Matrix4x4& liveMatrix )
-	{
-		// Master "ESP Player": com o toggle desligado nada do overlay congelado
-		// e desenhado (aim/silent nao dependem deste caminho).
-		if ( !g_Globals.Visuals.ESP.Enabled ) return;
+        // Globals de projecao atualizados ANTES de qualquer desenho (inclusive o
+        // path de base==0 abaixo) — W2S nunca usa dimensoes de um frame antigo.
+        ScreenWidth = width;
+        ScreenHeight = height;
 
-		// Snapshot velho NAO para o desenho: o snapshot congelado continua
-		// sendo exibido (reprojetado com a camera ao vivo, se houver) ate a
-		// leitura renovar — antes, >3s sem leitura fresca zerava a tela no
-		// meio da partida (engasgo do emulador/CR3) e o ESP so voltava quando
-		// a leitura voltava (ou nem voltava). A limpeza de verdade (partida
-		// encerrada) continua sendo feita pelo lobby-clear de 30s no ReadLoop.
+        // Corpo inteiro protegido: uma excecao (bad_alloc do snapshot, leitura
+        // lixo) nao pode derrubar o frame de render — sem isso o overlay inteiro
+        // congela e a ESP morre junto. Captura e segue o proximo frame.
+        try
+        {
 
-		const auto& ESPc = g_Globals.Visuals.ESP;
-		ImDrawList* DLc = ImGui::GetForegroundDrawList( );
+        // Sempre que a base/contexto nao permitir leituras vivas, desenha o overlay
+        // do ultimo snapshot congelado (posicoes de tela) para o ESP nunca sumir.
+        // O skeleton e desativado nesse caminho pois precisa de memoria ao vivo.
+        // liveMatrix: view matrix atual (releitura ao vivo ou ultima boa). Se
+        // valida, reprojeta os mundos do snapshot — o ESP SEGUE a camera mesmo
+        // sem leitura fresca, em vez de ficar grudado na tela.
+        auto DrawFrozenEsp = [ ] ( const Matrix4x4& liveMatrix )
+        {
+                // Master "ESP Player": com o toggle desligado nada do overlay congelado
+                // e desenhado (aim/silent nao dependem deste caminho).
+                if ( !g_Globals.Visuals.ESP.Enabled ) return;
 
-		std::vector<PlayerData> frozen;
-		{
-			std::lock_guard<std::mutex> lock( m_Mutex );
-			frozen = m_Players;
-		}
+                // Snapshot velho NAO para o desenho: o snapshot congelado continua
+                // sendo exibido (reprojetado com a camera ao vivo, se houver) ate a
+                // leitura renovar — antes, >3s sem leitura fresca zerava a tela no
+                // meio da partida (engasgo do emulador/CR3) e o ESP so voltava quando
+                // a leitura voltava (ou nem voltava). A limpeza de verdade (partida
+                // encerrada) continua sendo feita pelo lobby-clear de 30s no ReadLoop.
 
-		for ( const auto& p : frozen )
-			DrawEspEntityOverlay( p, DLc, ESPc, liveMatrix, false, false, false );
-	};
+                const auto& ESPc = g_Globals.Visuals.ESP;
+                ImDrawList* DLc = ImGui::GetForegroundDrawList( );
 
-	if ( Offsets::LibIl2Cpp == 0 )
-	{
-		// Relocaliza em background (single-flight + cooldown) sem travar
-		// a thread de render nem empilhar restarts.
-		g_FreeFireMemory.RestartAsync( );
+                std::vector<PlayerData> frozen;
+                {
+                        std::lock_guard<std::mutex> lock( m_Mutex );
+                        frozen = m_Players;
+                }
 
-		static LONGLONG lastBaseLog = 0;
-		LONGLONG now = GetTickCount64();
-		if ( now - lastBaseLog > 1000 )
-		{
-			lastBaseLog = now;
-			DiagLog( "[diag] base==0: DrawFrozenEsp, snapshot=%d", ( int )m_Players.size( ) );
-		}
-		DrawFrozenEsp( Data::GetContext( ).ViewMatrix );
-		return;
-	}
+                for ( const auto& p : frozen )
+                        DrawEspEntityOverlay( p, DLc, ESPc, liveMatrix, false, false, false );
+        };
+
+        if ( Offsets::LibIl2Cpp == 0 )
+        {
+                // Base ainda nao achada (RestartAsync ja foi acionado no
+                // bloco pre-gate acima, single-flight). Desenha o congelado.
+                DrawFrozenEsp( Data::GetContext( ).ViewMatrix );
+                return;
+        }
 
 	auto ReadPtr = [ N32 ] ( uintptr_t addr ) -> uintptr_t
 	{

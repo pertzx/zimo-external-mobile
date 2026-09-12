@@ -125,6 +125,8 @@ class Data
 	static std::atomic<bool> m_Running;
 	static pthread_t m_ThreadHandle;
 	static bool m_ThreadValid;
+	static bool m_ThreadN32;
+    static bool m_ThreadV31;
 	// true quando m_Players/m_Context vieram de um frame de leitura que
 	// completou com sucesso. Em falha transitória o snapshot antigo é mantido
 	// (ESP continua desenhando), mas fica "não fresco" para o aimbot não mirar

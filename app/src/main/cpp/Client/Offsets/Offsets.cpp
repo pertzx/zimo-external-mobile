@@ -9,6 +9,7 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormOffsets", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormOffsets", __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, "StormOffsets", __VA_ARGS__)
 
 #define OFFSET_LOGI(...) \
     __android_log_print(ANDROID_LOG_INFO, "StormOffsets", __VA_ARGS__)
@@ -321,135 +322,270 @@ template class Offsets::UnityDictionary<true, true, uint64_t>;
 template class Offsets::UnityDictionary<false, true, uint32_t>;
 template class Offsets::UnityDictionary<false, true, uint64_t>;
 
+bool Offsets::Loaded()
+{
+    return GameFacade::GameFacade_TypeInfo          != 0 &&
+           GameFacade::CurrentMatchGame             != 0 &&
+           MatchGame::m_Match                       != 0 &&
+           MatchGame::m_CameraControllerManager     != 0 &&
+           Match::m_State                           != 0 &&
+           Match::m_LocalPlayer                     != 0 &&
+           Match::m_AttackableEntities              != 0 &&
+           Camera::ViewMatrix                       != 0;
+}
+
+/*
+ * Dump (logcat) dos offsets-chave apos carregar um perfil — serve para
+ * conferir visualmente se o perfil que subiu e o esperado.
+ *
+ * ATENCAO: funcao SOLTA (fora da classe Offsets). Todo acesso a membros
+ * precisa do prefixo Offsets:: — sem isso o clang emite
+ * "use of undeclared identifier".
+ */
+static void LogLoadedOffsets(const char* perfil)
+{
+    LOGI("--------- PERFIL CARREGADO: %s ---------", perfil);
+    LOGI("  AccessClass                  = 0x%lX", (unsigned long)Offsets::AccessClass);
+    LOGI("  GameFacade.TypeInfo          = 0x%lX", (unsigned long)Offsets::GameFacade::GameFacade_TypeInfo);
+    LOGI("  GameFacade.CurrentMatchGame  = 0x%lX", (unsigned long)Offsets::GameFacade::CurrentMatchGame);
+    LOGI("  MatchGame.m_Match            = 0x%lX", (unsigned long)Offsets::MatchGame::m_Match);
+    LOGI("  MatchGame.m_CameraController = 0x%lX", (unsigned long)Offsets::MatchGame::m_CameraControllerManager);
+    LOGI("  Match.m_State                = 0x%lX", (unsigned long)Offsets::Match::m_State);
+    LOGI("  Match.m_LocalPlayer          = 0x%lX", (unsigned long)Offsets::Match::m_LocalPlayer);
+    LOGI("  Match.m_LocalObserver        = 0x%lX", (unsigned long)Offsets::Match::m_LocalObserver);
+    LOGI("  Match.m_AttackableEntities   = 0x%lX", (unsigned long)Offsets::Match::m_AttackableEntities);
+    LOGI("  Camera.m_CachedPtr           = 0x%lX", (unsigned long)Offsets::Camera::m_CachedPtr);
+    LOGI("  Camera.ViewMatrix            = 0x%lX", (unsigned long)Offsets::Camera::ViewMatrix);
+    LOGI("  Player.m_AvatarManager       = 0x%lX", (unsigned long)Offsets::Player::m_AvatarManager);
+    LOGI("  Player.MainCameraTransform   = 0x%lX", (unsigned long)Offsets::Player::MainCameraTransform);
+    LOGI("------------------------------------------------");
+}
+
+/*
+ * Lista QUAIS offsets-chave ficaram em 0 — porque Loaded() exige TODOS
+ * != 0. Se um so deles estiver 0, o StartReadThread recusa subir e o
+ * daemon fica com reads 0 para sempre. Este log mostra exatamente qual.
+ */
+static void LogOffsetsZerados()
+{
+    LOGE("  ---- OFFSETS-CHAVE ZERADOS (Loaded() = false) ----");
+    if (Offsets::GameFacade::GameFacade_TypeInfo == 0)          LOGE("    GameFacade.TypeInfo              = 0");
+    if (Offsets::GameFacade::CurrentMatchGame == 0)             LOGE("    GameFacade.CurrentMatchGame     = 0");
+    if (Offsets::MatchGame::m_Match == 0)                       LOGE("    MatchGame.m_Match               = 0");
+    if (Offsets::MatchGame::m_CameraControllerManager == 0)     LOGE("    MatchGame.m_CameraControllerMgr = 0");
+    if (Offsets::Match::m_State == 0)                           LOGE("    Match.m_State                   = 0");
+    if (Offsets::Match::m_LocalPlayer == 0)                     LOGE("    Match.m_LocalPlayer             = 0");
+    if (Offsets::Match::m_AttackableEntities == 0)              LOGE("    Match.m_AttackableEntities      = 0");
+    if (Offsets::Camera::ViewMatrix == 0)                       LOGE("    Camera.ViewMatrix               = 0");
+    LOGE("  => Preencha esses valores dentro do perfil (FFTHV7A75/76)");
+    LOGE("     ou o ReadThread NUNCA vai subir.");
+}
+
+/*
+ * GameConfig() — A BUSCA INICIAL de versao/offsets do painel.
+ *
+ * Fluxo:
+ *   0. ForceProfile != 0? Aplica o perfil DIRETO, sem probe (bypass).
+ *   1. Para cada candidata a base de libil2cpp.so...
+ *   2. Probe: le TypeInfo -> StaticFields -> ponteiro de ReleaseVersion;
+ *   3. Le a string de versao (ex: "OB54") de dentro do processo do jogo;
+ *   4. Se casar com uma versao suportada, carrega o perfil correspondente.
+ *
+ * A probe le ponteiros do tamanho do JOGO (v7a = uint32, v8a = uint64).
+ */
 void Offsets::GameConfig()
 {
-    LOGI("========================================");
-    LOGI("GameConfig() iniciado");
-    LOGI("Candidates: %zu", LibIl2CppCandidates.size());
-    LOGI("LibIl2Cpp atual: 0x%lX",
-         static_cast<unsigned long>(LibIl2Cpp));
+    LOGI("================================================");
+    LOGI("GameConfig() — BUSCA INICIAL de versao/offsets");
+    LOGI("  candidatos a libil2cpp: %zu", LibIl2CppCandidates.size());
+    LOGI("  LibIl2Cpp atual: 0x%lX", (unsigned long)LibIl2Cpp);
+    LOGI("  arquitetura do jogo: %s",
+         g_Globals.General.N32 ? "32-bit (armeabi-v7a)" : "64-bit (arm64-v8a)");
+    LOGI("  ForceProfile = %d (0=probe | 1=forcar v7a b75 | 2=forcar v7a b76)",
+         g_Globals.General.ForceProfile);
 
+    if (LibIl2CppCandidates.empty())
+    {
+        LOGE("SEM CANDIDATOS de libil2cpp — busca inicial impossivel!");
+        LOGE("(Memory::Initialize nao preencheu LibIl2CppCandidates)");
+        LibIl2Cpp = 0;
+        return;
+    }
+
+    LibIl2Cpp = LibIl2CppCandidates.front();
+
+    /*
+     * ================================================================
+     * MODO FORCADO — bypass total da probe de versao.
+     * Aplica o perfil que VOCE preencheu, sem validar a versao.
+     * ================================================================
+     */
+    if (g_Globals.General.ForceProfile == 1 || g_Globals.General.ForceProfile == 2)
+    {
+        LOGW("  MODO FORCADO: probe de versao IGNORADA pelo usuario");
+
+        if (!g_Globals.General.N32)
+            LOGW("  MODO FORCADO: jogo foi detectado como 64-bit, mas perfil v7a sera aplicado assim mesmo");
+
+        g_Globals.General.N32     = true;
+        g_Globals.General.V31     = true;
+        g_Globals.General.NoAnogs = true;
+
+        if (g_Globals.General.ForceProfile == 1)
+        {
+            LOGW("  MODO FORCADO: aplicando FFTHV7A75 SEM validar versao");
+            FFTHV7A75();
+            LogLoadedOffsets("FORCADO: FF TH v7a build 75");
+        }
+        else
+        {
+            LOGW("  MODO FORCADO: aplicando FFTHV7A76 SEM validar versao");
+            FFTHV7A76();
+            LogLoadedOffsets("FORCADO: FF TH v7a build 76");
+        }
+
+        if (!Loaded())
+            LogOffsetsZerados();
+
+        return;
+    }
+
+    /*
+     * ================================================================
+     * MODO AUTO — probe normal por versao (comportamento original)
+     * ================================================================
+     */
     for (uintptr_t candidate : LibIl2CppCandidates)
     {
         LibIl2Cpp = candidate;
+        LOGI("--- testando candidata libil2cpp @ 0x%lX ---", (unsigned long)candidate);
 
-        LOGI("Testando libil2cpp candidata: 0x%lX",
-             static_cast<unsigned long>(candidate));
+        if (g_Globals.General.N32)
+        {
+            /* ============ probe v7a — build 75 (OB54) ============ */
+            {
+                const uintptr_t RvaProbe = 0xABFF3B8;
+                uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + RvaProbe);
+                LOGI("  [b75] probe RVA 0x%lX -> pTypeInfo = 0x%X",
+                     (unsigned long)RvaProbe, pTypeInfo);
 
-        // ==================== FF TH v7a 75 32-bit ====================
+                uint32_t StaticFields = (pTypeInfo != 0)
+                    ? g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C) : 0;
+                LOGI("  [b75] StaticFields (+0x5C) = 0x%X", StaticFields);
 
-		// ❌ Antes (linhas ~319 e ~347)
-// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uintptr_t)candidate);
+                uint32_t ReleaseVersion = (StaticFields != 0)
+                    ? g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0) : 0;
+                LOGI("  [b75] ReleaseVersion (+0x0) = 0x%X", ReleaseVersion);
 
-printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+                if (ReleaseVersion != 0)
+                {
+                    std::string version = ObterStr(
+                        ReleaseVersion + 0xC,
+                        g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
+                    LOGI("  [b75] versao do jogo = \"%s\"", version.c_str());
 
-// ✅ Depois — opção 2: forçar cast (mais simples)
-// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (unsigned long long)candidate);
-		// ==================== FF TH v7a 75 32-bit, OB54) ====================
-		{
-			uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + 0xABFF3B8);
-			uint32_t StaticFields = g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C);
-			uint32_t ReleaseVersion = g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0);
+                    if (version == "OB54")
+                    {
+                        g_Globals.General.N32     = true;
+                        g_Globals.General.V31     = true;
+                        g_Globals.General.NoAnogs = true;
+                        FFTHV7A75();
+                        LogLoadedOffsets("FF TH v7a build 75 (OB54)");
+                        return;
+                    }
+                }
+                else
+                {
+                    LOGI("  [b75] probe nao casou (pTypeInfo/StaticFields/ReleaseVersion = 0 — RVA de outra build?)");
+                }
+            }
 
-			printf("[V7A] pTypeInfo    : 0x%X (from LibIl2Cpp+0xABFF3B8)\n", pTypeInfo);
-			printf("[V7A] StaticFields : 0x%X (+0x5C)\n", StaticFields);
-			printf("[V7A] ReleaseVersion: 0x%X\n", ReleaseVersion);
+            /* ============ probe v7a — build 76 (OB54) ============ */
+            {
+                const uintptr_t RvaProbe = 0xABFF6D8;
+                uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + RvaProbe);
+                LOGI("  [b76] probe RVA 0x%lX -> pTypeInfo = 0x%X",
+                     (unsigned long)RvaProbe, pTypeInfo);
 
-			if (ReleaseVersion)
-			{
-				std::string version = ObterStr(ReleaseVersion + 0xC, g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
-				printf("[V7A] Release Version: %s\n", version.c_str());
+                uint32_t StaticFields = (pTypeInfo != 0)
+                    ? g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C) : 0;
+                LOGI("  [b76] StaticFields (+0x5C) = 0x%X", StaticFields);
 
-				if (version == "OB54")
-				{
-					g_Globals.General.N32 = true;
-					g_Globals.General.V31 = true;
-					g_Globals.General.NoAnogs = true;
-					FFTHV7A75();
-					return;
-				}
-			}
-		}
+                uint32_t ReleaseVersion = (StaticFields != 0)
+                    ? g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0) : 0;
+                LOGI("  [b76] ReleaseVersion (+0x0) = 0x%X", ReleaseVersion);
 
-		LibIl2Cpp = candidate;
-		// ❌ Antes (linhas ~319 e ~347)
-// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uintptr_t)candidate);
+                if (ReleaseVersion != 0)
+                {
+                    std::string version = ObterStr(
+                        ReleaseVersion + 0xC,
+                        g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
+                    LOGI("  [b76] versao do jogo = \"%s\"", version.c_str());
 
+                    if (version == "OB54")
+                    {
+                        g_Globals.General.N32     = true;
+                        g_Globals.General.V31     = true;
+                        g_Globals.General.NoAnogs = true;
+                        FFTHV7A76();
+                        LogLoadedOffsets("FF TH v7a build 76 (OB54)");
+                        return;
+                    }
+                }
+                else
+                {
+                    LOGI("  [b76] probe nao casou (pTypeInfo/StaticFields/ReleaseVersion = 0 — RVA de outra build?)");
+                }
+            }
+        }
+        else
+        {
+            /*
+             * ============ probe v8a (arm64) ============
+             * TODO(v8a): o RVA abaixo foi herdado do perfil v7a — um jogo
+             * v8a tem RVAs diferentes. Use o MODO FORCADO quando existir
+             * perfil v8a cadastrado.
+             */
+            const uintptr_t RvaProbe = 0xABFF3B8; // TODO(v8a): ajustar RVA
+            uint64_t pTypeInfo = g_FreeFireMemory.Read<uint64_t>(LibIl2Cpp + RvaProbe);
+            LOGI("  [v8a] probe RVA 0x%lX -> pTypeInfo = 0x%llX",
+                 (unsigned long)RvaProbe, (unsigned long long)pTypeInfo);
 
-printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr_t)candidate);
+            uint64_t StaticFields = (pTypeInfo != 0)
+                ? g_FreeFireMemory.Read<uint64_t>(pTypeInfo + 0x5C) : 0;
+            LOGI("  [v8a] StaticFields (+0x5C) = 0x%llX", (unsigned long long)StaticFields);
 
-// ✅ Depois — opção 2: forçar cast (mais simples)
-// printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (unsigned long long)candidate);
-		// ==================== FF TH v7a 76 32-bit, OB54) ====================
-		{
-			uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + 0xABFF6D8);
-			uint32_t StaticFields = g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C);
-			uint32_t ReleaseVersion = g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0);
+            uint64_t ReleaseVersion = (StaticFields != 0)
+                ? g_FreeFireMemory.Read<uint64_t>(StaticFields + 0x0) : 0;
+            LOGI("  [v8a] ReleaseVersion (+0x0) = 0x%llX", (unsigned long long)ReleaseVersion);
 
-			printf("[V7A] pTypeInfo    : 0x%X (from LibIl2Cpp+0xABFF6D8)\n", pTypeInfo);
-			printf("[V7A] StaticFields : 0x%X (+0x5C)\n", StaticFields);
-			printf("[V7A] ReleaseVersion: 0x%X\n", ReleaseVersion);
+            if (ReleaseVersion != 0)
+            {
+                // System.String em 64-bit: length @ 0x10, chars @ 0x14
+                std::string version = ObterStr(
+                    ReleaseVersion + 0x14,
+                    g_FreeFireMemory.Read<int>(ReleaseVersion + 0x10));
+                LOGI("  [v8a] versao do jogo = \"%s\"", version.c_str());
+                LOGE("  [v8a] PERFIL DE OFFSETS V8A AINDA NAO CADASTRADO!");
+                LOGE("  [v8a] Cadastre os offsets v8a em Offsets.cpp (novo perfil) + RVA da probe.");
+            }
+            else
+            {
+                LOGI("  [v8a] probe nao casou (valores zerados — RVA herdado do v7a, precisa ajustar)");
+            }
+        }
+    }
 
-			if (ReleaseVersion)
-			{
-				std::string version = ObterStr(ReleaseVersion + 0xC, g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
-				printf("[V7A] Release Version: %s\n", version.c_str());
+    LOGE("==================================================");
+    LOGE("NENHUMA VERSAO CASEU — offsets ficam ZERADOS!");
+    LOGE("A busca inicial nao reconheceu a versao do seu jogo.");
+    LOGE("=> Sem perfil, o ReadThread NAO sobe (reads 0 pra sempre).");
+    LOGE("=> Solucao imediata: Settings -> Offsets Profile -> Forcar");
+    LOGE("   -> Apply + Restart.");
+    LogOffsetsZerados();
+    LOGE("==================================================");
 
-				if (version == "OB54")
-				{
-					g_Globals.General.N32 = true;
-					g_Globals.General.V31 = true;
-					g_Globals.General.NoAnogs = true;
-					FFTHV7A76();
-					return;
-				}
-			}
-		}
-
-	}
-
-	LibIl2Cpp = 0;
-	printf("[GameConfig] No matching version found!\n");
-
-	OFFSET_LOGI(
-    "GameConfig FINAL: LibIl2Cpp = 0x%lX",
-    static_cast<unsigned long>(LibIl2Cpp)
-);
-
-OFFSET_LOGI(
-    "GameConfig FINAL: GameFacade.TypeInfo = 0x%lX",
-    static_cast<unsigned long>(
-        GameFacade::GameFacade_TypeInfo
-    )
-);
-
-OFFSET_LOGI(
-    "GameConfig FINAL: CurrentMatchGame = 0x%lX",
-    static_cast<unsigned long>(
-        GameFacade::CurrentMatchGame
-    )
-);
-
-OFFSET_LOGI(
-    "GameConfig FINAL: Match.m_Match = 0x%lX",
-    static_cast<unsigned long>(
-        MatchGame::m_Match
-    )
-);
-
-OFFSET_LOGI(
-    "GameConfig FINAL: Match.m_LocalPlayer = 0x%lX",
-    static_cast<unsigned long>(
-        Match::m_LocalPlayer
-    )
-);
-
-OFFSET_LOGI(
-    "GameConfig FINAL: Match.m_AttackableEntities = 0x%lX",
-    static_cast<unsigned long>(
-        Match::m_AttackableEntities
-    )
-);
+    LibIl2Cpp = 0;
 }
 
 void Offsets::FFTHV7A75() // v31 32-bit

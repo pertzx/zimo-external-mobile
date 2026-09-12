@@ -117,7 +117,7 @@ namespace Cheat {
                 } LocalPlayer;
             } Exploits;
         } Misc;
-        struct General
+                struct General
         {
             int MenuKey = 0;
             int ThreadDelay = 240;
@@ -128,6 +128,16 @@ namespace Cheat {
             bool N32 = false;
             bool V31 = false;
             bool EnableFuncs = false;
+
+            /*
+             * Perfil de offsets:
+             *   0 = AUTO (probe de versao normal)
+             *   1 = FORCAR FFTHV7A75 (pula a probe)
+             *   2 = FORCAR FFTHV7A76 (pula a probe)
+             * Mudou aqui? Clique em "Apply + Restart" na aba Settings.
+             */
+            int ForceProfile = 0;
+
             char Username[20] = {0};
             char Role[20] = {0};
             char PassWord[20] = {0};

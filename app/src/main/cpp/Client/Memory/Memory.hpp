@@ -33,6 +33,17 @@ public:
      */
     static bool IsBridgeConnected();
 
+    /*
+     * true somente apos um Initialize() COMPLETO: pid + base + offsets
+     * reais carregados pelo GameConfig(). Nao basta a ponte responder.
+     */
+    static bool IsInitialized();
+
+    /*
+     * Motivo da ultima falha de Initialize() — para mostrar na UI/log.
+     */
+    static const char* GetLastInitError();
+
     template<typename T>
     static bool Read(uintptr_t address, T& outValue)
     {
@@ -72,7 +83,7 @@ public:
 private:
     static pid_t FindTargetPid();
     static uintptr_t FindModuleBase(pid_t pid, const char* moduleName, int index = 1);
-    static bool DetectTarget32Bit(pid_t pid);
+    static bool DetectTarget32Bit(pid_t pid, bool& outIs32);
 
     static bool OpenProcessMemory(pid_t pid);
     static void CloseProcessMemory();
@@ -91,6 +102,7 @@ private:
     static bool s_Target32Bit;
     static int s_ProcMemFd;
     static bool s_Initialized;
+    static const char* s_LastInitError;
 
     static volatile bool s_RestartInProgress;
 };
