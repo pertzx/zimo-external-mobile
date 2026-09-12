@@ -3,4 +3,5 @@
   -C ^
   "C:\\zimo-external-mobile\\app\\.cxx\\Debug\\2ka4sv6u\\arm64-v8a" ^
   daemon ^
-  panel
+  panel ^
+  stormdaemon

@@ -59,7 +59,7 @@ public:
 
 private:
     static pid_t FindTargetPid();
-    static uintptr_t FindModuleBase(pid_t pid, const char* moduleName);
+    static uintptr_t FindModuleBase(pid_t pid, const char* moduleName, int index = 1);
     static bool DetectTarget32Bit(pid_t pid);
 
     static bool OpenProcessMemory(pid_t pid);

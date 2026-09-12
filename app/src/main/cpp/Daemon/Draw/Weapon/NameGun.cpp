@@ -1,4 +1,4 @@
-#include "Namegun.h"
+#include "NameGun.h"
 #include <iostream>
 #include <vector>
 #include <string>

@@ -33,7 +33,7 @@ set(IMGUI_SOURCES
 )
 
 # ============================================================
-# SHARED - somente código realmente compartilhado
+# SHARED
 # ============================================================
 
 set(SHARED_SOURCES
@@ -99,12 +99,10 @@ set(PANEL_SOURCES
 )
 
 # ============================================================
-# DAEMON
+# DAEMON CORE
 # ============================================================
 
-set(DAEMON_SOURCES
-
-    ${CPP_DIR}/Daemon/daemon_main.cpp
+set(DAEMON_CORE_SOURCES
 
     ${CPP_DIR}/Daemon/DaemonApp.cpp
     ${CPP_DIR}/Daemon/DaemonApp.hpp
@@ -138,60 +136,151 @@ set(DAEMON_SOURCES
 )
 
 # ============================================================
-# PANEL LIBRARY
-# ============================================================
-
-add_library(panel SHARED
-    ${PANEL_SOURCES}
-    ${SHARED_SOURCES}
-    ${IMGUI_SOURCES}
-)
-
-target_include_directories(panel PRIVATE
-    ${CPP_DIR}/Shared
-    ${CPP_DIR}/Panel
-    ${CPP_DIR}/Daemon
-    ${IMGUI_DIR}
-    ${EXTERNAL_DIR}
-)
-
-target_compile_definitions(panel PRIVATE
-    IMGUI_DEFINE_MATH_OPERATORS
-)
-
-target_link_libraries(panel
-    ${log-lib}
-    ${android-lib}
-    ${EGL-lib}
-    ${GLESv3-lib}
-)
-
-# ============================================================
-# DAEMON LIBRARY
+# DAEMON JNI LIBRARY
 # ============================================================
 
 add_library(daemon SHARED
-    ${DAEMON_SOURCES}
+
+    ${CPP_DIR}/Daemon/daemon_main.cpp
+
+    ${DAEMON_CORE_SOURCES}
+
     ${SHARED_SOURCES}
+
     ${IMGUI_SOURCES}
 )
 
 target_include_directories(daemon PRIVATE
+
     ${CPP_DIR}/Shared
     ${CPP_DIR}/Daemon
+    ${CPP_DIR}/Panel
+
     ${IMGUI_DIR}
     ${FREETYPE_INCLUDE_DIR}
     ${EXTERNAL_DIR}
 )
 
 target_compile_definitions(daemon PRIVATE
+
     DAEMON_BUILD
     IMGUI_DEFINE_MATH_OPERATORS
 )
 
 target_link_libraries(daemon
+
     ${log-lib}
     ${android-lib}
     ${EGL-lib}
     ${GLESv3-lib}
+)
+
+# ============================================================
+# PANEL LIBRARY
+# ============================================================
+
+add_library(panel SHARED
+
+    ${PANEL_SOURCES}
+
+    ${SHARED_SOURCES}
+
+    ${IMGUI_SOURCES}
+)
+
+target_include_directories(panel PRIVATE
+
+    ${CPP_DIR}/Shared
+    ${CPP_DIR}/Panel
+    ${CPP_DIR}/Daemon
+
+    ${IMGUI_DIR}
+    ${FREETYPE_INCLUDE_DIR}
+    ${EXTERNAL_DIR}
+)
+
+target_compile_definitions(panel PRIVATE
+
+    IMGUI_DEFINE_MATH_OPERATORS
+)
+
+target_link_libraries(panel
+
+    ${log-lib}
+    ${android-lib}
+    ${EGL-lib}
+    ${GLESv3-lib}
+)
+
+# ============================================================
+# ROOT STORMDAEMON EXECUTABLE
+# ============================================================
+
+add_executable(stormdaemon
+
+    ${CPP_DIR}/Daemon/daemon_root_main.cpp
+
+    ${DAEMON_CORE_SOURCES}
+
+    ${SHARED_SOURCES}
+)
+
+target_include_directories(stormdaemon PRIVATE
+
+    ${CPP_DIR}/Shared
+    ${CPP_DIR}/Daemon
+
+    # Shared/Includes.hpp inclui imgui.h
+    # Skeleton.hpp tambem usa ImDrawList
+    ${IMGUI_DIR}
+
+    ${FREETYPE_INCLUDE_DIR}
+    ${EXTERNAL_DIR}
+)
+
+target_compile_definitions(stormdaemon PRIVATE
+
+    DAEMON_ROOT_BUILD
+    IMGUI_DEFINE_MATH_OPERATORS
+)
+
+target_link_libraries(stormdaemon
+
+    ${log-lib}
+    ${android-lib}
+    ${EGL-lib}
+    ${GLESv3-lib}
+)
+
+# ============================================================
+# STORMDAEMON OUTPUT
+# ============================================================
+
+set(STORM_ASSET_DIR
+    ${CMAKE_SOURCE_DIR}/../assets/bin/${ANDROID_ABI}
+)
+
+file(MAKE_DIRECTORY
+    ${STORM_ASSET_DIR}
+)
+
+set_target_properties(stormdaemon PROPERTIES
+
+    RUNTIME_OUTPUT_DIRECTORY
+        ${STORM_ASSET_DIR}
+)
+
+# ============================================================
+# STORMDAEMON FLAGS
+# ============================================================
+
+target_compile_options(stormdaemon PRIVATE
+
+    -fdata-sections
+    -ffunction-sections
+)
+
+target_link_options(stormdaemon PRIVATE
+
+    -Wl,--gc-sections
 )

@@ -1,9 +1,20 @@
 
 #include <cinttypes>
+#include <android/log.h>
+
 #include "Offsets.hpp"
 #include <Memory/Memory.hpp>
 #include <Globals.hpp>
 #include <Unity/UTF/UTF8.hpp>
+
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormOffsets", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormOffsets", __VA_ARGS__)
+
+#define OFFSET_LOGI(...) \
+    __android_log_print(ANDROID_LOG_INFO, "StormOffsets", __VA_ARGS__)
+
+#define OFFSET_LOGE(...) \
+    __android_log_print(ANDROID_LOG_ERROR, "StormOffsets", __VA_ARGS__)
 
 // ==================== Offsets ====================
 
@@ -13,8 +24,8 @@ uintptr_t Offsets::AccessClass = 0;
 
 bool Offsets::IsMatchActive(Offsets::MatchState s)
 {
-	int v = static_cast<int>(s);
-	return v >= 1 && v <= 3;
+    int v = static_cast<int>(s);
+    return v >= 1 && v <= 3;
 }
 
 // ==================== Game Flow ====================
@@ -312,9 +323,20 @@ template class Offsets::UnityDictionary<false, true, uint64_t>;
 
 void Offsets::GameConfig()
 {
-	for (uintptr_t candidate : LibIl2CppCandidates)
-	{
-		LibIl2Cpp = candidate;
+    LOGI("========================================");
+    LOGI("GameConfig() iniciado");
+    LOGI("Candidates: %zu", LibIl2CppCandidates.size());
+    LOGI("LibIl2Cpp atual: 0x%lX",
+         static_cast<unsigned long>(LibIl2Cpp));
+
+    for (uintptr_t candidate : LibIl2CppCandidates)
+    {
+        LibIl2Cpp = candidate;
+
+        LOGI("Testando libil2cpp candidata: 0x%lX",
+             static_cast<unsigned long>(candidate));
+
+        // ==================== FF TH v7a 75 32-bit ====================
 
 		// ❌ Antes (linhas ~319 e ~347)
 // printf("[GameConfig] Testando libil2cpp.so candidata: 0x%llX\n", (uintptr_t)candidate);
@@ -388,6 +410,46 @@ printf("[GameConfig] Testando libil2cpp.so candidata: 0x%" PRIx64 "\n", (uintptr
 
 	LibIl2Cpp = 0;
 	printf("[GameConfig] No matching version found!\n");
+
+	OFFSET_LOGI(
+    "GameConfig FINAL: LibIl2Cpp = 0x%lX",
+    static_cast<unsigned long>(LibIl2Cpp)
+);
+
+OFFSET_LOGI(
+    "GameConfig FINAL: GameFacade.TypeInfo = 0x%lX",
+    static_cast<unsigned long>(
+        GameFacade::GameFacade_TypeInfo
+    )
+);
+
+OFFSET_LOGI(
+    "GameConfig FINAL: CurrentMatchGame = 0x%lX",
+    static_cast<unsigned long>(
+        GameFacade::CurrentMatchGame
+    )
+);
+
+OFFSET_LOGI(
+    "GameConfig FINAL: Match.m_Match = 0x%lX",
+    static_cast<unsigned long>(
+        MatchGame::m_Match
+    )
+);
+
+OFFSET_LOGI(
+    "GameConfig FINAL: Match.m_LocalPlayer = 0x%lX",
+    static_cast<unsigned long>(
+        Match::m_LocalPlayer
+    )
+);
+
+OFFSET_LOGI(
+    "GameConfig FINAL: Match.m_AttackableEntities = 0x%lX",
+    static_cast<unsigned long>(
+        Match::m_AttackableEntities
+    )
+);
 }
 
 void Offsets::FFTHV7A75() // v31 32-bit
