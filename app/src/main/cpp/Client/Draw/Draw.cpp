@@ -53,6 +53,92 @@ static void DiagLog(
     va_end(args);
 }
 
+// =====================================================================
+//  DIAGNOSTICO DA CADEIA [CHAIN] — dependencia zero
+//  Loga no logcat com tag: StormDiag   (adb logcat -s StormDiag)
+// =====================================================================
+#include <android/log.h>
+#include <cstdarg>
+#include <cstdio>
+#include <ctime>
+
+namespace ReadChain
+{
+    enum Step : int
+    {
+        OffsetsZerados = 0,
+        ElfMagic, GameFacade, AccessClass, MatchGame, Match, MatchState,
+        LocalPlayer, CameraControllerManager, Camera, CachedPtr,
+        ViewMatrix, EntityList, DictCount,
+        STEP_COUNT
+    };
+
+    inline const char* Name(int s)
+    {
+        static const char* kNames[STEP_COUNT] =
+        {
+            "offsets-zerados", "elf-magic", "GameFacade", "AccessClass",
+            "MatchGame", "Match", "MatchState", "LocalPlayer",
+            "CameraControllerManager", "Camera", "m_CachedPtr",
+            "ViewMatrix", "EntityList", "dictCount"
+        };
+        return (s >= 0 && s < STEP_COUNT) ? kNames[s] : "?";
+    }
+}
+
+// Logger proprio do bloco — NAO mexe no teu DiagLog
+static void ChainLogRaw(const char* fmt, ...)
+{
+    va_list a;
+    va_start(a, fmt);
+    __android_log_vprint(ANDROID_LOG_DEBUG, "StormDiag", fmt, a);
+    va_end(a);
+}
+
+static unsigned long long ChainTickMs()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned long long)ts.tv_sec * 1000ull
+         + (unsigned long long)ts.tv_nsec / 1000000ull;
+}
+
+// Falha de um passo da cadeia — rate-limit de 5s POR passo (sem spam)
+static void ChainFailLog(int step, const char* fmt, ...)
+{
+    static unsigned long long s_Last[ReadChain::STEP_COUNT] = { 0 };
+
+    if (step < 0 || step >= ReadChain::STEP_COUNT)
+        return;
+
+    unsigned long long now = ChainTickMs();
+    if (now - s_Last[step] < 5000ull)
+        return;
+    s_Last[step] = now;
+
+    char detail[192];
+    va_list a;
+    va_start(a, fmt);
+    vsnprintf(detail, sizeof(detail), fmt, a);
+    va_end(a);
+
+    ChainLogRaw("[CHAIN] cadeia parou em %s — %s", ReadChain::Name(step), detail);
+}
+
+// Cadeia completa — heartbeat de sucesso a cada 10s
+static void ChainOkLog(int entities, int matchState, bool isObserving)
+{
+    static unsigned long long s_LastOk = 0;
+
+    unsigned long long now = ChainTickMs();
+    if (now - s_LastOk < 10000ull)
+        return;
+    s_LastOk = now;
+
+    ChainLogRaw("[CHAIN] OK — cadeia completa: %d entidades, matchState=%d, observando=%d",
+                entities, matchState, isObserving ? 1 : 0);
+}
+
 bool Data::m_ThreadN32 = false;
 bool Data::m_ThreadV31 = false;
 
@@ -324,467 +410,575 @@ void Data::StopReadThread()
 template <bool N32, bool V31>
 void Data::ReadLoop( )
 {
-	int failCount = 0;
-	int lobbyFrames = 0;
-	int emptyFrames = 0;
-	LONGLONG emptyStartMs = 0;
-	LONGLONG lobbyStartMs = 0;
-	while ( m_Running.load( ) && !g_Globals.General.ShutDown )
-	{
-		try
-		{
-		std::vector<PlayerData> tempPlayers;
-		GameContext tempCtx{ };
-		// Entidades confirmadas como inimigo no frame atual (na lista oficial
-		// e com classe conhecida). Servem de base para o carry-over: quem
-		// passou destes checks mas caiu por falha transitória NÃO sai do
-		// snapshot — herda o último estado bom da entidade (anti-flicker).
-		std::unordered_set<uintptr_t> seenThisFrame;
+        int failCount = 0;
+        int lobbyFrames = 0;
+        int emptyFrames = 0;
+        LONGLONG emptyStartMs = 0;
+        LONGLONG lobbyStartMs = 0;
+        while ( m_Running.load( ) && !g_Globals.General.ShutDown )
+        {
+                try
+                {
+                /*
+                 * SEM GUARDA de offsets: o ReadLoop roda direto com o perfil
+                 * escolhido na Settings. Offset zerado = a cadeia falha na
+                 * etapa correspondente e o proprio ChainFailLog abaixo mostra
+                 * onde parou (nada le o ELF como ponteiro sem log).
+                 */
 
-		// fresh          = o frame inteiro (facade->partida->entidades) leu ok
-		// readMatchState = conseguiu ler o estado da partida
-		// matchActive    = a partida está ativa
-		// matchRead      = conseguiu ler o ponteiro do Match (sinal confiavel
-		//                  de "estamos numa partida"; false = cadeia quebrou
-		//                  no nivel de partida/lobby/facade)
-		bool fresh = false;
-		bool readMatchState = false;
-		bool matchActive = false;
-		bool matchRead = false;
+                std::vector<PlayerData> tempPlayers;
+                GameContext tempCtx{ };
+                // Entidades confirmadas como inimigo no frame atual (na lista oficial
+                // e com classe conhecida). Servem de base para o carry-over: quem
+                // passou destes checks mas caiu por falha transitória NÃO sai do
+                // snapshot — herda o último estado bom da entidade (anti-flicker).
+                std::unordered_set<uintptr_t> seenThisFrame;
 
-		do
-		{
-			Memory::FlushTLB( );
+                // fresh          = o frame inteiro (facade->partida->entidades) leu ok
+                // readMatchState = conseguiu ler o estado da partida
+                // matchActive    = a partida está ativa
+                // matchRead      = conseguiu ler o ponteiro do Match (sinal confiavel
+                //                  de "estamos numa partida"; false = cadeia quebrou
+                //                  no nivel de partida/lobby/facade)
+                bool fresh = false;
+                bool readMatchState = false;
+                bool matchActive = false;
+                bool matchRead = false;
 
-			// Revalida o CR3 do processo a cada ~64 iteracoes. Se o processo
-			// do jogo reiniciou no meio da sessao, o CR3 antigo envenena TODAS
-			// as leituras de uma vez (ESP + aimbot + silent param juntos). O
-			// check de ELF magic nao detecta isso quando a pagina antiga ainda
-			// esta mapeada — so a revalidacao direta do pgd pega.
-			static int cR3Tick = 0;
-			if ( ( ++cR3Tick & 0x3F ) == 0 )
-				Memory::RefreshCR3( );
+                do
+                {
+                        Memory::FlushTLB( );
 
-			// Valida a base do modulo ANTES de qualquer leitura. Quando o
-			// processo do jogo reinicia (ex: alt-tab no emulador) o ASLR muda a
-			// base e o magic ELF some — mesmo que leituras de ponteiro voltem
-			// lixo nao-zero (que antes nao era detectado). Com base invalida:
-			// mantem o snapshot congelado (ESP nao some) e agenda restart apos
-			// falha sustentada.
-			uint32_t ElfMagic = 0;
-			if ( !g_FreeFireMemory.Read<uint32_t>( Offsets::LibIl2Cpp, ElfMagic ) || ElfMagic != 0x464C457F )
-			{
-if ( ++failCount > 20 )
-			{
-				failCount = 0;
-				DiagLog( "[diag] ELF fail: restart async apos %d frames com base invalida", 20 );
-				g_FreeFireMemory.RestartAsync( );
-			}
-				break;
-			}
-			failCount = 0;
+                        // Revalida o CR3 do processo a cada ~64 iteracoes. Se o processo
+                        // do jogo reiniciou no meio da sessao, o CR3 antigo envenena TODAS
+                        // as leituras de uma vez (ESP + aimbot + silent param juntos). O
+                        // check de ELF magic nao detecta isso quando a pagina antiga ainda
+                        // esta mapeada — so a revalidacao direta do pgd pega.
+                        static int cR3Tick = 0;
+                        if ( ( ++cR3Tick & 0x3F ) == 0 )
+                                Memory::RefreshCR3( );
 
-			auto ReadPtr = [ ] ( uintptr_t addr ) -> uintptr_t
-			{
-				return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
-			};
+                        // Valida a base do modulo ANTES de qualquer leitura. Quando o
+                        // processo do jogo reinicia (ex: alt-tab no emulador) o ASLR muda a
+                        // base e o magic ELF some — mesmo que leituras de ponteiro voltem
+                        // lixo nao-zero (que antes nao era detectado). Com base invalida:
+                        // mantem o snapshot congelado (ESP nao some) e agenda restart apos
+                        // falha sustentada.
+                        uint32_t ElfMagic = 0;
+                        const bool elfReadOk = g_FreeFireMemory.Read<uint32_t>( Offsets::LibIl2Cpp, ElfMagic );
+                        if ( !elfReadOk || ElfMagic != 0x464C457F )
+                        {
+                                ChainFailLog( ReadChain::ElfMagic,
+                                              elfReadOk
+                                                      ? "magic invalido (lido=0x%X) — base errada ou pagina trocada"
+                                                      : "leitura falhou (processo morto? base desmapeada?)",
+                                              ElfMagic );
+                                if ( ++failCount > 20 )
+                                {
+                                        failCount = 0;
+                                        DiagLog( "[diag] ELF fail: restart async apos %d frames com base invalida", 20 );
+                                        g_FreeFireMemory.RestartAsync( );
+                                }
+                                break;
+                        }
+                        failCount = 0;
 
-			uintptr_t GameFacade = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo );
-			DiagLog("[Data] GAMEFACADE: %p", GameFacade);
-			if ( GameFacade == 0 ) break;
-			
-			uintptr_t AccessClass = ReadPtr( GameFacade + Offsets::AccessClass );
-			DiagLog("[Data] AccessClass: %p", AccessClass);
-			if ( AccessClass == 0 ) break;
-			
-			uintptr_t MatchGame = ReadPtr( AccessClass + Offsets::GameFacade::CurrentMatchGame );
-			DiagLog("[Data] MatchGame: %p", MatchGame);
-			if ( MatchGame == 0 ) break;
-			
-			uintptr_t Match = ReadPtr( MatchGame + Offsets::MatchGame::m_Match );
-			DiagLog("[Data] Match: %p", Match);
-			if ( Match == 0 ) break;
-			matchRead = true;
-			
-			int MatchRaw = g_FreeFireMemory.Read<int>( Match + Offsets::Match::m_State );
-			DiagLog("[Data] MatchRaw: %p", MatchRaw);
-			auto MatchState = static_cast< Offsets::MatchState >( MatchRaw );
-			DiagLog("[Data] MatchState: %p", MatchState);
-			readMatchState = true;
-			if ( !Offsets::IsMatchActive( MatchState ) ) break;
-			DiagLog("[Data] PARTIDA ATIVA!");
-			
-			matchActive = true;
+                        auto ReadPtr = [ ] ( uintptr_t addr ) -> uintptr_t
+                        {
+                                return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
+                        };
 
-			uintptr_t LocalObserver = ReadPtr( Match + Offsets::Match::m_LocalObserver );
-			bool IsObserving = ( LocalObserver != 0 );
-			uintptr_t LocalPlayer;
-			if ( LocalObserver != 0 )
-			{
-				LocalPlayer = ReadPtr( LocalObserver + Offsets::Observer::m_TargetPlayer );
-			}
-			else
-			{
-				LocalPlayer = ReadPtr( Match + Offsets::Match::m_LocalPlayer );
-			}
-			if ( LocalPlayer == 0 ) break;
+                        uintptr_t GameFacade = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo );
+                        if ( GameFacade == 0 )
+                        {
+                                // Nulo aqui = estamos no lobby OU o offset GameFacade_TypeInfo
+                                // nao serve para esta versao do jogo (cai sempre neste break).
+                                ChainFailLog( ReadChain::GameFacade,
+                                              "GameFacade nulo (lib+0x%lX) — lobby ou offset TypeInfo errado para esta versao",
+                                              ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
+                                break;
+                        }
+                        static LONGLONG s_LastGfLog = 0;
+                        if ( GetTickCount64( ) - s_LastGfLog > 10000 )
+                        {
+                                s_LastGfLog = GetTickCount64( );
+                                DiagLog( "[CHAIN] GameFacade=0x%lX (lido em lib+0x%lX)",
+                                         ( unsigned long )GameFacade,
+                                         ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
+                        }
 
-			tempCtx.LocalPlayer = LocalPlayer;
-			tempCtx.MatchGame = MatchGame;
-			tempCtx.Match = Match;
-			tempCtx.IsObserving = IsObserving;
+                        uintptr_t AccessClass = ReadPtr( GameFacade + Offsets::AccessClass );
+                        if ( AccessClass == 0 )
+                        {
+                                ChainFailLog( ReadChain::AccessClass,
+                                              "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — offset AccessClass errado?",
+                                              ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
+                                break;
+                        }
 
-			uintptr_t MainCamera = ReadPtr( LocalPlayer + Offsets::Player::MainCameraTransform );
-			tempCtx.MainCamera = MainCamera;
+                        uintptr_t MatchGame = ReadPtr( AccessClass + Offsets::GameFacade::CurrentMatchGame );
+                        if ( MatchGame == 0 )
+                        {
+                                ChainFailLog( ReadChain::MatchGame,
+                                              "MatchGame nulo (AccessClass=0x%lX + 0x%lX) — offset CurrentMatchGame errado?",
+                                              ( unsigned long )AccessClass, ( unsigned long )Offsets::GameFacade::CurrentMatchGame );
+                                break;
+                        }
 
-			uintptr_t m_CameraControllerManager = ReadPtr( MatchGame + Offsets::MatchGame::m_CameraControllerManager );
-			if ( m_CameraControllerManager == 0 ) break;
+                        uintptr_t Match = ReadPtr( MatchGame + Offsets::MatchGame::m_Match );
+                        if ( Match == 0 )
+                        {
+                                ChainFailLog( ReadChain::Match,
+                                              "Match nulo (MatchGame=0x%lX + 0x%lX) — offset m_Match errado?",
+                                              ( unsigned long )MatchGame, ( unsigned long )Offsets::MatchGame::m_Match );
+                                break;
+                        }
+                        matchRead = true;
 
-			uintptr_t m_Camera = ReadPtr( m_CameraControllerManager + Offsets::CameraControllerManager::m_Camera );
-			if ( m_Camera == 0 ) break;
+                        int MatchRaw = g_FreeFireMemory.Read<int>( Match + Offsets::Match::m_State );
+                        auto MatchState = static_cast< Offsets::MatchState >( MatchRaw );
+                        readMatchState = true;
+                        if ( !Offsets::IsMatchActive( MatchState ) )
+                        {
+                                ChainFailLog( ReadChain::MatchState,
+                                              "state=%d fora de [1..3] — fora de partida/lobby",
+                                              MatchRaw );
+                                break;
+                        }
+                        matchActive = true;
 
-			uintptr_t m_CachedPtr = ReadPtr( m_Camera + Offsets::Camera::m_CachedPtr );
-			if ( m_CachedPtr == 0 ) break;
+                        uintptr_t LocalObserver = ReadPtr( Match + Offsets::Match::m_LocalObserver );
+                        bool IsObserving = ( LocalObserver != 0 );
+                        uintptr_t LocalPlayer;
+                        if ( LocalObserver != 0 )
+                        {
+                                LocalPlayer = ReadPtr( LocalObserver + Offsets::Observer::m_TargetPlayer );
+                        }
+                        else
+                        {
+                                LocalPlayer = ReadPtr( Match + Offsets::Match::m_LocalPlayer );
+                        }
+                        if ( LocalPlayer == 0 )
+                        {
+                                ChainFailLog( ReadChain::LocalPlayer,
+                                              "LocalPlayer nulo (observando=%d, Match=0x%lX) — offset m_LocalPlayer/m_TargetPlayer errado?",
+                                              IsObserving ? 1 : 0, ( unsigned long )Match );
+                                break;
+                        }
 
-			Matrix4x4 ViewMatrix = g_FreeFireMemory.Read<Matrix4x4>( m_CachedPtr + Offsets::Camera::ViewMatrix );
-			if ( !IsValidViewMatrix( ViewMatrix ) ) break;
-			tempCtx.ViewMatrix = ViewMatrix;
+                        tempCtx.LocalPlayer = LocalPlayer;
+                        tempCtx.MatchGame = MatchGame;
+                        tempCtx.Match = Match;
+                        tempCtx.IsObserving = IsObserving;
 
-			auto EntityList = reinterpret_cast< Offsets::UnityList<N32>* >( ReadPtr( Match + Offsets::Match::m_AttackableEntities ) );
-			if ( EntityList == nullptr ) break;
+                        uintptr_t MainCamera = ReadPtr( LocalPlayer + Offsets::Player::MainCameraTransform );
+                        tempCtx.MainCamera = MainCamera;
 
-			int dictCount = EntityList->GetSize( );
-			if ( dictCount <= 0 || dictCount > 200 ) break;
+                        uintptr_t m_CameraControllerManager = ReadPtr( MatchGame + Offsets::MatchGame::m_CameraControllerManager );
+                        if ( m_CameraControllerManager == 0 )
+                        {
+                                ChainFailLog( ReadChain::CameraControllerManager,
+                                              "nulo (MatchGame=0x%lX + 0x%lX)",
+                                              ( unsigned long )MatchGame, ( unsigned long )Offsets::MatchGame::m_CameraControllerManager );
+                                break;
+                        }
 
-			tempPlayers.reserve( dictCount );
-			seenThisFrame.reserve( dictCount );
+                        uintptr_t m_Camera = ReadPtr( m_CameraControllerManager + Offsets::CameraControllerManager::m_Camera );
+                        if ( m_Camera == 0 )
+                        {
+                                ChainFailLog( ReadChain::Camera,
+                                              "Camera nula (controller=0x%lX + 0x%lX)",
+                                              ( unsigned long )m_CameraControllerManager, ( unsigned long )Offsets::CameraControllerManager::m_Camera );
+                                break;
+                        }
 
-			for ( int i = 0; i < dictCount; i++ )
-			{
-				uintptr_t Entity = EntityList->GetItem( i );
-				if ( Entity == 0 ) continue;
+                        uintptr_t m_CachedPtr = ReadPtr( m_Camera + Offsets::Camera::m_CachedPtr );
+                        if ( m_CachedPtr == 0 )
+                        {
+                                ChainFailLog( ReadChain::CachedPtr,
+                                              "m_CachedPtr nulo (camera=0x%lX + 0x%lX)",
+                                              ( unsigned long )m_Camera, ( unsigned long )Offsets::Camera::m_CachedPtr );
+                                break;
+                        }
 
-				PlayerType type = Data::GetPlayerType( Entity, N32 );
-				if ( type == PLAYER_UNKNOWN ) continue;
+                        Matrix4x4 ViewMatrix = g_FreeFireMemory.Read<Matrix4x4>( m_CachedPtr + Offsets::Camera::ViewMatrix );
+                        if ( !IsValidViewMatrix( ViewMatrix ) )
+                        {
+                                // Fallback do codigo que funcionava: v7a usa 0xE8, FF MAX
+                                // usa 0xE4. Se o offset configurado vier lixo/rasgado, tenta
+                                // o offset alternativo antes de desistir do frame.
+                                const uintptr_t kAltVM = ( Offsets::Camera::ViewMatrix == 0xE8 ) ? 0xE4 : 0xE8;
+                                Matrix4x4 AltVM = g_FreeFireMemory.Read<Matrix4x4>( m_CachedPtr + kAltVM );
+                                if ( IsValidViewMatrix( AltVM ) )
+                                        ViewMatrix = AltVM;
+                        }
+                        if ( !IsValidViewMatrix( ViewMatrix ) )
+                        {
+                                ChainFailLog( ReadChain::ViewMatrix,
+                                              "view matrix invalida/rasgada (cachedPtr=0x%lX + 0x%lX)",
+                                              ( unsigned long )m_CachedPtr, ( unsigned long )Offsets::Camera::ViewMatrix );
+                                break;
+                        }
+                        tempCtx.ViewMatrix = ViewMatrix;
 
-				seenThisFrame.insert( Entity );
+                        auto EntityList = reinterpret_cast< Offsets::UnityList<N32>* >( ReadPtr( Match + Offsets::Match::m_AttackableEntities ) );
+                        if ( EntityList == nullptr )
+                        {
+                                ChainFailLog( ReadChain::EntityList,
+                                              "lista de entidades nula (Match=0x%lX + 0x%lX)",
+                                              ( unsigned long )Match, ( unsigned long )Offsets::Match::m_AttackableEntities );
+                                break;
+                        }
 
-				uintptr_t m_AvatarManager = ReadPtr( Entity + Offsets::Player::m_AvatarManager );
-				if ( m_AvatarManager == 0 ) continue;
+                        int dictCount = EntityList->GetSize( );
+                        if ( dictCount <= 0 || dictCount > 200 )
+                        {
+                                ChainFailLog( ReadChain::DictCount,
+                                              "count=%d fora de [1..200] — lista lixo ou offset errado",
+                                              dictCount );
+                                break;
+                        }
 
-				uintptr_t m_Avatar = ReadPtr( m_AvatarManager + Offsets::AvatarManager::m_Avatar );
-				if ( m_Avatar == 0 ) continue;
+                        tempPlayers.reserve( dictCount );
+                        seenThisFrame.reserve( dictCount );
 
-				uintptr_t UMAData = ReadPtr( m_Avatar + Offsets::UMAAvatarBase::umaData );
-				if ( UMAData == 0 ) continue;
+                        /*
+                         * Contadores de descarte por motivo. O ESP pode "nao aparecer"
+                         * porque TODAS as entidades morrem em algum filtro intermediario
+                         * (classe, time, HP, posicao) sem que a cadeia principal falhe.
+                         * O resumo [ENTITY] (rate-limit 5s) mostra no logcat exatamente
+                         * qual etapa esta comendo os players.
+                         */
+                        int entOk = 0, entLocal = 0, entClasse = 0, entAvatar = 0;
+                        int entTeam = 0, entPri = 0, entHp = 0, entPos = 0;
+                        bool sampleLogged = false;
 
-				// Sem filtro de visibilidade do mesh: IsVisible=0 (mesh oculto
-				// em veiculo/animacao/revive/paraquedas) derrubava players
-				// legitimos da ESP — "alguns players nao aparecem". Todo player
-				// valido entra no snapshot; a visibilidade visual fica por
-				// conta do VisibleCheck do aimbot/silent, nao da ESP.
+                        for ( int i = 0; i < dictCount; i++ )
+                        {
+                                uintptr_t Entity = EntityList->GetItem( i );
+                                if ( Entity == 0 ) continue;
 
-				bool IsTeam = g_FreeFireMemory.Read<bool>( UMAData + Offsets::UMAData::isTeammate );
-				// "Mostrar time" (ESP.ShowTeam): aliados entram no snapshot
-				// marcados como IsTeammate — desenhados com cor de time e
-				// nunca viram alvo do aimbot/silent. Desligado = filtro antigo.
-				if ( IsTeam && !g_Globals.Visuals.ESP.ShowTeam ) continue;
+                                // Mesmo do codigo que funcionava: a lista pode conter o
+                                // proprio jogador local — nunca processar ele.
+                                if ( Entity == LocalPlayer ) { entLocal++; continue; }
 
-				uintptr_t m_PRIDataPoolPtr = ReadPtr( Entity + Offsets::ReplicationEntity::m_PRIDataPool );
-				if ( m_PRIDataPoolPtr == 0 ) continue;
+                                PlayerType type = Data::GetPlayerType( Entity, N32 );
+                                if ( type == PLAYER_UNKNOWN ) { entClasse++; continue; }
 
-				uintptr_t dataArrayPtr = ReadPtr( m_PRIDataPoolPtr + Offsets::ReplicationEntity::m_Datas );
-				if ( dataArrayPtr == 0 ) continue;
+                                // Amostra da 1a entidade valida: prova no logcat a cadeia
+                                // completa (classe/avatar/HP) de uma entidade real.
+                                if ( !sampleLogged )
+                                {
+                                        sampleLogged = true;
+                                        uintptr_t sAv = ReadPtr( Entity + Offsets::Player::m_AvatarManager );
+                                        uintptr_t sAva = ( sAv != 0 ) ? ReadPtr( sAv + Offsets::AvatarManager::m_Avatar ) : 0;
+                                        uintptr_t sUMA = ( sAva != 0 ) ? ReadPtr( sAva + Offsets::UMAAvatarBase::umaData ) : 0;
+                                        uintptr_t sPri = ReadPtr( Entity + Offsets::ReplicationEntity::m_PRIDataPool );
+                                        uintptr_t sDat = ( sPri != 0 ) ? ReadPtr( sPri + Offsets::ReplicationEntity::m_Datas ) : 0;
+                                        uintptr_t sCur = ( sDat != 0 ) ? ReadPtr( sDat + Offsets::ReplicationEntity::HealthCurrentPtr ) : 0;
+                                        uintptr_t sMax = ( sDat != 0 ) ? ReadPtr( sDat + Offsets::ReplicationEntity::HealthMaxPtr ) : 0;
+                                        int sHPc = ( sCur != 0 ) ? g_FreeFireMemory.Read<int>( sCur + Offsets::ReplicationEntity::Value ) : -1;
+                                        int sHPm = ( sMax != 0 ) ? g_FreeFireMemory.Read<int>( sMax + Offsets::ReplicationEntity::Value ) : -1;
+                                        DiagLog( "[ENTITY] amostra ent=0x%lX classe=%s av=0x%lX avatar=0x%lX uma=0x%lX pri=0x%lX datas=0x%lX hp=%d/%d",
+                                                  ( unsigned long )Entity, Data::GetPlayerTypeName( type ),
+                                                  ( unsigned long )sAv, ( unsigned long )sAva, ( unsigned long )sUMA,
+                                                  ( unsigned long )sPri, ( unsigned long )sDat, sHPc, sHPm );
+                                }
 
-				uintptr_t CurrentHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthCurrentPtr );
-				uintptr_t MaxHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthMaxPtr );
-				if ( CurrentHealthptr == 0 || MaxHealthptr == 0 ) continue;
+                                seenThisFrame.insert( Entity );
 
-				bool IsKnocked = false;
-				uintptr_t ShadowBase = ReadPtr( Entity + Offsets::PlayerNetwork::m_ShadowState );
-				if ( ShadowBase != 0 )
-				{
-					int PlayerPose = g_FreeFireMemory.Read<int>( ShadowBase + Offsets::ShadowState::TargetPhysXPose );
-					IsKnocked = ( PlayerPose == 8 );
-				}
+                                uintptr_t m_AvatarManager = ReadPtr( Entity + Offsets::Player::m_AvatarManager );
+                                if ( m_AvatarManager == 0 ) { entAvatar++; continue; }
 
-				int CurrentHealth = g_FreeFireMemory.Read<int>( CurrentHealthptr + Offsets::ReplicationEntity::Value );
-				int MaxHealth = g_FreeFireMemory.Read<int>( MaxHealthptr + Offsets::ReplicationEntity::Value );
-				if ( MaxHealth == 0 || CurrentHealth <= 0 ) continue;
+                                uintptr_t m_Avatar = ReadPtr( m_AvatarManager + Offsets::AvatarManager::m_Avatar );
+                                if ( m_Avatar == 0 ) { entAvatar++; continue; }
 
-				float HealthPercent = ( float )CurrentHealth / ( float )MaxHealth;
+                                uintptr_t UMAData = ReadPtr( m_Avatar + Offsets::UMAAvatarBase::umaData );
+                                if ( UMAData == 0 ) { entAvatar++; continue; }
 
-				uintptr_t WeaponPtr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::WeaponPtr );
-				// Falha transitoria do ponteiro de arma NAO derruba o player da
-				// ESP (era um dos motivos de players sumirem): fica com
-				// WeaponID=-1 e a linha da arma apenas nao e desenhada.
-				int WeaponID = -1;
-				if ( WeaponPtr != 0 )
-					WeaponID = g_FreeFireMemory.Read<int>( WeaponPtr + Offsets::ReplicationEntity::Value );
+                                // Sem filtro de visibilidade do mesh: IsVisible=0 (mesh oculto
+                                // em veiculo/animacao/revive/paraquedas) derrubava players
+                                // legitimos da ESP — "alguns players nao aparecem". Todo player
+                                // valido entra no snapshot; a visibilidade visual fica por
+                                // conta do VisibleCheck do aimbot/silent, nao da ESP.
 
-				// Name
-				std::string nameStr = "BOT";
-				bool IsClientBot = false;
-				g_FreeFireMemory.Read<bool>( Entity + Offsets::Player::IsClientBot, IsClientBot );
-				if ( !IsClientBot )
-				{
-					uintptr_t profilePtr = ReadPtr( Entity + Offsets::PlayerNetwork::m_Profile );
-					if ( profilePtr != 0 )
-					{
-						uintptr_t PlayerName = ReadPtr( profilePtr + Offsets::BaseProfileInfo::NickName );
-						if ( PlayerName != 0 )
-						{
-							if constexpr ( N32 )
-							{
-								nameStr = ObterStr( PlayerName + 0xC, g_FreeFireMemory.Read<int>( PlayerName + 0x8 ) );
-							}
-							else
-							{
-								nameStr = ObterStr( PlayerName + 0x14, g_FreeFireMemory.Read<int>( PlayerName + 0x10 ) );
-							}
-							if ( nameStr.empty( ) )
-							{
-								nameStr = XorStr( "BOT" );
-							}
-						}
-					}
-				}
+                                bool IsTeam = g_FreeFireMemory.Read<bool>( UMAData + Offsets::UMAData::isTeammate );
+                                // "Mostrar time" (ESP.ShowTeam): aliados entram no snapshot
+                                // marcados como IsTeammate — desenhados com cor de time e
+                                // nunca viram alvo do aimbot/silent. Desligado = filtro antigo.
+                                if ( IsTeam && !g_Globals.Visuals.ESP.ShowTeam ) { entTeam++; continue; }
 
-				Vector3 PosHeadEntity = Transform::GetHeadPosition( Entity, N32 );
-				if ( PosHeadEntity == Vector3::Zero( ) ) continue;
+                                uintptr_t m_PRIDataPoolPtr = ReadPtr( Entity + Offsets::ReplicationEntity::m_PRIDataPool );
+                                if ( m_PRIDataPoolPtr == 0 ) { entPri++; continue; }
 
-				Vector3 PosEntity = Transform::GetPosition( Entity, N32 );
-				if ( PosEntity == Vector3::Zero( ) ) continue;
+                                uintptr_t dataArrayPtr = ReadPtr( m_PRIDataPoolPtr + Offsets::ReplicationEntity::m_Datas );
+                                if ( dataArrayPtr == 0 ) { entPri++; continue; }
 
-				Vector3 MainPos = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
-				float Distancia = ( MainPos != Vector3::Zero( ) ) ? Vector3::Distance( PosEntity, MainPos ) : 0.0f;
+                                uintptr_t CurrentHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthCurrentPtr );
+                                uintptr_t MaxHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthMaxPtr );
+                                if ( CurrentHealthptr == 0 || MaxHealthptr == 0 ) { entPri++; continue; }
 
-				Vector3 HeadWorld = PosHeadEntity + ( Vector3::Up( ) * 0.20f );
-				Vector3 FeetWorld = PosEntity + ( Vector3::Down( ) * 0.1f );
+                                bool IsKnocked = false;
+                                uintptr_t ShadowBase = ReadPtr( Entity + Offsets::PlayerNetwork::m_ShadowState );
+                                if ( ShadowBase != 0 )
+                                {
+                                        int PlayerPose = g_FreeFireMemory.Read<int>( ShadowBase + Offsets::ShadowState::TargetPhysXPose );
+                                        IsKnocked = ( PlayerPose == 8 );
+                                }
 
-				// Projecao de leitura NAO pode descartar a entidade: se a view
-				// matrix estiver ruim/rasgada por um frame (escrita concorrente do
-				// jogo), descartar todas as entidades esvazia o snapshot e o ESP
-				// some e volta. Guarda o mundo sempre; a projecao em tela fica
-				// como fallback (congelado) e a reprojecao acontece no desenho.
-				Vector3 HeadPos = W2S::World2Screen( ViewMatrix, HeadWorld );
-				Vector3 EntityPos = W2S::World2Screen( ViewMatrix, FeetWorld );
-				// Projecao so vale com tela real: no boot (antes do primeiro
-				// render) ScreenWidth/Height sao 0 e W2S devolve (0,0) — gravar
-				// isso no snapshot fazia os inimigos aparecerem amontoados no
-				// canto do caminho congelado.
-				bool projOk = ( ScreenWidth > 0 && ScreenHeight > 0 && HeadPos.Z > 0 && EntityPos.Z > 0 );
+                                int CurrentHealth = g_FreeFireMemory.Read<int>( CurrentHealthptr + Offsets::ReplicationEntity::Value );
+                                int MaxHealth = g_FreeFireMemory.Read<int>( MaxHealthptr + Offsets::ReplicationEntity::Value );
+                                if ( MaxHealth == 0 || CurrentHealth <= 0 ) { entHp++; continue; }
 
-				PlayerData pd;
-				pd.HeadScreen = projOk ? HeadPos : Vector3::Zero( );
-				pd.FeetScreen = projOk ? EntityPos : Vector3::Zero( );
-				pd.HeadWorld = HeadWorld;
-				pd.FeetWorld = FeetWorld;
-				pd.HealthPercent = HealthPercent;
-				pd.IsKnocked = IsKnocked;
-				pd.IsTeammate = IsTeam;
-				pd.WeaponID = WeaponID;
-				pd.Entity = Entity;
-				pd.UMAData = UMAData;
-				pd.Name = nameStr;
-				pd.Distance = Distancia;
-				pd.CurrentHealth = ( short )CurrentHealth;
-				pd.MaxHealth = ( short )MaxHealth;
-				pd.LastSeenTick = GetTickCount64( );
-				pd.MaxHealth = ( short )MaxHealth;
-				tempPlayers.push_back( pd );
-			}
+                                float HealthPercent = ( float )CurrentHealth / ( float )MaxHealth;
 
-			fresh = true;
-		}
-		while ( false );
+                                uintptr_t WeaponPtr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::WeaponPtr );
+                                // Falha transitoria do ponteiro de arma NAO derruba o player da
+                                // ESP (era um dos motivos de players sumirem): fica com
+                                // WeaponID=-1 e a linha da arma apenas nao e desenhada.
+                                int WeaponID = -1;
+                                if ( WeaponPtr != 0 )
+                                        WeaponID = g_FreeFireMemory.Read<int>( WeaponPtr + Offsets::ReplicationEntity::Value );
 
-		if ( fresh )
-		{
-			lobbyFrames = 0;
-			lobbyStartMs = 0;
+                                // Name
+                                std::string nameStr = "BOT";
+                                bool IsClientBot = false;
+                                g_FreeFireMemory.Read<bool>( Entity + Offsets::Player::IsClientBot, IsClientBot );
+                                if ( !IsClientBot )
+                                {
+                                        uintptr_t profilePtr = ReadPtr( Entity + Offsets::PlayerNetwork::m_Profile );
+                                        if ( profilePtr != 0 )
+                                        {
+                                                uintptr_t PlayerName = ReadPtr( profilePtr + Offsets::BaseProfileInfo::NickName );
+                                                if ( PlayerName != 0 )
+                                                {
+                                                        if constexpr ( N32 )
+                                                        {
+                                                                nameStr = ObterStr( PlayerName + 0xC, g_FreeFireMemory.Read<int>( PlayerName + 0x8 ) );
+                                                        }
+                                                        else
+                                                        {
+                                                                nameStr = ObterStr( PlayerName + 0x14, g_FreeFireMemory.Read<int>( PlayerName + 0x10 ) );
+                                                        }
+                                                        if ( nameStr.empty( ) )
+                                                        {
+                                                                nameStr = XorStr( "BOT" );
+                                                        }
+                                                }
+                                        }
+                                }
 
-			// ==== carry-over de entidades (anti-flicker) ====
-			// Mesma filosofia do cheat de referência (hyperX): a entidade fica
-			// presa pelo ponteiro e falha transitória NÃO derruba o ESP. Uma
-			// entidade que passou dos checks fundamentais deste frame (está na
-			// lista oficial e é inimiga) mas caiu no meio da leitura — cadeia
-			// de ponteiros com um frame de lixo, posição (0,0), weapon/health
-			// ptr falhando — herda o ÚLTIMO ESTADO BOM do snapshot: o ESP não
-			// pisca e o aimbot não perde o alvo por 1 frame ruim.
-			//
-			// A entidade SÓ cai de verdade quando:
-			//  - não aparece em seenThisFrame (saiu da lista de ataque:
-			//    despawnado/eliminado pelo jogo);
-			//  - a re-leitura de vida dá <= 0 (morreu — não ressuscita cadáver);
-			//  - passou da janela de validade (3s sem nenhuma leitura boa —
-			//    mesma política de expiração do snapshot congelado).
-			{
-				LONGLONG nowCarry = GetTickCount64( );
-				std::vector<PlayerData> carried;
-				carried.reserve( m_Players.size( ) / 2 );
-				std::lock_guard<std::mutex> lock( m_Mutex );
-				for ( const auto& prev : m_Players )
-				{
-					if ( nowCarry - prev.LastSeenTick > 3000 )
-						continue;
-					if ( seenThisFrame.find( prev.Entity ) == seenThisFrame.end( ) )
-						continue;
-					bool alreadyIn = false;
-					for ( const auto& np : tempPlayers )
-					{
-						if ( np.Entity == prev.Entity )
-						{
-							alreadyIn = true;
-							break;
-						}
-					}
-					if ( alreadyIn )
-						continue;
-					// Não ressuscita morto: re-lê a vida (mesma cadeia do loop).
-					// Se voltar <= 0 a entidade morreu e cai no próximo frame.
-					uintptr_t priPool = N32 ? g_FreeFireMemory.Read<uint32_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool ) : g_FreeFireMemory.Read<uint64_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool );
-					uintptr_t arrPtr = ( priPool != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( priPool + Offsets::ReplicationEntity::m_Datas ) : g_FreeFireMemory.Read<uint64_t>( priPool + Offsets::ReplicationEntity::m_Datas ) ) : 0;
-					uintptr_t hPtr = ( arrPtr != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) : g_FreeFireMemory.Read<uint64_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) ) : 0;
-					int h = ( hPtr != 0 ) ? g_FreeFireMemory.Read<int>( hPtr + Offsets::ReplicationEntity::Value ) : -1;
-					if ( h <= 0 )
-						continue;
-					carried.push_back( prev );
-				}
-				for ( const auto& c : carried )
-					tempPlayers.push_back( c );
-			}
+                                Vector3 PosHeadEntity = Transform::GetHeadPosition( Entity, N32 );
+                                if ( PosHeadEntity == Vector3::Zero( ) ) { entPos++; continue; }
 
-			std::lock_guard<std::mutex> lock( m_Mutex );
-			// Contexto/camera sempre atualiza — mesmo quando o snapshot e
-			// segurado, o ESP reprojeta as posicoes de mundo com a camera atual.
-			m_Context = tempCtx;
-			if ( tempPlayers.empty( ) && !m_Players.empty( ) )
-			{
-				// Um frame "fresco" que veio vazio (todos os inimigos filtrados
-				// por leitura transitoria) NAO pode apagar o ESP. So aceita o
-				// vazio apos uma janela sustentada — saida legitima de todos os
-				// inimigos / fim de partida. Enquanto segura, marca o snapshot
-				// como nao-fresco para o aimbot nao mirar em posicao antiga.
-				//
-				// Janela de 25s EM TEMPO REAL (nao frames): quando o processo do
-				// jogo reinicia no meio da partida (emulador), leituras lixo
-				// podem produzir frames "frescos e vazios" por ate ~1-2s ate o
-				// RefreshCR3/RestartAsync recapturar o CR3 novo. Com 900 frames
-				// (~3-15s a menos fps), o wipe acontecia DURANTE a recuperacao e
-				// derrubava ESP+aimbot+silent juntos no meio da partida.
-				LONGLONG nowEmpty = GetTickCount64( );
-				if ( emptyStartMs == 0 )
-					emptyStartMs = nowEmpty;
-				if ( nowEmpty - emptyStartMs > 25000 )
-				{
-					// JA estamos sob o lock de m_Mutex acima (linha do
-					// std::lock_guard externo); relock do mesmo mutex nao
-					// recursivo aqui = deadlock/hard-freeze do processo.
-					LONGLONG elapsedEmpty = nowEmpty - emptyStartMs;
-					emptyStartMs = 0;
-					emptyFrames = 0;
-					DiagLog( "[diag] empty-clear: snapshot apagado apos %lldms de frames vazios frescos", ( long long )elapsedEmpty );
-					m_Players.swap( tempPlayers );
-					m_SnapshotFresh = true;
-					m_LastFreshTick.store( nowEmpty );
-				}
-				else
-				{
-					m_SnapshotFresh = false;
-				}
-			}
-			else
-			{
-				emptyStartMs = 0;
-				emptyFrames = 0;
-				m_Players.swap( tempPlayers );
-				m_SnapshotFresh = true;
-				m_LastFreshTick.store( GetTickCount64( ) );
-			}
-		}
-		else if ( readMatchState && !matchActive )
-		{
-			// m_State fora de [1..3] NUNCA limpa nada. No meio da partida isso
-			// acontece em transicoes de rodada/re-instancia do Match (estado
-			// legitimo de inatividade por alguns segundos) e com leitura lixo
-			// (CR3 obsoleta). Limpar aqui era o que fazia ESP + aimbot + silent
-			// desligarem JUNTOS no meio da partida. So marca nao-fresco
-			// (aimbot desliga; o ESP segue desenhando o snapshot).
-			lobbyFrames = 0;
-			lobbyStartMs = 0;
-			std::lock_guard<std::mutex> lock( m_Mutex );
-			m_SnapshotFresh = false;
-		}
-		else
-		{
-			// Falha de leitura (GameFacade==0 no meio da partida, loading,
-			// reinicio do processo, CR3 obsoleta): mantém o ultimo snapshot
-			// congelado para o ESP nao sumir, mas marca como nao-fresco para o
-			// aimbot nao mirar em posicao antiga/morta.
-			//
-			// O unico sinal confiavel de "saiu da partida" e a cadeia quebrar
-			// ANTES de ler o Match (GameFacade/MatchGame == 0). Se o Match foi
-			// lido, e falha de entidade/localPlayer NO MEIO DA PARTIDA: nunca
-			// limpa — segura. So limpa apos um periodo longo e sustentado sem
-			// Match (lobby real / jogo fechado), liberando a memoria para a
-			// proxima partida.
-if ( !matchRead )
-					{
-						// Janela de 30s REAIS (nao frames): cobre com folga o
-						// reinicio do processo do emulador + restart automatico;
-						// limpar antes (1200 frames ≈ 4-8s) era o que derrubava
-						// ESP+aimbot+silent juntos quando o processo reiniciava
-						// no meio da partida.
-						LONGLONG nowLobby = GetTickCount64( );
-						if ( lobbyStartMs == 0 )
-							lobbyStartMs = nowLobby;
-						if ( nowLobby - lobbyStartMs > 30000 )
-						{
-							LONGLONG elapsedLobby = nowLobby - lobbyStartMs;
-							lobbyStartMs = 0;
-							lobbyFrames = 0;
-							DiagLog( "[diag] lobby-clear: snapshot+contexto zerados apos %lldms sem Match", ( long long )elapsedLobby );
-							std::lock_guard<std::mutex> lock( m_Mutex );
-							m_Players.clear( );
-							m_Context = GameContext{ };
-							m_SnapshotFresh = false;
-						}
-						else
-						{
-							std::lock_guard<std::mutex> lock( m_Mutex );
-							m_SnapshotFresh = false;
-						}
-					}
-					else
-					{
-						lobbyStartMs = 0;
-						lobbyFrames = 0;
-				std::lock_guard<std::mutex> lock( m_Mutex );
-				m_SnapshotFresh = false;
-				// Se a leitura chegou ate a camera/view matrix antes de falhar,
-				// atualiza o contexto com ela — o ESP reprojeta as posicoes de
-				// mundo congeladas com a camera mais recente, ficando grudado
-				// nos inimigos mesmo durante o engasgo da leitura de entidades.
-				if ( tempCtx.ViewMatrix.m [ 0 ][ 0 ] != 0.f )
-					m_Context = tempCtx;
-			}
-		}
-		}
-		catch ( const std::exception& ex )
-		{
-			// Protege a thread de leitura de morrer silenciosamente por excecao
-			// (bad_alloc/lixo de leitura): sem isso, um unico lance faz o snapshot
-			// congelar para sempre e o ESP sumir ate o processo ser reiniciado.
-			DiagLog( "[diag] ReadLoop exception: %s", ex.what( ) );
-		}
-		catch ( ... )
-		{
-			DiagLog( "[diag] ReadLoop exception (unknown)" );
-		}
+                                Vector3 PosEntity = Transform::GetPosition( Entity, N32 );
+                                if ( PosEntity == Vector3::Zero( ) ) { entPos++; continue; }
 
-		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-	}
+                                Vector3 MainPos = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
+                                float Distancia = ( MainPos != Vector3::Zero( ) ) ? Vector3::Distance( PosEntity, MainPos ) : 0.0f;
+
+                                Vector3 HeadWorld = PosHeadEntity + ( Vector3::Up( ) * 0.20f );
+                                Vector3 FeetWorld = PosEntity + ( Vector3::Down( ) * 0.1f );
+
+                                // Projecao de leitura NAO pode descartar a entidade: se a view
+                                // matrix estiver ruim/rasgada por um frame (escrita concorrente do
+                                // jogo), descartar todas as entidades esvazia o snapshot e o ESP
+                                // some e volta. Guarda o mundo sempre; a projecao em tela fica
+                                // como fallback (congelado) e a reprojecao acontece no desenho.
+                                Vector3 HeadPos = W2S::World2Screen( ViewMatrix, HeadWorld );
+                                Vector3 EntityPos = W2S::World2Screen( ViewMatrix, FeetWorld );
+                                // Projecao so vale com tela real: no boot (antes do primeiro
+                                // render) ScreenWidth/Height sao 0 e W2S devolve (0,0) — gravar
+                                // isso no snapshot fazia os inimigos aparecerem amontoados no
+                                // canto do caminho congelado.
+                                bool projOk = ( ScreenWidth > 0 && ScreenHeight > 0 && HeadPos.Z > 0 && EntityPos.Z > 0 );
+
+                                PlayerData pd;
+                                pd.HeadScreen = projOk ? HeadPos : Vector3::Zero( );
+                                pd.FeetScreen = projOk ? EntityPos : Vector3::Zero( );
+                                pd.HeadWorld = HeadWorld;
+                                pd.FeetWorld = FeetWorld;
+                                pd.HealthPercent = HealthPercent;
+                                pd.IsKnocked = IsKnocked;
+                                pd.IsTeammate = IsTeam;
+                                pd.WeaponID = WeaponID;
+                                pd.Entity = Entity;
+                                pd.UMAData = UMAData;
+                                pd.Name = nameStr;
+                                pd.Distance = Distancia;
+                                pd.CurrentHealth = ( short )CurrentHealth;
+                                pd.MaxHealth = ( short )MaxHealth;
+                                pd.LastSeenTick = GetTickCount64( );
+                                tempPlayers.push_back( pd );
+                                entOk++;
+                        }
+
+                        // Resumo de descarte (rate-limit 5s). Se o ESP nao aparece e a
+                        // cadeia esta OK, ESTE log mostra qual filtro esta comendo tudo.
+                        static LONGLONG s_LastEntSummary = 0;
+                        if ( GetTickCount64( ) - s_LastEntSummary > 5000 )
+                        {
+                                s_LastEntSummary = GetTickCount64( );
+                                DiagLog( "[ENTITY] lista=%d ok=%d | descartados: local=%d classe=%d avatar=%d team=%d hp=%d pos=%d",
+                                          dictCount, entOk, entLocal, entClasse, entAvatar,
+                                          entTeam, entHp, entPos );
+                        }
+
+                        // Heartbeat de sucesso da busca inicial: prova que a cadeia
+                        // inteira (GameFacade -> ... -> entidades) leu limpo neste frame.
+                        ChainOkLog( dictCount, static_cast< int >( MatchState ), IsObserving );
+
+                        fresh = true;
+                }
+                while ( false );
+
+                if ( fresh )
+                {
+                        lobbyFrames = 0;
+                        lobbyStartMs = 0;
+
+                        // ==== carry-over de entidades (anti-flicker) ====
+                        // A entidade fica presa pelo ponteiro e falha transitória NÃO
+                        // derruba o ESP. Uma entidade que passou dos checks fundamentais
+                        // deste frame (está na lista oficial e é inimiga) mas caiu no
+                        // meio da leitura herda o ÚLTIMO ESTADO BOM do snapshot.
+                        //
+                        // A entidade SÓ cai de verdade quando:
+                        //  - não aparece em seenThisFrame (saiu da lista de ataque);
+                        //  - a re-leitura de vida dá <= 0 (morreu);
+                        //  - passou da janela de validade (3s sem nenhuma leitura boa).
+                        {
+                                LONGLONG nowCarry = GetTickCount64( );
+                                std::vector<PlayerData> carried;
+                                carried.reserve( m_Players.size( ) / 2 );
+                                std::lock_guard<std::mutex> lock( m_Mutex );
+                                for ( const auto& prev : m_Players )
+                                {
+                                        if ( nowCarry - prev.LastSeenTick > 3000 )
+                                                continue;
+                                        if ( seenThisFrame.find( prev.Entity ) == seenThisFrame.end( ) )
+                                                continue;
+                                        bool alreadyIn = false;
+                                        for ( const auto& np : tempPlayers )
+                                        {
+                                                if ( np.Entity == prev.Entity )
+                                                {
+                                                        alreadyIn = true;
+                                                        break;
+                                                }
+                                        }
+                                        if ( alreadyIn )
+                                                continue;
+                                        // Não ressuscita morto: re-lê a vida (mesma cadeia do loop).
+                                        // Se voltar <= 0 a entidade morreu e cai no próximo frame.
+                                        uintptr_t priPool = N32 ? g_FreeFireMemory.Read<uint32_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool ) : g_FreeFireMemory.Read<uint64_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool );
+                                        uintptr_t arrPtr = ( priPool != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( priPool + Offsets::ReplicationEntity::m_Datas ) : g_FreeFireMemory.Read<uint64_t>( priPool + Offsets::ReplicationEntity::m_Datas ) ) : 0;
+                                        uintptr_t hPtr = ( arrPtr != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) : g_FreeFireMemory.Read<uint64_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) ) : 0;
+                                        int h = ( hPtr != 0 ) ? g_FreeFireMemory.Read<int>( hPtr + Offsets::ReplicationEntity::Value ) : -1;
+                                        if ( h <= 0 )
+                                                continue;
+                                        carried.push_back( prev );
+                                }
+                                for ( const auto& c : carried )
+                                        tempPlayers.push_back( c );
+                        }
+
+                        std::lock_guard<std::mutex> lock( m_Mutex );
+                        // Contexto/camera sempre atualiza — mesmo quando o snapshot e
+                        // segurado, o ESP reprojeta as posicoes de mundo com a camera atual.
+                        m_Context = tempCtx;
+                        if ( tempPlayers.empty( ) && !m_Players.empty( ) )
+                        {
+                                // Um frame "fresco" que veio vazio NAO pode apagar o ESP.
+                                // So aceita o vazio apos uma janela sustentada (25s reais).
+                                LONGLONG nowEmpty = GetTickCount64( );
+                                if ( emptyStartMs == 0 )
+                                        emptyStartMs = nowEmpty;
+                                if ( nowEmpty - emptyStartMs > 25000 )
+                                {
+                                        // JA estamos sob o lock de m_Mutex acima; relock do
+                                        // mesmo mutex nao recursivo aqui = deadlock.
+                                        LONGLONG elapsedEmpty = nowEmpty - emptyStartMs;
+                                        emptyStartMs = 0;
+                                        emptyFrames = 0;
+                                        DiagLog( "[diag] empty-clear: snapshot apagado apos %lldms de frames vazios frescos", ( long long )elapsedEmpty );
+                                        m_Players.swap( tempPlayers );
+                                        m_SnapshotFresh = true;
+                                        m_LastFreshTick.store( nowEmpty );
+                                }
+                                else
+                                {
+                                        m_SnapshotFresh = false;
+                                }
+                        }
+                        else
+                        {
+                                emptyStartMs = 0;
+                                emptyFrames = 0;
+                                m_Players.swap( tempPlayers );
+                                m_SnapshotFresh = true;
+                                m_LastFreshTick.store( GetTickCount64( ) );
+                        }
+                }
+                else if ( readMatchState && !matchActive )
+                {
+                        // m_State fora de [1..3] NUNCA limpa nada. So marca nao-fresco.
+                        lobbyFrames = 0;
+                        lobbyStartMs = 0;
+                        std::lock_guard<std::mutex> lock( m_Mutex );
+                        m_SnapshotFresh = false;
+                }
+                else
+                {
+                        // Falha de leitura: mantém o ultimo snapshot congelado.
+                        // So limpa apos 30s reais sem Match (lobby real / jogo fechado).
+                        if ( !matchRead )
+                        {
+                                LONGLONG nowLobby = GetTickCount64( );
+                                if ( lobbyStartMs == 0 )
+                                        lobbyStartMs = nowLobby;
+                                if ( nowLobby - lobbyStartMs > 30000 )
+                                {
+                                        LONGLONG elapsedLobby = nowLobby - lobbyStartMs;
+                                        lobbyStartMs = 0;
+                                        lobbyFrames = 0;
+                                        DiagLog( "[diag] lobby-clear: snapshot+contexto zerados apos %lldms sem Match", ( long long )elapsedLobby );
+                                        std::lock_guard<std::mutex> lock( m_Mutex );
+                                        m_Players.clear( );
+                                        m_Context = GameContext{ };
+                                        m_SnapshotFresh = false;
+                                }
+                                else
+                                {
+                                        std::lock_guard<std::mutex> lock( m_Mutex );
+                                        m_SnapshotFresh = false;
+                                }
+                        }
+                        else
+                        {
+                                lobbyStartMs = 0;
+                                lobbyFrames = 0;
+                                std::lock_guard<std::mutex> lock( m_Mutex );
+                                m_SnapshotFresh = false;
+                                // Se a leitura chegou ate a camera/view matrix antes de falhar,
+                                // atualiza o contexto com ela — o ESP reprojeta as posicoes de
+                                // mundo congeladas com a camera mais recente.
+                                if ( tempCtx.ViewMatrix.m [ 0 ][ 0 ] != 0.f )
+                                        m_Context = tempCtx;
+                        }
+                }
+                }
+                catch ( const std::exception& ex )
+                {
+                        DiagLog( "[diag] ReadLoop exception: %s", ex.what( ) );
+                }
+                catch ( ... )
+                {
+                        DiagLog( "[diag] ReadLoop exception (unknown)" );
+                }
+
+                std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+        }
 }
 
 template void Data::ReadLoop<true, false>( );    // v24.1 32-bit
@@ -993,8 +1187,12 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 		BS_ActiveByCursor = false;
 	}
 
-	uintptr_t GameVar_TI = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo );
-	uintptr_t GameVar = ReadPtr( GameVar_TI + Offsets::AccessClass );
+	/* Se o perfil nao preencheu GameVarDef_TypeInfo (ex: v8a vazio),
+    * pula — sem isso lia o proprio ELF (0x464C457F) como TypeInfo. */
+    uintptr_t GameVar_TI = ( Offsets::GameVarDef::GameVarDef_TypeInfo != 0 )
+                ? ReadPtr( Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo ) : 0;
+    uintptr_t GameVar = ( GameVar_TI != 0 )
+                ? ReadPtr( GameVar_TI + Offsets::AccessClass ) : 0;
 
 	// --- BugarPixel ---
 	if ( GameVar != 0 )

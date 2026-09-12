@@ -322,6 +322,11 @@ template class Offsets::UnityDictionary<true, true, uint64_t>;
 template class Offsets::UnityDictionary<false, true, uint32_t>;
 template class Offsets::UnityDictionary<false, true, uint64_t>;
 
+/*
+ * Offsets::Loaded()
+ * true quando o perfil aplicado tem os offsets-chave != 0.
+ * APENAS diagnostico — NAO bloqueia mais nada. O ReadLoop soba direto.
+ */
 bool Offsets::Loaded()
 {
     return GameFacade::GameFacade_TypeInfo          != 0 &&
@@ -335,12 +340,11 @@ bool Offsets::Loaded()
 }
 
 /*
- * Dump (logcat) dos offsets-chave apos carregar um perfil — serve para
- * conferir visualmente se o perfil que subiu e o esperado.
+ * Dump (logcat) dos offsets-chave apos aplicar o perfil escolhido.
  *
  * ATENCAO: funcao SOLTA (fora da classe Offsets). Todo acesso a membros
- * precisa do prefixo Offsets:: — sem isso o clang emite
- * "use of undeclared identifier".
+ * precisa do prefixo Offsets:: — sem isso o clang emite "use of
+ * undeclared identifier".
  */
 static void LogLoadedOffsets(const char* perfil)
 {
@@ -362,233 +366,444 @@ static void LogLoadedOffsets(const char* perfil)
 }
 
 /*
- * Lista QUAIS offsets-chave ficaram em 0 — porque Loaded() exige TODOS
- * != 0. Se um so deles estiver 0, o StartReadThread recusa subir e o
- * daemon fica com reads 0 para sempre. Este log mostra exatamente qual.
+ * Lista QUAIS offsets-chave ficaram em 0 (ex: FFTHV8A() ainda vazio).
+ * So AVISA — nao impede nada de rodar.
  */
 static void LogOffsetsZerados()
 {
-    LOGE("  ---- OFFSETS-CHAVE ZERADOS (Loaded() = false) ----");
-    if (Offsets::GameFacade::GameFacade_TypeInfo == 0)          LOGE("    GameFacade.TypeInfo              = 0");
-    if (Offsets::GameFacade::CurrentMatchGame == 0)             LOGE("    GameFacade.CurrentMatchGame     = 0");
-    if (Offsets::MatchGame::m_Match == 0)                       LOGE("    MatchGame.m_Match               = 0");
-    if (Offsets::MatchGame::m_CameraControllerManager == 0)     LOGE("    MatchGame.m_CameraControllerMgr = 0");
-    if (Offsets::Match::m_State == 0)                           LOGE("    Match.m_State                   = 0");
-    if (Offsets::Match::m_LocalPlayer == 0)                     LOGE("    Match.m_LocalPlayer             = 0");
-    if (Offsets::Match::m_AttackableEntities == 0)              LOGE("    Match.m_AttackableEntities      = 0");
-    if (Offsets::Camera::ViewMatrix == 0)                       LOGE("    Camera.ViewMatrix               = 0");
-    LOGE("  => Preencha esses valores dentro do perfil (FFTHV7A75/76)");
-    LOGE("     ou o ReadThread NUNCA vai subir.");
+    LOGW("  ---- OFFSETS-CHAVE ZERADOS (incompleto, mas seguindo) ----");
+    if (Offsets::GameFacade::GameFacade_TypeInfo == 0)          LOGW("    GameFacade.TypeInfo              = 0");
+    if (Offsets::GameFacade::CurrentMatchGame == 0)             LOGW("    GameFacade.CurrentMatchGame     = 0");
+    if (Offsets::MatchGame::m_Match == 0)                       LOGW("    MatchGame.m_Match               = 0");
+    if (Offsets::MatchGame::m_CameraControllerManager == 0)     LOGW("    MatchGame.m_CameraControllerMgr = 0");
+    if (Offsets::Match::m_State == 0)                           LOGW("    Match.m_State                   = 0");
+    if (Offsets::Match::m_LocalPlayer == 0)                     LOGW("    Match.m_LocalPlayer             = 0");
+    if (Offsets::Match::m_AttackableEntities == 0)              LOGW("    Match.m_AttackableEntities      = 0");
+    if (Offsets::Camera::ViewMatrix == 0)                       LOGW("    Camera.ViewMatrix               = 0");
+    LOGW("  => Preencha esses valores dentro do perfil selecionado");
+    LOGW("     (FFTHV7A75 / FFTHV7A76 / FFTHV8A) em Offsets.cpp");
 }
 
 /*
- * GameConfig() — A BUSCA INICIAL de versao/offsets do painel.
+ * Zera TODOS os offsets antes de aplicar um perfil. Garante que trocar
+ * "FF v7a" <-> "FF v8a" na Settings nao deixe valor velho de um perfil
+ * vazando dentro do outro.
+ */
+void Offsets::ZerarOffsets()
+{
+    AccessClass = 0;
+
+    // GameVarDef
+    GameVarDef::GameVarDef_TypeInfo = 0;
+    GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0;
+    GameVarDef::EnableAccelerationOnFalling = 0;
+    GameVarDef::EnableLowFallingSwapWeapon = 0;
+    GameVarDef::RotationSensitivityMin = 0;
+    GameVarDef::RotationSensitivityMax = 0;
+    GameVarDef::AimRotationSensitivityMin = 0;
+    GameVarDef::AimRotationSensitivityMax = 0;
+
+    // GameFacade
+    GameFacade::GameFacade_TypeInfo = 0;
+    GameFacade::CurrentMatchGame = 0;
+
+    // MatchGame
+    MatchGame::m_Match = 0;
+    MatchGame::m_CameraControllerManager = 0;
+
+    // Match
+    Match::m_State = 0;
+    Match::m_LocalPlayer = 0;
+    Match::m_LocalObserver = 0;
+    Match::m_AttackableEntities = 0;
+
+    // Camera
+    CameraControllerManager::m_Camera = 0;
+    Camera::m_CachedPtr = 0;
+    Camera::ViewMatrix = 0;
+
+    // Observer
+    Observer::m_TargetPlayer = 0;
+
+    // Player
+    Player::IsClientBot = 0;
+    Player::IsFemale = 0;
+    Player::IsPrepareAttack = 0;
+    Player::m_IsCurFrameFowardLockToAimRot = 0;
+    Player::m_WaitForForceSync = 0;
+    Player::m_TransformType = 0;
+    Player::m_AimRotation = 0;
+    Player::m_AuxAimRotation = 0;
+    Player::m_AimAssist = 0;
+    Player::m_EAimAssit = 0;
+    Player::m_AimAssistOnSighting = 0;
+    Player::m_LastAimingInfoFromWeapon = 0;
+    Player::MainCameraTransform = 0;
+    Player::m_SwapWeaponTime = 0;
+    Player::m_FollowCamera = 0;
+    Player::m_Attributes = 0;
+    Player::m_AvatarManager = 0;
+    Player::m_InventoryManager = 0;
+    Player::m_UserControl = 0;
+    Player::m_HeadCollider = 0;
+    Player::m_fireColliders = 0;
+    Player::HeadNode = 0;
+    Player::m_HipNode = 0;
+    Player::m_BloodEffectNode = 0;
+    Player::m_RootNode = 0;
+    Player::m_BoneRootNode = 0;
+    Player::m_WeaponMountNode = 0;
+    Player::m_LeftWeaponNode = 0;
+    Player::m_FlightNode = 0;
+    Player::m_RightArmNode = 0;
+    Player::m_LeftArmNode = 0;
+    Player::m_RightForeArmNode = 0;
+    Player::m_LeftForeArmNode = 0;
+    Player::m_RightHandNode = 0;
+    Player::m_LeftHandNode = 0;
+    Player::m_RightAnkleNode = 0;
+    Player::m_LeftAnkleNode = 0;
+    Player::m_RightToeNode = 0;
+    Player::m_LeftToeNode = 0;
+
+    // PlayerNetwork
+    PlayerNetwork::m_ShadowState = 0;
+    PlayerNetwork::m_Profile = 0;
+
+    // PlayerAttributes
+    PlayerAttributes::m_EatSpeedScale = 0;
+    PlayerAttributes::m_FireIntervalScale = 0;
+
+    // AimAssistAutoLock
+    AimAssistAutoLock::m_TargetHeuristic = 0;
+    AimAssistAutoLock::m_Entity = 0;
+
+    // UserControlHandler
+    UserControlHandler::m_AxisData = 0;
+    UserControlHandler::m_FingerInDashArea = 0;
+    UserControlHandler::m_IsTouched = 0;
+    UserControlHandler::m_LockFingerInDashArea = 0;
+    UserControlHandler::m_DashByMovingJoystick = 0;
+
+    // AimAssistOnSighting
+    AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0;
+
+    // HitObjectInfo
+    HitObjectInfo::RayDir = 0;
+    HitObjectInfo::StartPosition = 0;
+
+    // InventoryManager
+    InventoryManager::m_itemOnHand = 0;
+
+    // Avatar
+    AvatarManager::m_Avatar = 0;
+    UMAAvatarBase::umaData = 0;
+    UmaAvatarSimple::IsVisible = 0;
+
+    // UMAData
+    UMAData::skeleton = 0;
+    UMAData::isLocalPlayer = 0;
+    UMAData::isTeammate = 0;
+
+    // UMASkeleton
+    UMASkeleton::boneHashDataLookup = 0;
+    UMASkeleton::boneNameHash = 0;
+    UMASkeleton::boneTransform = 0;
+
+    // Replication
+    ReplicationEntity::m_PRIDataPool = 0;
+    ReplicationEntity::m_Datas = 0;
+    ReplicationEntity::HealthCurrentPtr = 0;
+    ReplicationEntity::HealthMaxPtr = 0;
+    ReplicationEntity::WeaponPtr = 0;
+    ReplicationEntity::EpPtr = 0;
+    ReplicationEntity::Value = 0;
+
+    // Shadow
+    ShadowState::TargetPhysXPose = 0;
+
+    // Profile
+    BaseProfileInfo::AccountID = 0;
+    BaseProfileInfo::Level = 0;
+    BaseProfileInfo::NickName = 0;
+
+    // Weapon
+    Weapon::FireComponent = 0;
+    Weapon::m_WeaponData = 0;
+    Weapon::m_WeaponParams = 0;
+    Weapon::m_FireDuration = 0;
+    Weapon::m_IsSighting = 0;
+    Weapon::tangentTheta = 0;
+    Weapon::IntWeaponType = 0;
+
+    // WeaponParams
+    WeaponParams::FullDamageDistance = 0;
+    WeaponParams::PrefireDelay = 0;
+    WeaponParams::Range = 0;
+
+    // PlayerTransformNode
+    PlayerTransformNode::Transform = 0;
+    PlayerTransformNode::m_CachedTransform = 0;
+
+    // GetPosWorld
+    GetPosWorld::transObj = 0;
+    GetPosWorld::matrix = 0;
+    GetPosWorld::index = 0;
+    GetPosWorld::matrix_list = 0;
+    GetPosWorld::matrix_indices = 0;
+    GetPosWorld::HeadColliderMale = 0;
+    GetPosWorld::HeadColliderFemale = 0;
+    GetPosWorld::ColliderTransform = 0;
+    GetPosWorld::BoundsCenter_1 = 0;
+    GetPosWorld::BoundsCenter_2 = 0;
+    GetPosWorld::BoundsCenter_3 = 0;
+}
+
+/*
+ * GameConfig() — aplica DIRETO o perfil escolhido na Settings.
  *
- * Fluxo:
- *   0. ForceProfile != 0? Aplica o perfil DIRETO, sem probe (bypass).
- *   1. Para cada candidata a base de libil2cpp.so...
- *   2. Probe: le TypeInfo -> StaticFields -> ponteiro de ReleaseVersion;
- *   3. Le a string de versao (ex: "OB54") de dentro do processo do jogo;
- *   4. Se casar com uma versao suportada, carrega o perfil correspondente.
+ * SEM probe, SEM validacao de versao, SEM candidatos, SEM deteccao.
+ * A UNICA coisa definida automaticamente e a base da libil2cpp.so,
+ * que o Memory::Initialize() ja achou com FindModuleBase() e deixou
+ * aqui em Offsets::LibIl2Cpp.
  *
- * A probe le ponteiros do tamanho do JOGO (v7a = uint32, v8a = uint64).
+ * Tudo e ditado por g_Globals.General.GameProfile:
+ *   0 = FF v7a b75 -> FFTHV7A75()   (32-bit, ponteiros de 4 bytes)
+ *   1 = FF v7a b76 -> FFTHV7A76()   (32-bit, ponteiros de 4 bytes)
+ *   2 = FF v8a     -> FFTHV8A()     (64-bit, ponteiros de 8 bytes)
+ *
+ * O tamanho da leitura de ponteiros (4/8 bytes) NAO e escolhido aqui:
+ * o ReadLoop le com o template N32 (v7a -> Read<uint32_t>, v8a ->
+ * Read<uint64_t>) e o N32 e derivado do GameProfile no Initialize.
  */
 void Offsets::GameConfig()
 {
+    const int profile = g_Globals.General.GameProfile;
+
     LOGI("================================================");
-    LOGI("GameConfig() — BUSCA INICIAL de versao/offsets");
-    LOGI("  candidatos a libil2cpp: %zu", LibIl2CppCandidates.size());
-    LOGI("  LibIl2Cpp atual: 0x%lX", (unsigned long)LibIl2Cpp);
-    LOGI("  arquitetura do jogo: %s",
-         g_Globals.General.N32 ? "32-bit (armeabi-v7a)" : "64-bit (arm64-v8a)");
-    LOGI("  ForceProfile = %d (0=probe | 1=forcar v7a b75 | 2=forcar v7a b76)",
-         g_Globals.General.ForceProfile);
+    LOGI("GameConfig() — aplicando perfil escolhido na Settings");
+    LOGI("  GameProfile = %d (0=v7a b75 | 1=v7a b76 | 2=v8a)", profile);
+    LOGI("  LibIl2Cpp   = 0x%lX (definida pelo Memory::Initialize)",
+         (unsigned long)LibIl2Cpp);
 
-    if (LibIl2CppCandidates.empty())
+    ZerarOffsets();
+
+    switch (profile)
     {
-        LOGE("SEM CANDIDATOS de libil2cpp — busca inicial impossivel!");
-        LOGE("(Memory::Initialize nao preencheu LibIl2CppCandidates)");
-        LibIl2Cpp = 0;
-        return;
-    }
+    case 2:
+        LOGW("  Perfil: FF v8a (64-bit, ponteiros de 8 bytes)");
+        FFTHV8A();
+        LogLoadedOffsets("FF v8a");
+        break;
 
-    LibIl2Cpp = LibIl2CppCandidates.front();
+    case 1:
+        LOGW("  Perfil: FF v7a build 76 (32-bit, ponteiros de 4 bytes)");
+        FFTHV7A76();
+        LogLoadedOffsets("FF v7a b76");
+        break;
 
-    /*
-     * ================================================================
-     * MODO FORCADO — bypass total da probe de versao.
-     * Aplica o perfil que VOCE preencheu, sem validar a versao.
-     * ================================================================
-     */
-    if (g_Globals.General.ForceProfile == 1 || g_Globals.General.ForceProfile == 2)
-    {
-        LOGW("  MODO FORCADO: probe de versao IGNORADA pelo usuario");
-
-        if (!g_Globals.General.N32)
-            LOGW("  MODO FORCADO: jogo foi detectado como 64-bit, mas perfil v7a sera aplicado assim mesmo");
-
-        g_Globals.General.N32     = true;
-        g_Globals.General.V31     = true;
-        g_Globals.General.NoAnogs = true;
-
-        if (g_Globals.General.ForceProfile == 1)
-        {
-            LOGW("  MODO FORCADO: aplicando FFTHV7A75 SEM validar versao");
-            FFTHV7A75();
-            LogLoadedOffsets("FORCADO: FF TH v7a build 75");
-        }
-        else
-        {
-            LOGW("  MODO FORCADO: aplicando FFTHV7A76 SEM validar versao");
-            FFTHV7A76();
-            LogLoadedOffsets("FORCADO: FF TH v7a build 76");
-        }
-
-        if (!Loaded())
-            LogOffsetsZerados();
-
-        return;
+    case 0:
+    default:
+        LOGW("  Perfil: FF v7a build 75 (32-bit, ponteiros de 4 bytes)");
+        FFTHV7A75();
+        LogLoadedOffsets("FF v7a b75");
+        break;
     }
 
     /*
-     * ================================================================
-     * MODO AUTO — probe normal por versao (comportamento original)
-     * ================================================================
+     * Aviso rapido se o perfil escolhido ainda tem offsets-chave em 0
+     * (ex: FFTHV8A() vazio). NAO bloqueia nada — o ReadThread sobe do
+     * mesmo jeito e o log da cadeia mostra onde parar.
      */
-    for (uintptr_t candidate : LibIl2CppCandidates)
-    {
-        LibIl2Cpp = candidate;
-        LOGI("--- testando candidata libil2cpp @ 0x%lX ---", (unsigned long)candidate);
+    if (!Loaded())
+        LogOffsetsZerados();
 
-        if (g_Globals.General.N32)
-        {
-            /* ============ probe v7a — build 75 (OB54) ============ */
-            {
-                const uintptr_t RvaProbe = 0xABFF3B8;
-                uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + RvaProbe);
-                LOGI("  [b75] probe RVA 0x%lX -> pTypeInfo = 0x%X",
-                     (unsigned long)RvaProbe, pTypeInfo);
-
-                uint32_t StaticFields = (pTypeInfo != 0)
-                    ? g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C) : 0;
-                LOGI("  [b75] StaticFields (+0x5C) = 0x%X", StaticFields);
-
-                uint32_t ReleaseVersion = (StaticFields != 0)
-                    ? g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0) : 0;
-                LOGI("  [b75] ReleaseVersion (+0x0) = 0x%X", ReleaseVersion);
-
-                if (ReleaseVersion != 0)
-                {
-                    std::string version = ObterStr(
-                        ReleaseVersion + 0xC,
-                        g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
-                    LOGI("  [b75] versao do jogo = \"%s\"", version.c_str());
-
-                    if (version == "OB54")
-                    {
-                        g_Globals.General.N32     = true;
-                        g_Globals.General.V31     = true;
-                        g_Globals.General.NoAnogs = true;
-                        FFTHV7A75();
-                        LogLoadedOffsets("FF TH v7a build 75 (OB54)");
-                        return;
-                    }
-                }
-                else
-                {
-                    LOGI("  [b75] probe nao casou (pTypeInfo/StaticFields/ReleaseVersion = 0 — RVA de outra build?)");
-                }
-            }
-
-            /* ============ probe v7a — build 76 (OB54) ============ */
-            {
-                const uintptr_t RvaProbe = 0xABFF6D8;
-                uint32_t pTypeInfo = g_FreeFireMemory.Read<uint32_t>(LibIl2Cpp + RvaProbe);
-                LOGI("  [b76] probe RVA 0x%lX -> pTypeInfo = 0x%X",
-                     (unsigned long)RvaProbe, pTypeInfo);
-
-                uint32_t StaticFields = (pTypeInfo != 0)
-                    ? g_FreeFireMemory.Read<uint32_t>(pTypeInfo + 0x5C) : 0;
-                LOGI("  [b76] StaticFields (+0x5C) = 0x%X", StaticFields);
-
-                uint32_t ReleaseVersion = (StaticFields != 0)
-                    ? g_FreeFireMemory.Read<uint32_t>(StaticFields + 0x0) : 0;
-                LOGI("  [b76] ReleaseVersion (+0x0) = 0x%X", ReleaseVersion);
-
-                if (ReleaseVersion != 0)
-                {
-                    std::string version = ObterStr(
-                        ReleaseVersion + 0xC,
-                        g_FreeFireMemory.Read<uint32_t>(ReleaseVersion + 0x8));
-                    LOGI("  [b76] versao do jogo = \"%s\"", version.c_str());
-
-                    if (version == "OB54")
-                    {
-                        g_Globals.General.N32     = true;
-                        g_Globals.General.V31     = true;
-                        g_Globals.General.NoAnogs = true;
-                        FFTHV7A76();
-                        LogLoadedOffsets("FF TH v7a build 76 (OB54)");
-                        return;
-                    }
-                }
-                else
-                {
-                    LOGI("  [b76] probe nao casou (pTypeInfo/StaticFields/ReleaseVersion = 0 — RVA de outra build?)");
-                }
-            }
-        }
-        else
-        {
-            /*
-             * ============ probe v8a (arm64) ============
-             * TODO(v8a): o RVA abaixo foi herdado do perfil v7a — um jogo
-             * v8a tem RVAs diferentes. Use o MODO FORCADO quando existir
-             * perfil v8a cadastrado.
-             */
-            const uintptr_t RvaProbe = 0xABFF3B8; // TODO(v8a): ajustar RVA
-            uint64_t pTypeInfo = g_FreeFireMemory.Read<uint64_t>(LibIl2Cpp + RvaProbe);
-            LOGI("  [v8a] probe RVA 0x%lX -> pTypeInfo = 0x%llX",
-                 (unsigned long)RvaProbe, (unsigned long long)pTypeInfo);
-
-            uint64_t StaticFields = (pTypeInfo != 0)
-                ? g_FreeFireMemory.Read<uint64_t>(pTypeInfo + 0x5C) : 0;
-            LOGI("  [v8a] StaticFields (+0x5C) = 0x%llX", (unsigned long long)StaticFields);
-
-            uint64_t ReleaseVersion = (StaticFields != 0)
-                ? g_FreeFireMemory.Read<uint64_t>(StaticFields + 0x0) : 0;
-            LOGI("  [v8a] ReleaseVersion (+0x0) = 0x%llX", (unsigned long long)ReleaseVersion);
-
-            if (ReleaseVersion != 0)
-            {
-                // System.String em 64-bit: length @ 0x10, chars @ 0x14
-                std::string version = ObterStr(
-                    ReleaseVersion + 0x14,
-                    g_FreeFireMemory.Read<int>(ReleaseVersion + 0x10));
-                LOGI("  [v8a] versao do jogo = \"%s\"", version.c_str());
-                LOGE("  [v8a] PERFIL DE OFFSETS V8A AINDA NAO CADASTRADO!");
-                LOGE("  [v8a] Cadastre os offsets v8a em Offsets.cpp (novo perfil) + RVA da probe.");
-            }
-            else
-            {
-                LOGI("  [v8a] probe nao casou (valores zerados — RVA herdado do v7a, precisa ajustar)");
-            }
-        }
-    }
-
-    LOGE("==================================================");
-    LOGE("NENHUMA VERSAO CASEU — offsets ficam ZERADOS!");
-    LOGE("A busca inicial nao reconheceu a versao do seu jogo.");
-    LOGE("=> Sem perfil, o ReadThread NAO sobe (reads 0 pra sempre).");
-    LOGE("=> Solucao imediata: Settings -> Offsets Profile -> Forcar");
-    LOGE("   -> Apply + Restart.");
-    LogOffsetsZerados();
-    LOGE("==================================================");
-
-    LibIl2Cpp = 0;
+    LOGI("================================================");
 }
 
-void Offsets::FFTHV7A75() // v31 32-bit
+/*
+ * FFTHV8A() — Free Fire arm64-v8a (64-bit, ponteiros de 8 bytes).
+ *
+ * PREENCHA com o dump da SUA lib v8a (dumpster/Ghidra). Todos os campos
+ * sao da mesma lista do perfil v7a — so mudam os valores. Enquanto
+ * estiver tudo 0, o painel avisa "OFFSETS-CHAVE ZERADOS" no logcat e a
+ * cadeia de leitura nao encontra nada, mas nada trava.
+ *
+ * Lembrete: em v8a a leitura de ponteiro ja e automatica (8 bytes via
+ * Read<uint64_t>) porque o GameProfile=2 deixa N32=false.
+ */
+void Offsets::FFTHV8A() // 64-bit
+{
+        AccessClass = 0x0; // TODO(v8a): preencha
+
+        // GameVarDef
+        GameVarDef::GameVarDef_TypeInfo = 0x0; // TODO(v8a)
+        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x0; // TODO(v8a)
+        GameVarDef::EnableAccelerationOnFalling = 0x0; // TODO(v8a)
+        GameVarDef::EnableLowFallingSwapWeapon = 0x0; // TODO(v8a)
+        GameVarDef::RotationSensitivityMin = 0x0; // TODO(v8a)
+        GameVarDef::RotationSensitivityMax = 0x0; // TODO(v8a)
+        GameVarDef::AimRotationSensitivityMin = 0x0; // TODO(v8a)
+        GameVarDef::AimRotationSensitivityMax = 0x0; // TODO(v8a)
+
+        // GameFacade
+        GameFacade::GameFacade_TypeInfo = 0x0; // TODO(v8a)
+        GameFacade::CurrentMatchGame = 0x0; // TODO(v8a)
+
+        // MatchGame
+        MatchGame::m_Match = 0x0; // TODO(v8a)
+        MatchGame::m_CameraControllerManager = 0x0; // TODO(v8a)
+
+        // Match
+        Match::m_State = 0x0; // TODO(v8a)
+        Match::m_LocalPlayer = 0x0; // TODO(v8a)
+        Match::m_LocalObserver = 0x0; // TODO(v8a)
+        Match::m_AttackableEntities = 0x0; // TODO(v8a)
+
+        // Camera
+        CameraControllerManager::m_Camera = 0x0; // TODO(v8a)
+        Camera::m_CachedPtr = 0x0; // TODO(v8a)
+        Camera::ViewMatrix = 0x0; // TODO(v8a)
+
+        // Observer
+        Observer::m_TargetPlayer = 0x0; // TODO(v8a)
+
+        // Player / PlayerNetwork
+        Player::IsClientBot = 0x0; // TODO(v8a)
+        Player::IsFemale = 0x0; // TODO(v8a)
+        Player::IsPrepareAttack = 0x0; // TODO(v8a)
+        Player::m_IsCurFrameFowardLockToAimRot = 0x0; // TODO(v8a)
+        Player::m_WaitForForceSync = 0x0; // TODO(v8a)
+        Player::m_TransformType = 0x0; // TODO(v8a)
+        Player::m_AimRotation = 0x0; // TODO(v8a)
+        Player::m_AuxAimRotation = 0x0; // TODO(v8a)
+        Player::m_AimAssist = 0x0; // TODO(v8a)
+        Player::m_EAimAssit = 0x0; // TODO(v8a)
+        Player::m_AimAssistOnSighting = 0x0; // TODO(v8a)
+        Player::m_LastAimingInfoFromWeapon = 0x0; // TODO(v8a)
+        Player::MainCameraTransform = 0x0; // TODO(v8a)
+        Player::m_SwapWeaponTime = 0x0; // TODO(v8a)
+        Player::m_Attributes = 0x0; // TODO(v8a)
+        Player::m_AvatarManager = 0x0; // TODO(v8a)
+        Player::m_InventoryManager = 0x0; // TODO(v8a)
+        Player::m_UserControl = 0x0; // TODO(v8a)
+        Player::m_HeadCollider = 0x0; // TODO(v8a)
+        Player::m_fireColliders = 0x0; // TODO(v8a)
+        Player::HeadNode = 0x0; // TODO(v8a)
+        Player::m_HipNode = 0x0; // TODO(v8a)
+        Player::m_BloodEffectNode = 0x0; // TODO(v8a)
+        Player::m_RootNode = 0x0; // TODO(v8a)
+        Player::m_BoneRootNode = 0x0; // TODO(v8a)
+        Player::m_WeaponMountNode = 0x0; // TODO(v8a)
+        Player::m_LeftWeaponNode = 0x0; // TODO(v8a)
+        Player::m_FlightNode = 0x0; // TODO(v8a)
+        Player::m_RightArmNode = 0x0; // TODO(v8a)
+        Player::m_LeftArmNode = 0x0; // TODO(v8a)
+        Player::m_RightForeArmNode = 0x0; // TODO(v8a)
+        Player::m_LeftForeArmNode = 0x0; // TODO(v8a)
+        Player::m_RightHandNode = 0x0; // TODO(v8a)
+        Player::m_LeftHandNode = 0x0; // TODO(v8a)
+        Player::m_RightAnkleNode = 0x0; // TODO(v8a)
+        Player::m_LeftAnkleNode = 0x0; // TODO(v8a)
+        Player::m_RightToeNode = 0x0; // TODO(v8a)
+        Player::m_LeftToeNode = 0x0; // TODO(v8a)
+
+        // PlayerNetwork
+        PlayerNetwork::m_ShadowState = 0x0; // TODO(v8a)
+        PlayerNetwork::m_Profile = 0x0; // TODO(v8a)
+
+        // Shadow
+        ShadowState::TargetPhysXPose = 0x0; // TODO(v8a)
+
+        // PlayerAttributes
+        PlayerAttributes::m_EatSpeedScale = 0x0; // TODO(v8a)
+        PlayerAttributes::m_FireIntervalScale = 0x0; // TODO(v8a)
+
+        // AimAssistAutoLock
+        AimAssistAutoLock::m_TargetHeuristic = 0x0; // TODO(v8a)
+        AimAssistAutoLock::m_Entity = 0x0; // TODO(v8a)
+
+        // UserControlHandler
+        UserControlHandler::m_AxisData = 0x0; // TODO(v8a)
+        UserControlHandler::m_FingerInDashArea = 0x0; // TODO(v8a)
+        UserControlHandler::m_IsTouched = 0x0; // TODO(v8a)
+        UserControlHandler::m_LockFingerInDashArea = 0x0; // TODO(v8a)
+        UserControlHandler::m_DashByMovingJoystick = 0x0; // TODO(v8a)
+
+        // AimAssistOnSighting
+        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x0; // TODO(v8a)
+
+        // HitObjectInfo
+        HitObjectInfo::RayDir = 0x0; // TODO(v8a)
+        HitObjectInfo::StartPosition = 0x0; // TODO(v8a)
+
+        // InventoryManager
+        InventoryManager::m_itemOnHand = 0x0; // TODO(v8a)
+
+        // Avatar
+        AvatarManager::m_Avatar = 0x0; // TODO(v8a)
+        UMAAvatarBase::umaData = 0x0; // TODO(v8a)
+        UmaAvatarSimple::IsVisible = 0x0; // TODO(v8a)
+
+        // UMAData
+        UMAData::skeleton = 0x0; // TODO(v8a)
+        UMAData::isLocalPlayer = 0x0; // TODO(v8a)
+        UMAData::isTeammate = 0x0; // TODO(v8a)
+
+        // UMASkeleton
+        UMASkeleton::boneHashDataLookup = 0x0; // TODO(v8a)
+        UMASkeleton::boneNameHash = 0x0; // TODO(v8a)
+        UMASkeleton::boneTransform = 0x0; // TODO(v8a)
+
+        // Replication
+        ReplicationEntity::m_PRIDataPool = 0x0; // TODO(v8a)
+        ReplicationEntity::m_Datas = 0x0; // TODO(v8a)
+        ReplicationEntity::HealthCurrentPtr = 0x0; // TODO(v8a)
+        ReplicationEntity::HealthMaxPtr = 0x0; // TODO(v8a)
+        ReplicationEntity::WeaponPtr = 0x0; // TODO(v8a)
+        ReplicationEntity::EpPtr = 0x0; // TODO(v8a)
+        ReplicationEntity::Value = 0x0; // TODO(v8a)
+
+        // Profile
+        BaseProfileInfo::AccountID = 0x0; // TODO(v8a)
+        BaseProfileInfo::Level = 0x0; // TODO(v8a)
+        BaseProfileInfo::NickName = 0x0; // TODO(v8a)
+
+        // Weapon
+        Weapon::FireComponent = 0x0; // TODO(v8a)
+        Weapon::m_WeaponData = 0x0; // TODO(v8a)
+        Weapon::m_WeaponParams = 0x0; // TODO(v8a)
+        Weapon::m_FireDuration = 0x0; // TODO(v8a)
+        Weapon::m_IsSighting = 0x0; // TODO(v8a)
+        Weapon::tangentTheta = 0x0; // TODO(v8a)
+        Weapon::IntWeaponType = 0x0; // TODO(v8a)
+
+        // WeaponParams
+        WeaponParams::FullDamageDistance = 0x0; // TODO(v8a)
+        WeaponParams::PrefireDelay = 0x0; // TODO(v8a)
+        WeaponParams::Range = 0x0; // TODO(v8a)
+
+        // PlayerTransformNode
+        PlayerTransformNode::Transform = 0x0; // TODO(v8a)
+        PlayerTransformNode::m_CachedTransform = 0x0; // TODO(v8a)
+
+        // get_position_Injected (fixed — so mudam se a Unity mudar)
+        GetPosWorld::transObj = 0x10; // fixed v8a
+        GetPosWorld::matrix = 0x40; // fixed v8a
+        GetPosWorld::index = 0x48; // fixed v8a
+        GetPosWorld::matrix_list = 0x30; // fixed v8a
+        GetPosWorld::matrix_indices = 0x38; // fixed v8a
+
+        // GetHeadPosition (fixed — so mudam se a Unity mudar)
+        GetPosWorld::HeadColliderMale = 0x70; // fixed v8a
+        GetPosWorld::HeadColliderFemale = 0x78; // fixed v8a
+        GetPosWorld::ColliderTransform = 0x10; // fixed v8a
+        GetPosWorld::BoundsCenter_1 = 0x50; // fixed v8a
+        GetPosWorld::BoundsCenter_2 = 0x28; // fixed v8a
+        GetPosWorld::BoundsCenter_3 = 0xC0; // fixed v8a
+}
+
+void Offsets::FFTHV7A75() // v75 32-bit
 {
 	AccessClass = 0x5C; // TODO: update manually
 
@@ -773,7 +988,7 @@ void Offsets::FFTHV7A75() // v31 32-bit
 	GetPosWorld::BoundsCenter_3 = 0x60; // fixed (may change if Unity updates)
 }
 
-void Offsets::FFTHV7A76() // v31 32-bit
+void Offsets::FFTHV7A76() // v76 32-bit
 {
 	AccessClass = 0x5C; // TODO: update manually
 

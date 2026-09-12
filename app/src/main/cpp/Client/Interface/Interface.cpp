@@ -1235,18 +1235,20 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         ImGui::Dummy(ImVec2(0, 8));
 
-                                                        /*
-                                                         * Perfil de offsets: AUTO roda a probe de versao;
-                                                         * os modos FORCAR aplicam seu perfil direto, sem
-                                                         * validar a versao do jogo (bypass da probe).
+                                                                                                                /*
+                                                         * TIPO DO JOGO — a unica escolha que existe.
+                                                         * Define o perfil de offsets aplicado (FFTHV7A75 /
+                                                         * FFTHV7A76 / FFTHV8A) E o tamanho da leitura de
+                                                         * ponteiros (v7a = 4 bytes, v8a = 8 bytes).
+                                                         * Mudou? Aperte "Apply + Restart" logo abaixo.
                                                          */
-                                                        Custom::Combo(XorStr("Offsets Profile"), &g_Globals.General.ForceProfile,
-                                                                XorStr("Auto (probe)\0Forcar v7a b75\0Forcar v7a b76\0"));
+                                                        Custom::Combo(XorStr("Game Type"), &g_Globals.General.GameProfile,
+                                                                XorStr("v7a b75\0v7a b76\0v8a\0"));
 
                                                         if (Custom::Button(XorStr("Apply + Restart"), ImVec2(ImGui::GetWindowSize().x - 28, 36)))
                                                         {
                                                                 std::thread([]{ g_FreeFireMemory.Restart(); }).detach();
-                                                                NotifyManager::Send(XorStr("Reiniciando com o perfil selecionado..."), 4000);
+                                                                NotifyManager::Send(XorStr("Aplicando Game Type selecionado..."), 4000);
                                                         }
 
                                                         ImGui::Dummy(ImVec2(0, 8));

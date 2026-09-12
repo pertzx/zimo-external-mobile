@@ -333,14 +333,19 @@ public:
 	    static void GameConfig();
 
         /*
-         * true somente quando um conjunto de offsets REAL foi carregado pelo
-         * GameConfig(). Se qualquer offset-chave continuar em 0, a busca inicial
-         * nao casou com nenhuma versao suportada — e o ReadLoop NAO PODE rodar:
-         * com GameFacade_TypeInfo=0 ele le o proprio header ELF da lib como se
-         * fosse ponteiro (0x464C457F / 0x00010101464C457F no log da ponte).
+         * true quando o perfil aplicado tem os offsets-chave != 0.
+         * APENAS diagnostico — nao bloqueia mais nada (sem gate).
          */
         static bool Loaded();
 private:
-	static void FFTHV7A75();
-	static void FFTHV7A76();
+        static void FFTHV7A75();
+        static void FFTHV7A76();
+        static void FFTHV8A();
+
+        /*
+         * Zera TODOS os offsets antes de aplicar um perfil. Garante que
+         * trocar "FF v7a" <-> "FF v8a" na Settings nao deixe valor velho
+         * de um perfil vazando dentro do outro.
+         */
+        static void ZerarOffsets();
 };

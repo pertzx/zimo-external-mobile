@@ -1469,270 +1469,122 @@ bool Memory::IsBridgeConnected()
 
 bool Memory::Initialize()
 {
-    LOGI(
-        "[INIT] ========================================"
-    );
+    LOGI("[INIT] ========================================");
+    LOGI("[INIT] Memory::Initialize()");
+    LOGI("[INIT] Backend=%s", MEMORY_BACKEND_VERSION);
+    LOGI("[INIT] Ponte=%s em %s",
+         BridgeClient::EnsureConnected() ? "CONECTADA" : "INDISPONIVEL (fallback local)",
+         BridgeClient::GetSocketPath());
 
-    LOGI(
-        "[INIT] Memory::Initialize()"
-    );
-
-    LOGI(
-        "[INIT] Backend=%s",
-        MEMORY_BACKEND_VERSION
-    );
-
-    LOGI(
-        "[INIT] Ponte=%s em %s",
-        BridgeClient::EnsureConnected()
-            ? "CONECTADA"
-            : "INDISPONIVEL (fallback local)",
-        BridgeClient::GetSocketPath()
-    );
-
-    LOGI(
-        "[INIT] Procurando processo do Free Fire..."
-    );
+    LOGI("[INIT] Procurando processo do Free Fire...");
 
     if (s_Initialized)
     {
-        LOGI(
-            "[INIT] Memory ja inicializada: pid=%d lib=0x%lX",
-            s_TargetPid,
-            static_cast<unsigned long>(
-                s_LibIl2Cpp
-            )
-        );
-
+        LOGI("[INIT] Memory ja inicializada: pid=%d lib=0x%lX",
+             s_TargetPid, static_cast<unsigned long>(s_LibIl2Cpp));
         return true;
     }
 
-    pid_t pid =
-        FindTargetPid();
+    pid_t pid = FindTargetPid();
 
     if (pid <= 0)
     {
-        LOGE(
-            "[INIT] FALHA: PID nao encontrado"
-        );
-
+        LOGE("[INIT] FALHA: PID nao encontrado");
         s_LastInitError = "jogo nao encontrado (FF aberto? daemon rodando?)";
-
         return false;
     }
 
-    LOGI(
-        "[INIT] PID encontrado: %d",
-        pid
-    );
+    LOGI("[INIT] PID encontrado: %d", pid);
 
-    bool target32 = false;
+    /*
+     * ================================================================
+     * ARQUITETURA: vem do combo "Game Type" da Settings — NADA de
+     * deteccao automatica (DetectTarget32Bit saiu do caminho).
+     *
+     *   GameProfile 0 = FF v7a b75  -> 32-bit, ponteiros de 4 bytes
+     *   GameProfile 1 = FF v7a b76  -> 32-bit, ponteiros de 4 bytes
+     *   GameProfile 2 = FF v8a      -> 64-bit, ponteiros de 8 bytes
+     * ================================================================
+     */
+    const bool profileIs32 = (g_Globals.General.GameProfile != 2);
 
-    if (!DetectTarget32Bit(pid, target32))
-    {
-        LOGE(
-            "[INIT] Arquitetura do alvo DESCONHECIDA (ponte offline + leitura local sem permissao)."
-        );
+    LOGI("[INIT] Game Type: %s (GameProfile=%d)",
+         profileIs32 ? "FF v7a / 32-bit (ptr 4 bytes)" : "FF v8a / 64-bit (ptr 8 bytes)",
+         g_Globals.General.GameProfile);
 
-        LOGE(
-            "[INIT] NAO vou chutar 64-bit: abortando init. O watchdog tenta de novo quando a ponte subir."
-        );
-
-        return false;
-    }
-
-    LOGI(
-        "[INIT] Arquitetura alvo: %s",
-        target32
-            ? "32-bit / armeabi-v7a"
-            : "64-bit / arm64-v8a"
-    );
-
-    uintptr_t il2cpp =
-        FindModuleBase(
-            pid,
-            "libil2cpp.so"
-        );
+    /*
+     * A UNICA coisa que o app ainda procura sozinho: a base da libil2cpp.
+     */
+    uintptr_t il2cpp = FindModuleBase(pid, "libil2cpp.so");
 
     if (il2cpp == 0)
     {
-        LOGE(
-            "[INIT] FALHA: libil2cpp.so nao encontrada no PID %d",
-            pid
-        );
-
+        LOGE("[INIT] FALHA: libil2cpp.so nao encontrada no PID %d", pid);
         s_LastInitError = "libil2cpp.so nao encontrada no processo";
-
         return false;
     }
 
-    LOGI(
-        "[INIT] libil2cpp.so = 0x%lX",
-        static_cast<unsigned long>(
-            il2cpp
-        )
-    );
+    LOGI("[INIT] libil2cpp.so = 0x%lX", static_cast<unsigned long>(il2cpp));
 
-    /*
-     * Configura o estado minimo necessario para que
-     * g_FreeFireMemory.Read() possa funcionar durante
-     * Offsets::GameConfig().
-     */
-    s_TargetPid = pid;
-    s_Target32Bit = target32;
-    s_LibIl2Cpp = il2cpp;
+    s_TargetPid   = pid;
+    s_Target32Bit = profileIs32;
+    s_LibIl2Cpp   = il2cpp;
 
     libAddress = il2cpp;
 
-    bool opened =
-        OpenProcessMemory(
-            pid
-        );
+    bool opened = OpenProcessMemory(pid);
 
-    LOGI(
-        "[INIT] OpenProcessMemory = %s",
-        opened
-            ? "OK"
-            : "FALHA"
-    );
+    LOGI("[INIT] OpenProcessMemory = %s", opened ? "OK" : "FALHA");
 
     if (!opened)
     {
-        LOGE(
-            "[INIT] FALHA abrindo memoria do processo"
-        );
-
+        LOGE("[INIT] FALHA abrindo memoria do processo");
         s_LastInitError = "falha abrindo memoria do processo (ponte/local)";
-
         Shutdown();
-
         return false;
     }
 
-    Offsets::LibIl2Cpp =
-        il2cpp;
+    Offsets::LibIl2Cpp = il2cpp;
 
     Offsets::LibIl2CppCandidates.clear();
+    Offsets::LibIl2CppCandidates.push_back(il2cpp);
 
-    Offsets::LibIl2CppCandidates.push_back(
-        il2cpp
-    );
+    /*
+     * Flags derivadas da escolha — o ReadLoop/Silent/Skeleton leem
+     * ponteiros com o template N32 (v7a = Read<uint32_t> 4 bytes,
+     * v8a = Read<uint64_t> 8 bytes). Nao ha nada manual aqui.
+     */
+    g_Globals.General.N32     = profileIs32;
+    g_Globals.General.V31     = profileIs32;
+    g_Globals.General.NoAnogs = profileIs32;
 
-    g_Globals.General.N32 =
-        s_Target32Bit;
+    LOGI("[INIT] N32=%d V31=%d (leitura de ptr: %d bytes)",
+         g_Globals.General.N32 ? 1 : 0,
+         g_Globals.General.V31 ? 1 : 0,
+         profileIs32 ? 4 : 8);
 
-    LOGI(
-        "[INIT] General.N32 = %d",
-        g_Globals.General.N32
-            ? 1
-            : 0
-    );
+    LOGI("[INIT] Offsets::LibIl2Cpp = 0x%lX", static_cast<unsigned long>(Offsets::LibIl2Cpp));
 
-    LOGI(
-        "[INIT] Offsets::LibIl2Cpp = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::LibIl2Cpp
-        )
-    );
+    LOGI("[INIT] Chamando Offsets::GameConfig()...");
+    Offsets::GameConfig();
+    LOGI("[INIT] GameConfig terminou (perfil aplicado direto, sem validacao)");
 
-    LOGI(
-        "[INIT] LibIl2CppCandidates.size() = %zu",
-        Offsets::LibIl2CppCandidates.size()
-    );
-
-    LOGI(
-        "[INIT] Chamando Offsets::GameConfig()..."
-    );
-
-        Offsets::GameConfig();
-
-LOGI("[INIT] GameConfig terminou");
-LOGI("[INIT] LibIl2Cpp = 0x%lX",
-     static_cast<unsigned long>(Offsets::LibIl2Cpp));
-
-/*
- * FIX CRITICO: antes este bloco "continuava mesmo assim" quando o
- * GameConfig() nao casava nenhuma versao — restaurava a base da lib e
- * declarava SUCCESS com TODOS os offsets em 0. O ReadLoop entao lia o
- * proprio header ELF da lib como se fosse ponteiro (0x464C457F /
- * 0x00010101464C457F no log da ponte = bytes "\x7FELF\x01\x01\x01")
- * e falhava eternamente. Agora: offsets zerados = init FALHOU.
- */
-if (!Offsets::Loaded())
-{
-    LOGE("[INIT] ==================================================");
-    LOGE("[INIT] GameConfig NAO carregou offsets reais!");
-    LOGE("[INIT] Causa provavel: a versao do seu FF nao casou com");
-    LOGE("[INIT] nenhuma probe (OB54 b75/b76). Veja os logs da tag");
-    LOGE("[INIT] StormOffsets para descobrir a versao que apareceu.");
-    LOGE("[INIT] ==================================================");
-
-    s_LastInitError = "versao do jogo nao suportada — offsets nao encontrados";
-
-    Shutdown();
-
-    return false;
-}
-
-LOGI("[INIT] Offsets::Loaded() = true — offsets reais carregados");
-
-    LOGI(
-        "[INIT] Teste de offsets principais:"
-    );
-
-    LOGI(
-        "[INIT] GameFacade.TypeInfo = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::GameFacade::GameFacade_TypeInfo
-        )
-    );
-
-    LOGI(
-        "[INIT] GameFacade.CurrentMatchGame = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::GameFacade::CurrentMatchGame
-        )
-    );
-
-    LOGI(
-        "[INIT] MatchGame.m_Match = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::MatchGame::m_Match
-        )
-    );
-
-    LOGI(
-        "[INIT] Match.m_LocalPlayer = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::Match::m_LocalPlayer
-        )
-    );
-
-    LOGI(
-        "[INIT] Match.m_AttackableEntities = 0x%lX",
-        static_cast<unsigned long>(
-            Offsets::Match::m_AttackableEntities
-        )
-    );
-
+    /*
+     * SEM gate de Loaded(): inicia direto. Se algum offset-chave ficou
+     * 0, o GameConfig ja avisou no logcat (tag StormOffsets) e o log da
+     * cadeia mostra exatamente onde a leitura para.
+     */
     s_Initialized = true;
 
-    LOGI(
-        "[INIT] Memory::Initialize() = SUCCESS"
-    );
-
-    LOGI(
-        "[INIT] ========================================"
-    );
+    LOGI("[INIT] Memory::Initialize() = SUCCESS");
+    LOGI("[INIT] ========================================");
 
     return true;
 }
 
 bool Memory::Restart()
 {
-    LOGI(
-        "[RESTART] reiniciando memoria (pid/base podem ter mudado)"
-    );
+    LOGI("[RESTART] reiniciando memoria (pid/base podem ter mudado)");
 
     BridgeClient::Disconnect();
 
@@ -1792,7 +1644,7 @@ bool Memory::RefreshCR3()
         return false;
 
     LOGI(
-        "[REFRESH] alvo mudou: pid %d -> %d, lib 0x%lX -> 0x%lX",
+        "[REFRESH] alvo mudou: pid %d -> %d, lib 0x%lX -> 0x%lX — re-aplicando GameProfile",
         s_TargetPid,
         currentPid,
         static_cast<unsigned long>(s_LibIl2Cpp),
@@ -1801,26 +1653,11 @@ bool Memory::RefreshCR3()
 
     Shutdown();
 
-    s_TargetPid =
-        currentPid;
+    const bool profileIs32 = (g_Globals.General.GameProfile != 2);
 
-        bool target32 = false;
-
-    if (!DetectTarget32Bit(currentPid, target32))
-    {
-        LOGE(
-            "[REFRESH] arquitetura do alvo desconhecida (ponte offline?) - abortando refresh"
-        );
-
-        Shutdown();
-
-        return false;
-    }
-
-    s_Target32Bit = target32;
-
-    s_LibIl2Cpp =
-        currentLib;
+    s_TargetPid   = currentPid;
+    s_Target32Bit = profileIs32;
+    s_LibIl2Cpp   = currentLib;
 
     libAddress =
         currentLib;
@@ -1836,35 +1673,21 @@ bool Memory::RefreshCR3()
         currentLib;
 
     Offsets::LibIl2CppCandidates.clear();
+    Offsets::LibIl2CppCandidates.push_back(currentLib);
 
-    Offsets::LibIl2CppCandidates.push_back(
-        currentLib
-    );
-
-    g_Globals.General.N32 =
-        s_Target32Bit;
+    g_Globals.General.N32     = profileIs32;
+    g_Globals.General.V31     = profileIs32;
+    g_Globals.General.NoAnogs = profileIs32;
 
     Offsets::GameConfig();
-
-    if (!Offsets::Loaded())
-    {
-        LOGE(
-            "RefreshCR3: GameConfig falhou"
-        );
-
-        Shutdown();
-
-        return false;
-    }
 
     s_Initialized = true;
 
     LOGI(
-        "Target atualizado: PID=%d lib=0x%lX",
+        "Target atualizado: PID=%d lib=0x%lX (perfil %d re-aplicado)",
         currentPid,
-        static_cast<unsigned long>(
-            currentLib
-        )
+        static_cast<unsigned long>(currentLib),
+        g_Globals.General.GameProfile
     );
 
     return true;

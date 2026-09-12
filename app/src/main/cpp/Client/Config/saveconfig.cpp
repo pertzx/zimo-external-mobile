@@ -150,6 +150,7 @@ namespace Cheat {
             wInt(ofs, "ThreadDelay", g_Globals.General.ThreadDelay);
             wBool(ofs, "CaptureBypass", g_Globals.General.CaptureBypass);
             wBool(ofs, "WebRemote", g_Globals.General.WebRemote);
+            wInt(ofs, "GameProfile", g_Globals.General.GameProfile);   // << NOVA
             ofs << "\n";
 
                 return true;
@@ -282,6 +283,7 @@ namespace Cheat {
             gInt("General", "ThreadDelay", g_Globals.General.ThreadDelay);
             gBool("General", "CaptureBypass", g_Globals.General.CaptureBypass);
             gBool("General", "WebRemote", g_Globals.General.WebRemote);
+            gInt("General", "GameProfile", g_Globals.General.GameProfile);   // << NOVA
 
 
             return true;
