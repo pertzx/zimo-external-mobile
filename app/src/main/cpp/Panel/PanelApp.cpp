@@ -5,7 +5,6 @@
 #include "IPC/IPCClient.hpp"
 #include <android/log.h>
 #include <thread>
-#include <chrono>
 #include <Notify/Notify.hpp>
 
 // #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormPanel", __VA_ARGS__)
@@ -15,6 +14,12 @@ static bool g_Running = true;
 // static Interface* g_Interface = nullptr;
 static int g_SurfaceWidth = 0;
 static int g_SurfaceHeight = 0;
+
+// ===== Bounds do painel ImGui (atualizadas a cada frame) =====
+static float g_panelX = 0.f;
+static float g_panelY = 0.f;
+static float g_panelW = 800.f;   // valor inicial — só pra não começar zerado
+static float g_panelH = 1200.f;
 
 namespace PanelApp {
 
@@ -44,7 +49,6 @@ void Run(ANativeWindow* window) {
     g_Interface = new Interface();
     g_Interface->Initialize(); // Sem parametros
     g_Interface->UpdateStyle();
-
 
     // Conectar ao daemon via IPC
     IPCClient::Connect("/data/local/tmp/storm_daemon.sock");
@@ -76,6 +80,27 @@ void Run(ANativeWindow* window) {
             // Render menu ImGui
             g_Interface->RenderGui();
             NotifyManager::Render();
+
+            // ===== FALLBACK: captura bounds do painel principal =====
+            // Se o Interface::RenderGui() já chamou PanelApp::SetPanelBounds(),
+            // esses valores já estão corretos. Caso contrário, este bloco
+            // pega a primeira janela ImGui visível (que costuma ser o painel).
+            {
+                ImGuiContext* ctx = ImGui::GetCurrentContext();
+                if (ctx) {
+                    for (int i = 0; i < ctx->Windows.Size; i++) {
+                        ImGuiWindow* w = ctx->Windows[i];
+                        if (!w) continue;
+                        if (w->Flags & ImGuiWindowFlags_ChildWindow) continue;
+                        if (!w->WasActive) continue;
+                        g_panelX = w->Pos.x;
+                        g_panelY = w->Pos.y;
+                        g_panelW = w->Size.x;
+                        g_panelH = w->Size.y;
+                        break;
+                    }
+                }
+            }
 
             // FOV Circles
             if (g_Globals.Misc.Screen.ShowAimbotFov) {
@@ -148,5 +173,18 @@ void OnResize(int width, int height) {
 void RequestShutdown() {
     g_Running = false;
 }
+
+// ===== NOVOS MÉTODOS =====
+void SetPanelBounds(float x, float y, float w, float h) {
+    g_panelX = x;
+    g_panelY = y;
+    g_panelW = w;
+    g_panelH = h;
+}
+
+float GetPanelX() { return g_panelX; }
+float GetPanelY() { return g_panelY; }
+float GetPanelW() { return g_panelW; }
+float GetPanelH() { return g_panelH; }
 
 } // namespace PanelApp

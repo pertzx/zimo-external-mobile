@@ -1,4 +1,0 @@
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/panel.dir
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/daemon.dir
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/edit_cache.dir
-C:/Users/Márcio Ribeiro/Desktop/Pyerre/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/rebuild_cache.dir

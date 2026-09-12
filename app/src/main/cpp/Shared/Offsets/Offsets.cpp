@@ -405,7 +405,7 @@ void Offsets::FFTHV7A75() // v31 32-bit
 	GameVarDef::AimRotationSensitivityMax = 0xF18;
 
 	// GameFacade
-	GameFacade::GameFacade_TypeInfo = 0xABFF3C0; // TODO: update manually
+	GameFacade::GameFacade_TypeInfo = 0xac01850; // TODO: update manually
 	GameFacade::CurrentMatchGame = 0x4;
 
 	// MatchGame
@@ -590,7 +590,7 @@ void Offsets::FFTHV7A76() // v31 32-bit
 	GameVarDef::AimRotationSensitivityMax = 0xF18;
 
 	// GameFacade
-	GameFacade::GameFacade_TypeInfo = 0xABFF6E0; // TODO: update manually
+	GameFacade::GameFacade_TypeInfo = 0xac01850; // TODO: update manually
 	GameFacade::CurrentMatchGame = 0x4;
 
 	// MatchGame

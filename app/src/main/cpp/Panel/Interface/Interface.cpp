@@ -1017,7 +1017,7 @@ void Interface::RenderGui()
 						}
 						Custom::EndCustomChild();
 						ImGui::SetCursorPos(ImVec2(cardWidth + 10 + AnimaTab, 0));
-
+						
 						Custom::CustomChild(XorStr("Config"), ImVec2(cardWidth, cardHeight));
 						{
 							Custom::Checkbox(XorStr("Show Fov"), &g_Globals.Misc.Screen.ShowSilentFov);
@@ -1028,9 +1028,10 @@ void Interface::RenderGui()
 								Custom::ColorEdit4(XorStr("Fov Filled Color"), g_Globals.Misc.Screen.SilentFilledFovColor);
 							}
 							Custom::SliderInt(XorStr("Silent FOV"), &g_Globals.Silent.Fov, 0, 360, "%d");
-
+							
 							Custom::SliderInt(XorStr("Silent Distance"), &g_Globals.Silent.MaxDistance, 0, 200, "%d m");
 						}
+						Custom::EndCustomChild();
 					}
 					ImGui::EndGroup();
 				}

@@ -44,6 +44,11 @@
             android:name="com.stormcheats.OverlayService"
             android:foregroundServiceType="mediaProjection"
             android:permission="android.permission.SYSTEM_ALERT_WINDOW" />
+
+        <property
+            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+            android:value="overlay_panel" />
+
         <service
             android:name="com.stormcheats.DaemonService"
             android:foregroundServiceType="dataSync"
