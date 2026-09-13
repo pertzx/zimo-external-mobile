@@ -181,6 +181,22 @@ static bool IsCursorVisibleNow( )
         return true;
 }
 
+// ==================== Disparo do player local (Player::UGCStartFiring) ====================
+// Le o campo do JOGO que indica que o player esta atirando. E a fonte da
+// verdade para o aimbot (so pode agir enquanto atira) — o MouseDown[0] do
+// ImGui no Android nao corresponde ao botao de fogo do jogo.
+// Se o offset nao estiver preenchido (perfil v8a ainda com TODO) ou a leitura
+// falhar, devolve true: degrada para o comportamento antigo (so tecla) em vez
+// de desligar o aimbot do usuario.
+static bool ReadLocalFiring( uintptr_t localPlayer )
+{
+        if ( localPlayer == 0 || Offsets::Player::IsFiring == 0 )
+                return true;
+        bool isFiring = g_FreeFireMemory.Read<bool>( localPlayer + Offsets::Player::IsFiring );
+        LOGI("IS FIRING: %p", isFiring);
+        return isFiring;
+}
+
 bool ghostActive = false;
 bool ghostSkeletonExists = false;
 Vector3 ghostSkeletonPos = { 0, 0, 0 };
@@ -188,6 +204,29 @@ uintptr_t RageTarget = 0;
 bool enemiesvisible = true;
 
 static std::vector<float> g_SmoothedHealth;
+
+/*
+ * FIX "AIMBOT/SILENT NAO DÃO SINAL" (mobile):
+ *
+ * No Windows o gatilho das funções de mira era uma TECLA FÍSICA
+ * (GetAsyncKeyState). No Android o "key" é um BOTÃO FLUTUANTE
+ * (FloatingKeys, vk 0x7000+) — e quando o usuário NUNCA criou o botão,
+ * o KeyBind fica 0 e IsKeyPressed(0) devolve false PARA SEMPRE.
+ * Resultado: ativar o checkbox no painel não tinha efeito nenhum no
+ * BoneSwap/Magnet/Rage (nenhum log, nenhum write — parecia morto).
+ *
+ * Regra agora:
+ *   - KeyBind != 0 (botão flutuante criado): o gatilho é o botão
+ *     (toque = toggle no modo simples, segurar no modo hold).
+ *   - KeyBind == 0 (nenhum botão): o próprio checkbox da função é o
+ *     gatilho — ativar no painel liga a mira de verdade.
+ */
+static bool AimTriggerHeld( int keyBind, bool enabledFlag )
+{
+        return ( keyBind == 0 )
+                ? enabledFlag
+                : AndroidInput::IsKeyPressed( keyBind );
+}
 
 // ==================== ESP Overlay Helper ====================
 // Desenha o overlay de um jogador a partir do snapshot. Quando uma view matrix
@@ -1842,7 +1881,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         
         // ==================== Ghost Toggle ====================
 
-        bool ghostKeyHeld = AndroidInput::IsKeyPressed( g_Globals.AimBot.ghostkey );
+        bool ghostKeyHeld = AimTriggerHeld( g_Globals.AimBot.ghostkey, g_Globals.AimBot.ghost );
         if ( g_Globals.AimBot.ghost )
         {
                 if ( ghostKeyHeld && !ghostActive )
@@ -2142,8 +2181,12 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 static uintptr_t lockedMatrixAddr = 0;
                 static std::thread magnetThread;
 
+                /*
+                 * Mobile: MagKey == 0 (botão flutuante nunca criado) -> o
+                 * checkbox "Pull Player" é o gatilho (antes nunca ativava).
+                 */
                 const bool keyPressed =
-    AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind);
+                        AimTriggerHeld( g_Globals.AimBot.MagKey, AimCfg.aimmagnect );
 
                 if ( keyPressed && !isHolding && ClosestEntity != 0 )
                 {
@@ -2257,14 +2300,39 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 ;
         }
 
+        // ==================== Estado de disparo (Player::UGCStartFiring) ====================
+        // O aimbot (BoneSwap/Safe e Rage) so age ENQUANTO o player atira.
+        // Grace pos-fogo: 300ms pro Rage (tap de semi-auto nao fica liga/desliga)
+        // e 400ms pro BoneSwap (bala em voo ainda precisa do bone trocado).
+        static LONGLONG s_LastFireTickMs = 0;
+        bool bsFiringActive = false;
+        bool rageFiringActive = false;
+
+        if ( AimCfg.Enabled && localPlayer != 0 )
+        {
+                const bool firingRaw = ReadLocalFiring( localPlayer );
+                const LONGLONG nowFireTickMs = ( LONGLONG )GetTickCount64( );
+
+                if ( firingRaw )
+                        s_LastFireTickMs = nowFireTickMs;
+
+                bsFiringActive = firingRaw || ( nowFireTickMs - s_LastFireTickMs ) < 400;
+                rageFiringActive = firingRaw || ( nowFireTickMs - s_LastFireTickMs ) < 300;
+        }
+
         // ==================== BoneSwap Aimbot ====================
 
         if ( AimCfg.Enabled && AimCfg.aimtype == 0 )
         {
-                const bool keyDown = AndroidInput::IsKeyPressed( AimCfg.KeyBind );
+                /*
+                 * Mobile: KeyBind == 0 (botão "Aim" nunca criado) -> o checkbox
+                 * "Aimbot" é o gatilho. Antes, ativar só o checkbox deixava
+                 * IsKeyPressed(0) == false para sempre e o boneswap nunca aplicava.
+                 */
+                const bool keyDown = AimTriggerHeld( AimCfg.KeyBind, AimCfg.Enabled );
                 const bool cursorVisible = IsCursorVisibleNow( );
 
-                if ( !keyDown )
+                if ( !keyDown || !bsFiringActive )
                 {
                         if ( BS_Applied ) BS_Restore( );
                         BS_ActiveByCursor = false;
@@ -2338,8 +2406,15 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 {
                         static bool s_AimFloodRunning = false;
 
-                        bool isShooting = ImGui::GetIO().MouseDown[0];
-                        bool keyCurrentlyPressed = AndroidInput::IsKeyPressed( AimCfg.KeyBind );
+                        bool isShooting = rageFiringActive; // so enquanto ATIRA (UGCStartFiring)
+                        /*
+                         * MOBILE (FIX "RAGE NUNCA ATIVA"): MouseDown[0] do painel
+                         * nunca fica true durante o gameplay — o toque vai pro jogo,
+                         * não pro overlay do painel (no Windows o rage esperava
+                         * botão do mouse + tecla). O gatilho aqui é o keybind
+                         * (botão flutuante) ou, sem botão criado, o checkbox Enabled.
+                         */
+                        const bool keyCurrentlyPressed = AimTriggerHeld( AimCfg.KeyBind, AimCfg.Enabled );
 
                         if ( isShooting && keyCurrentlyPressed && !IsCursorVisibleNow( ) )
                         {
@@ -2355,6 +2430,34 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                 // s_AimFloodRunning preso em true e o rage nunca mais
                                                 // ativava na partida ("para do nada e nao volta").
                                                 struct FloodReset { bool* p; ~FloodReset( ) { *p = false; } } reset{ &s_AimFloodRunning };
+
+                                                /*
+                                                 * Disparo FRESCO (Player::UGCStartFiring) lido da
+                                                 * memoria DENTRO da thread: o MouseDown[0] do ImGui
+                                                 * nao acompanha o botao de fogo do jogo no Android.
+                                                 * Recheca a cada 32ms pra nao inflar a ponte; entre
+                                                 * checagens usa cache com grace de 250ms (tap de
+                                                 * semi-auto nao derruba o rage entre um tiro e outro).
+                                                 */
+                                                LONGLONG lastFireMs = 0;
+                                                LONGLONG lastFireCheckMs = 0;
+                                                bool fireCache = true;
+
+                                                auto firingNow = [ & ] ( ) -> bool
+                                                {
+                                                        const LONGLONG nowMs = ( LONGLONG )GetTickCount64( );
+
+                                                        if ( nowMs - lastFireCheckMs >= 32 )
+                                                        {
+                                                                lastFireCheckMs = nowMs;
+                                                                fireCache = ReadLocalFiring( localPlayer );
+
+                                                                if ( fireCache )
+                                                                        lastFireMs = nowMs;
+                                                        }
+
+                                                        return fireCache || ( nowMs - lastFireMs ) < 250;
+                                                };
 
                                                 int originalAimAssist = 0;
                                                 bool aimAssistModified = false;
@@ -2388,7 +2491,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                         aimAssistModified = true;
                                                 }
 
-                                                if ( !ImGui::GetIO().MouseDown[0] || !AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind) || IsCursorVisibleNow() ) 
+                                                if ( !AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) || IsCursorVisibleNow() ) 
                                                 {
                                                         if ( aimAssistModified )
                                                                 g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
@@ -2401,9 +2504,9 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                         if ( IsCursorVisibleNow( ) )
                                                                 break;
 
-                                                        bool isStillShooting = ImGui::GetIO().MouseDown[0];
+                                                        bool isStillShooting = firingNow( ); // so enquanto ATIRA (UGCStartFiring fresco)
                                                         bool isKeyStillPressed = AndroidInput::IsKeyPressed( g_Globals.AimBot.KeyBind );
-                                                        if ( !( isStillShooting && isKeyStillPressed ) )
+                                                        if ( !AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) )
                                                                 break;
 
                                                         // Relê o HP do alvo SEMPRE (com ou sem IgnoreKnocked):

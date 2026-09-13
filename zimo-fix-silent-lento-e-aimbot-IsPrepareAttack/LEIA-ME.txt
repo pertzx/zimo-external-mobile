@@ -1,0 +1,66 @@
+================================================================
+ZIMO — CORRECAO SILENT LENTO + AIMBOT SO ENQUANTO ATIRA
+================================================================
+
+ARQUIVOS CORRIGIDOS (substitua os da sua repo pelos daqui,
+mantendo os mesmos caminhos):
+
+  app/src/main/cpp/Client/Draw/Silent.cpp   (reescrito)
+  app/src/main/cpp/Client/Draw/Silent.hpp   (atualizado)
+  app/src/main/cpp/Client/Draw/Draw.cpp     (atualizado)
+
+----------------------------------------------------------------
+1) SILENT LENTO — CAUSA E CORRECAO
+----------------------------------------------------------------
+CAUSA: o loop antigo dava um BURST de 28.000 writes no RayDir.
+Cada write pela ponte (socket -> daemon -> process_vm_writev)
+custa um roundtrip, entao cada passada levava SEGUNDOS. Pior:
+a cabeca do alvo so era relida a cada 128 writes e a troca de
+alvo so era percebida a cada 1024 — o tiro saia com direcao
+velha (por isso parecia "demorar muito" e nao ser insistente).
+
+AGORA: laco continuo e ritmado, guiado pelo estado de disparo:
+  - ATIRANDO (Player::IsPrepareAttack = true):
+      * direcao reescrita a cada 2ms (~500/s)
+      * cabeca + origem do tiro relidos a cada 8ms
+  - PARADO (modo morno, pro 1o tiro ja sair certo):
+      * direcao reescrita a cada 20ms (~50/s)
+  - view matrix recopiada a cada 33ms (FovCheck honesto)
+  - troca de alvo detectada em TODA iteracao (leitura atomica,
+    custo zero) — reacao imediata
+  - sem FlushTLB/TranslateVA inuteis no caminho (eram legado)
+O mesmo jitter humano (SMOOTH_MIN/MAX) foi mantido.
+
+----------------------------------------------------------------
+2) AIMBOT SO ENQUANTO ATIRA — Player::IsPrepareAttack
+----------------------------------------------------------------
+O aimbot usava ImGui::GetIO().MouseDown[0] como "atirando", que
+no Android NAO acompanha o botao de fogo do jogo. Agora:
+
+  - Le-se o campo do jogo: localPlayer + Player::IsPrepareAttack
+    (0x540 nos perfis v7a b75/b76, ja existente na sua Offsets).
+  - Aimbot Type Rage (aimtype 1): so ativa com tecla pressionada
+    E IsPrepareAttack true. DENTRO da thread do rage o estado de
+    disparo e RELIDO da memoria (a cada 32ms) — se voce soltar
+    o fogo, o rage para na hora.
+  - Aimbot Type Safe/BoneSwap (aimtype 0): so aplica o bone
+    enquanto atira; soltou o fogo, restaura depois de 400ms
+    (grace pra bala que ainda esta em voo).
+  - Grace pos-fogo de 300ms no rage pra tap de semi-automatico
+    nao ficar ligando/desligando entre um tiro e outro.
+
+FALLBACK SEGURO: se o offset IsPrepareAttack nao estiver
+preenchido (v8a ainda com TODO) ou a leitura falhar, o aimbot
+volta pro comportamento antigo (só tecla) em vez de morrer.
+
+----------------------------------------------------------------
+3) COMO TESTAR
+----------------------------------------------------------------
+  1. Silent: ligue, aponte pro alvo e ATIRE — a correcao de
+     direcao agora reage em milissegundos, nao em segundos.
+  2. Rage: ligue o Aimbot + segure a floating key e ATIRE — a
+     mira so gruda enquanto o fogo esta saindo. Soltou, para.
+  3. BoneSwap: mesma coisa — so troca o bone durante o disparo.
+
+Logcat util: tag StormBridge (ponte) segue igual; nenhuma
+mudanca de protocolo ou do daemon nesta correcao.

@@ -75,6 +75,8 @@ uintptr_t Offsets::Observer::m_TargetPlayer = 0;
 // General
 uintptr_t Offsets::Player::IsClientBot = 0;
 uintptr_t Offsets::Player::IsFemale = 0;
+uintptr_t Offsets::Player::IsFiring = 0;
+uintptr_t Offsets::Player::UGCStartFiring = 0;
 uintptr_t Offsets::Player::IsPrepareAttack = 0;
 uintptr_t Offsets::Player::m_IsCurFrameFowardLockToAimRot = 0;
 uintptr_t Offsets::Player::m_WaitForForceSync = 0;
@@ -428,6 +430,8 @@ void Offsets::ZerarOffsets()
     // Player
     Player::IsClientBot = 0;
     Player::IsFemale = 0;
+	Player::IsFiring = 0;
+	Player::UGCStartFiring = 0;
     Player::IsPrepareAttack = 0;
     Player::m_IsCurFrameFowardLockToAimRot = 0;
     Player::m_WaitForForceSync = 0;
@@ -671,6 +675,8 @@ void Offsets::FFTHV8A() // 64-bit
         // Player / PlayerNetwork
         Player::IsClientBot = 0x0; // TODO(v8a)
         Player::IsFemale = 0x0; // TODO(v8a)
+		Player::IsFiring = 0x0; // TODO(v8a)
+		Player::UGCStartFiring = 0x0; // TODO(v8a)
         Player::IsPrepareAttack = 0x0; // TODO(v8a)
         Player::m_IsCurFrameFowardLockToAimRot = 0x0; // TODO(v8a)
         Player::m_WaitForForceSync = 0x0; // TODO(v8a)
@@ -843,6 +849,8 @@ void Offsets::FFTHV7A75() // v75 32-bit
 	// General
 	Player::IsClientBot = 0x2E4;
 	Player::IsFemale = 0x7D8;
+	Player::IsFiring = 0x540;
+	Player::UGCStartFiring = 0x13d;
 	Player::IsPrepareAttack = 0x540;
 	Player::m_IsCurFrameFowardLockToAimRot = 0x1D4;
 	Player::m_WaitForForceSync = 0x520;
@@ -1028,6 +1036,8 @@ void Offsets::FFTHV7A76() // v76 32-bit
 	// General
 	Player::IsClientBot = 0x2E4;
 	Player::IsFemale = 0x7D8;
+	Player::IsFiring = 0x540;
+	Player::UGCStartFiring = 0x13d;
 	Player::IsPrepareAttack = 0x540;
 	Player::m_IsCurFrameFowardLockToAimRot = 0x1D4;
 	Player::m_WaitForForceSync = 0x520;

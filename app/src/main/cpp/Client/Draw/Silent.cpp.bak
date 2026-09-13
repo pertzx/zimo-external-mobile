@@ -1,0 +1,548 @@
+#include "Silent.hpp"
+
+#include <Globals.hpp>
+#include <Memory/Memory.hpp>
+#include <Memory/BridgeClient.hpp>
+#include <Offsets/Offsets.hpp>
+
+#include <android/log.h>
+
+#include <pthread.h>
+
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+
+/*
+ * ============================================================================
+ * SILENT AIM (mobile / ponte root)
+ * ============================================================================
+ *
+ * FIX "SILENT NAO DÁ SINAL":
+ *
+ * 1) A THREAD NUNCA NASCIA. O painel setava g_Globals.Silent.Enabled e o
+ *    Draw chamava Silent::SetTarget(), mas Silent::Start() não era chamado
+ *    em lugar NENHUM do client — ThreadProc nunca rodava e nenhum write
+ *    acontecia. Agora o Draw chama Start() quando o silent é ligado
+ *    (Draw.cpp: Silent.Enabled && g_Running == 0 -> Silent::Start()).
+ *
+ * 2) FLOOD NA PONTE. O loop original escrevia o RayDir SEM PAUSA (28000
+ *    round-trips de socket em sequência, mais as passadas em loop eterno).
+ *    Pela ponte (daemon root) cada write é uma viagem de socket e isso
+ *    SATURAVA a conexão: o ESP engasgava e o daemon só dava conta do
+ *    silent. Agora o loop escreve em cadência controlada
+ *    (WRITE_BATCH_PAUSE): 4 writes por ~1ms ≈ ~3000 writes/s — o RayDir
+ *    fica apontado pro alvo o tempo inteiro (janela de 0.3ms entre
+ *    escritas) e a ponte respira para o ESP continuar fluido.
+ *
+ * 3) SINAL NO LOG. Os primeiros writes e os erros são logados (tag
+ *    "StormSilent"), então dá pra confirmar no logcat que o silent está
+ *    escrevendo de verdade.
+ * ============================================================================
+ */
+
+#define LOG_TAG "StormSilent"
+
+#define SLOGI(...) \
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+#define SLOGE(...) \
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+namespace Silent
+{
+    static volatile LONGLONG g_LocalPlayer = 0;
+    static volatile LONGLONG g_TargetEntity = 0;
+
+    volatile LONG g_Running = 0;
+
+    static CRITICAL_SECTION g_MatrixCS;
+    static Matrix4x4 g_ViewMatrix = {};
+    static bool g_CSInitialized = false;
+
+    static void EnsureCSInit()
+    {
+        if (!g_CSInitialized)
+        {
+            InitializeCriticalSection(&g_MatrixCS);
+            g_CSInitialized = true;
+        }
+    }
+
+    static uintptr_t ReadPtr(
+        uintptr_t addr,
+        bool N32
+    )
+    {
+        return N32
+            ? g_FreeFireMemory.Read<uint32_t>(addr)
+            : g_FreeFireMemory.Read<uint64_t>(addr);
+    }
+
+    static uint32_t NextRandom(
+        uint32_t& state
+    )
+    {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        return state;
+    }
+
+    static void* ThreadProc(void*)
+    {
+        const auto now =
+            std::chrono::steady_clock::now();
+
+        uint32_t rngState =
+            static_cast<uint32_t>(
+                now.time_since_epoch().count()
+            );
+
+        if (!rngState)
+            rngState = 0xDEADBEEF;
+
+        SLOGI("thread do silent iniciada");
+
+        while (
+            InterlockedCompareExchange(
+                &g_Running,
+                0,
+                0
+            ) != 0 &&
+            !g_Globals.General.ShutDown
+        )
+        {
+            if (!g_Globals.Silent.Enabled)
+            {
+                Sleep(3);
+                continue;
+            }
+
+            const bool N32 =
+                g_Globals.General.N32;
+
+            const uintptr_t localPlayer =
+                static_cast<uintptr_t>(
+                    InterlockedCompareExchange64(
+                        &g_LocalPlayer,
+                        0,
+                        0
+                    )
+                );
+
+            const uintptr_t targetEntity =
+                static_cast<uintptr_t>(
+                    InterlockedCompareExchange64(
+                        &g_TargetEntity,
+                        0,
+                        0
+                    )
+                );
+
+            if (
+                localPlayer == 0 ||
+                targetEntity == 0
+            )
+            {
+                /*
+                 * Sem alvo ainda: dorme em vez de girar em sched_yield
+                 * (busy-spin queimava um core no mobile).
+                 */
+                Sleep(2);
+                continue;
+            }
+
+            Memory::FlushTLB();
+
+            const uintptr_t weaponPtr =
+                ReadPtr(
+                    localPlayer +
+                    Offsets::Player::m_LastAimingInfoFromWeapon,
+                    N32
+                );
+
+            if (weaponPtr == 0)
+            {
+                Sleep(2);
+                continue;
+            }
+
+            const uintptr_t directionVA =
+                weaponPtr +
+                Offsets::HitObjectInfo::RayDir;
+
+            const uintptr_t startPosVA =
+                weaponPtr +
+                Offsets::HitObjectInfo::StartPosition;
+
+            uintptr_t dirPhys = 0;
+
+            if (!g_FreeFireMemory.TranslateVA(
+                    directionVA,
+                    dirPhys
+                ))
+            {
+                Sleep(2);
+                continue;
+            }
+
+            uintptr_t startPhys = 0;
+
+            g_FreeFireMemory.TranslateVA(
+                startPosVA,
+                startPhys
+            );
+
+            Matrix4x4 cachedMatrix;
+
+            EnterCriticalSection(&g_MatrixCS);
+            cachedMatrix = g_ViewMatrix;
+            LeaveCriticalSection(&g_MatrixCS);
+
+            Vector3 cachedAimPos = {};
+            Vector3 cachedShootOrigin = {};
+            bool posValid = false;
+
+            for (int i = 0;
+                 i < WRITE_LOOP_COUNT;
+                 ++i)
+            {
+                /*
+                 * Cadência de escrita pela ponte: a cada 4 writes, ~1ms
+                 * de pausa. O RayDir continua sendo sobrescrito
+                 * continuamente (~3000x/s) — quando o jogo cria o hit
+                 * object do disparo, a direção aponta pro alvo — mas sem
+                 * saturar o socket (antes: 28000 writes sem pausa).
+                 */
+                if ((i & 3) == 3)
+                {
+                    usleep(1000);
+                }
+
+                if ((i & 255) == 0)
+                {
+                    if (
+                        InterlockedCompareExchange(
+                            &g_Running,
+                            0,
+                            0
+                        ) == 0 ||
+                        g_Globals.General.ShutDown
+                    )
+                    {
+                        break;
+                    }
+
+                    const uintptr_t curTarget =
+                        static_cast<uintptr_t>(
+                            InterlockedCompareExchange64(
+                                &g_TargetEntity,
+                                0,
+                                0
+                            )
+                        );
+
+                    if (
+                        curTarget != targetEntity ||
+                        curTarget == 0
+                    )
+                    {
+                        break;
+                    }
+                }
+
+                if ((i & 127) == 0)
+                {
+                    Vector3 newAimPos =
+                        Transform::GetHeadPosition(
+                            targetEntity,
+                            N32
+                        );
+
+                    if (
+                        newAimPos.X == 0.0f &&
+                        newAimPos.Y == 0.0f &&
+                        newAimPos.Z == 0.0f
+                    )
+                    {
+                        posValid = false;
+                        continue;
+                    }
+
+                    if (!W2S::FovCheck(
+                            cachedMatrix,
+                            newAimPos,
+                            static_cast<float>(
+                                g_Globals.Silent.Fov
+                            )
+                        ))
+                    {
+                        break;
+                    }
+
+                    newAimPos.Y += 0.05f;
+                    cachedAimPos = newAimPos;
+
+                    cachedShootOrigin = g_FreeFireMemory.Read<Vector3>(startPosVA);
+
+                    if (
+                        cachedShootOrigin.X == 0.0f &&
+                        cachedShootOrigin.Y == 0.0f &&
+                        cachedShootOrigin.Z == 0.0f
+                    )
+                    {
+                        posValid = false;
+                        continue;
+                    }
+
+                    posValid = true;
+
+                    if (directionVA == 0)
+                    break;
+                }
+
+                if (!posValid)
+                    continue;
+
+                Vector3 dir;
+
+                dir.X =
+                    cachedAimPos.X -
+                    cachedShootOrigin.X;
+
+                dir.Y =
+                    cachedAimPos.Y -
+                    cachedShootOrigin.Y;
+
+                dir.Z =
+                    cachedAimPos.Z -
+                    cachedShootOrigin.Z;
+
+                if (
+                    dir.X == 0.0f &&
+                    dir.Y == 0.0f &&
+                    dir.Z == 0.0f
+                )
+                {
+                    continue;
+                }
+
+                const float randomA =
+                    static_cast<float>(
+                        NextRandom(rngState) &
+                        0x00FFFFFF
+                    ) /
+                    static_cast<float>(0x01000000);
+
+                const float randomB =
+                    static_cast<float>(
+                        NextRandom(rngState) &
+                        0x00FFFFFF
+                    ) /
+                    static_cast<float>(0x01000000);
+
+                const float randomC =
+                    static_cast<float>(
+                        NextRandom(rngState) &
+                        0x00FFFFFF
+                    ) /
+                    static_cast<float>(0x01000000);
+
+                const float jitter =
+                    (
+                        randomA *
+                        (SMOOTH_MAX - SMOOTH_MIN)
+                    ) +
+                    SMOOTH_MIN;
+
+                dir.X +=
+                    (randomB * jitter) -
+                    (jitter * 0.5f);
+
+                dir.Y +=
+                    (randomC * jitter) -
+                    (jitter * 0.5f);
+
+                dir.Z +=
+                    (randomA * jitter) -
+                    (jitter * 0.5f);
+
+                if (g_FreeFireMemory.Write<Vector3>(
+                        directionVA,
+                        dir
+                    ))
+                {
+                    /*
+                     * SINAL NO LOG: os 3 primeiros writes bem-sucedidos
+                     * de cada sessão aparecem no logcat — prova que o
+                     * silent está gravando no alvo.
+                     */
+                    static volatile LONG s_WriteOkLogs = 0;
+
+                    const LONG logged =
+                        InterlockedCompareExchange(
+                            &s_WriteOkLogs,
+                            0,
+                            0
+                        );
+
+                    if (logged < 3)
+                    {
+                        InterlockedExchange(&s_WriteOkLogs, logged + 1);
+
+                        SLOGI(
+                            "write %ld ok: RayDir em 0x%llX <- (%.3f, %.3f, %.3f)",
+                            (long)(logged + 1),
+                            (unsigned long long)directionVA,
+                            dir.X, dir.Y, dir.Z
+                        );
+                    }
+                }
+                else
+                {
+                    static volatile LONG s_WriteFailLogs = 0;
+
+                    const LONG logged =
+                        InterlockedCompareExchange(
+                            &s_WriteFailLogs,
+                            0,
+                            0
+                        );
+
+                    if (logged < 3)
+                    {
+                        InterlockedExchange(&s_WriteFailLogs, logged + 1);
+
+                        SLOGE(
+                            "write FALHOU em 0x%llX (ponte conectada=%d)",
+                            (unsigned long long)directionVA,
+                            BridgeClient::IsConnected() ? 1 : 0
+                        );
+                    }
+                }
+            }
+
+            /*
+             * Fim de passada: respiro curto antes de revalidar arma/alvo.
+             * Evita girar leituras (weaponPtr, TranslateVA, head) em
+             * cadência de metrônomo quando o alvo está fora do FOV.
+             */
+            Sleep(2);
+        }
+
+        InterlockedExchange(
+            &g_Running,
+            0
+        );
+
+        SLOGI("thread do silent encerrada");
+
+        return nullptr;
+    }
+
+    void Start()
+    {
+        EnsureCSInit();
+
+        if (
+            InterlockedExchange(
+                &g_Running,
+                1
+            ) != 0
+        )
+        {
+            return;
+        }
+
+        pthread_t thread{};
+
+        const int result =
+            pthread_create(
+                &thread,
+                nullptr,
+                ThreadProc,
+                nullptr
+            );
+
+        if (result != 0)
+        {
+            InterlockedExchange(
+                &g_Running,
+                0
+            );
+
+            SLOGE(
+                "pthread_create falhou (%d) — silent nao rodara",
+                result
+            );
+
+            return;
+        }
+
+        pthread_detach(thread);
+    }
+
+    void Stop()
+    {
+        InterlockedExchange(
+            &g_Running,
+            0
+        );
+
+        InterlockedExchange64(
+            &g_LocalPlayer,
+            0
+        );
+
+        InterlockedExchange64(
+            &g_TargetEntity,
+            0
+        );
+    }
+
+    void UpdateViewMatrix(
+        const Matrix4x4& matrix
+    )
+    {
+        EnsureCSInit();
+
+        EnterCriticalSection(
+            &g_MatrixCS
+        );
+
+        g_ViewMatrix = matrix;
+
+        LeaveCriticalSection(
+            &g_MatrixCS
+        );
+    }
+
+    void SetTarget(
+        uintptr_t localPlayer,
+        uintptr_t targetEntity
+    )
+    {
+        InterlockedExchange64(
+            &g_LocalPlayer,
+            static_cast<LONGLONG>(
+                localPlayer
+            )
+        );
+
+        InterlockedExchange64(
+            &g_TargetEntity,
+            static_cast<LONGLONG>(
+                targetEntity
+            )
+        );
+    }
+
+    void ClearTarget()
+    {
+        InterlockedExchange64(
+            &g_TargetEntity,
+            0
+        );
+    }
+}

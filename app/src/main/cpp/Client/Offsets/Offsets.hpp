@@ -94,6 +94,8 @@ public:
 		// General
 		static uintptr_t IsClientBot; // public bool IsClientBot;
 		static uintptr_t IsFemale; // private bool<IsFemale>k__BackingField; - private bool <CDOBMFNCJHD>k__BackingField;
+		static uintptr_t IsFiring; // private Boolean <NNFKGNCILNK>k__BackingField; // abaixo de TBTAction
+		static uintptr_t UGCStartFiring; // public Boolean UGCStartFiring; 
 		static uintptr_t IsPrepareAttack; // private bool <IsPrepareAttack>k__BackingField; - private bool <LPEIEILIKGC>k__BackingField;
 		static uintptr_t m_IsCurFrameFowardLockToAimRot; // protected bool m_IsCurFrameFowardLockToAimRot; - protected bool JEPFNELBGID;
 		static uintptr_t m_WaitForForceSync; // protected bool m_WaitForForceSync; - protected bool LJHKFOOOPBF;
@@ -143,6 +145,9 @@ public:
 		static uintptr_t m_LeftAnkleNode; // protected ITransformNode BMGCHFGEDDA; - m_LeftAnkleNode
 		static uintptr_t m_RightToeNode; // protected ITransformNode CKABHDJDMAP; - m_RightToeNode
 		static uintptr_t m_LeftToeNode; // protected ITransformNode FDMBKCKMODA; - m_LeftToeNode
+
+		// UI HUd COntroller
+		static uintptr_t m_IsFiring; //private Boolean m_IsFiring; 
 	};
 
 	class PlayerNetwork : public Player

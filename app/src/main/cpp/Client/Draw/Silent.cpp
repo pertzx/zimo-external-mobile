@@ -50,6 +50,33 @@ namespace Silent
         return state;
     }
 
+    /*
+     * Player::UGCStartFiring — campo do jogo que indica que o player local
+     * esta atirando. Define a cadencia do loop: disparando, o RayDir e
+     * reescrito agressivo (2ms); fora do disparo, ritmo morno (20ms) apenas
+     * para manter a direcao quente para o primeiro tiro.
+     *
+     * Se o offset nao estiver preenchido (v8a ainda com TODO) devolve false
+     * e o loop roda no ritmo idle — o silent continua funcionando, so sem o
+     * boost de cadencia.
+     */
+    static bool ReadIsFiring(
+        uintptr_t localPlayer
+    )
+    {
+        if (
+            localPlayer == 0 ||
+            Offsets::Player::IsFiring == 0
+        )
+        {
+            return false;
+        }
+
+        return g_FreeFireMemory.Read<bool>(
+            localPlayer + Offsets::Player::IsFiring
+        );
+    }
+
     static void* ThreadProc(void*)
     {
         const auto now =
@@ -104,11 +131,13 @@ namespace Silent
                 targetEntity == 0
             )
             {
-                sched_yield();
+                /*
+                 * Sem alvo: dorme em vez de girar em sched_yield —
+                 * o spin queimava CPU do client sem fazer nada.
+                 */
+                Sleep(2);
                 continue;
             }
-
-            Memory::FlushTLB();
 
             const uintptr_t weaponPtr =
                 ReadPtr(
@@ -119,7 +148,7 @@ namespace Silent
 
             if (weaponPtr == 0)
             {
-                sched_yield();
+                Sleep(2);
                 continue;
             }
 
@@ -131,35 +160,18 @@ namespace Silent
                 weaponPtr +
                 Offsets::HitObjectInfo::StartPosition;
 
-            uintptr_t dirPhys = 0;
-
-            if (!g_FreeFireMemory.TranslateVA(
-                    directionVA,
-                    dirPhys
-                ))
-            {
-                sched_yield();
-                continue;
-            }
-
-            uintptr_t startPhys = 0;
-
-            g_FreeFireMemory.TranslateVA(
-                startPosVA,
-                startPhys
-            );
-
-            // PageMapping writeMap;
-
-            // void* dirHostPtr =
-            //     writeMap.ResolveWrite(dirPhys);
-
-            // if (!dirHostPtr)
-            // {
-            //     sched_yield();
-            //     continue;
-            // }
-
+            /*
+             * CADENCIA — a ponte e um socket: cada operacao custa um
+             * roundtrip. O burst de 28000 writes levava SEGUNDOS por
+             * passada e a posicao do alvo ficava velha (o "silent
+             * demorando muito"). Agora e um laco continuo e ritmado:
+             *
+             *  - direcao reescrita a cada 2ms atirando / 20ms parado
+             *  - cabeca + origem relidos a cada 8ms atirando / 20ms parado
+             *  - view matrix recopiada a cada 33ms (FovCheck honesto)
+             *  - estado de disparo rechecado a cada 48ms
+             *  - troca de alvo detectada em TODA iteracao (atomica, gratis)
+             */
             Matrix4x4 cachedMatrix;
 
             EnterCriticalSection(&g_MatrixCS);
@@ -170,43 +182,84 @@ namespace Silent
             Vector3 cachedShootOrigin = {};
             bool posValid = false;
 
-            for (int i = 0;
-                 i < WRITE_LOOP_COUNT;
-                 ++i)
+            const LONGLONG startMs =
+                static_cast<LONGLONG>(GetTickCount64());
+
+            LONGLONG lastMatrixMs =
+                startMs - MATRIX_REFRESH_MS;
+
+            LONGLONG lastPosMs =
+                startMs - POS_REFRESH_FIRING_MS;
+
+            LONGLONG lastFireCheckMs =
+                startMs - FIRE_CHECK_MS;
+
+            bool firing = false;
+
+            while (
+                InterlockedCompareExchange(
+                    &g_Running,
+                    0,
+                    0
+                ) != 0 &&
+                !g_Globals.General.ShutDown
+            )
             {
-                if ((i & 1023) == 0)
-                {
-                    if (
-                        InterlockedCompareExchange(
-                            &g_Running,
+                /*
+                 * Troca de alvo / ClearTarget: sai NA HORA. Leitura
+                 * atomica a cada iteracao — custo zero, reacao de um
+                 * ciclo (no burst antigo era a cada 1024 writes).
+                 */
+                const uintptr_t curTarget =
+                    static_cast<uintptr_t>(
+                        InterlockedCompareExchange64(
+                            &g_TargetEntity,
                             0,
                             0
-                        ) == 0 ||
-                        g_Globals.General.ShutDown
-                    )
-                    {
-                        break;
-                    }
+                        )
+                    );
 
-                    const uintptr_t curTarget =
-                        static_cast<uintptr_t>(
-                            InterlockedCompareExchange64(
-                                &g_TargetEntity,
-                                0,
-                                0
-                            )
-                        );
-
-                    if (
-                        curTarget != targetEntity ||
-                        curTarget == 0
-                    )
-                    {
-                        break;
-                    }
+                if (
+                    curTarget != targetEntity ||
+                    curTarget == 0
+                )
+                {
+                    break;
                 }
 
-                if ((i & 127) == 0)
+                const LONGLONG nowMs =
+                    static_cast<LONGLONG>(GetTickCount64());
+
+                if (
+                    nowMs - lastMatrixMs >=
+                    MATRIX_REFRESH_MS
+                )
+                {
+                    EnterCriticalSection(&g_MatrixCS);
+                    cachedMatrix = g_ViewMatrix;
+                    LeaveCriticalSection(&g_MatrixCS);
+
+                    lastMatrixMs = nowMs;
+                }
+
+                if (
+                    nowMs - lastFireCheckMs >=
+                    FIRE_CHECK_MS
+                )
+                {
+                    firing = ReadIsFiring(localPlayer);
+                    lastFireCheckMs = nowMs;
+                }
+
+                const LONGLONG posRefreshMs =
+                    firing
+                        ? POS_REFRESH_FIRING_MS
+                        : POS_REFRESH_IDLE_MS;
+
+                if (
+                    !posValid ||
+                    nowMs - lastPosMs >= posRefreshMs
+                )
                 {
                     Vector3 newAimPos =
                         Transform::GetHeadPosition(
@@ -221,6 +274,9 @@ namespace Silent
                     )
                     {
                         posValid = false;
+                        lastPosMs = nowMs;
+
+                        Sleep(2);
                         continue;
                     }
 
@@ -238,7 +294,8 @@ namespace Silent
                     newAimPos.Y += 0.05f;
                     cachedAimPos = newAimPos;
 
-                    cachedShootOrigin = g_FreeFireMemory.Read<Vector3>(startPosVA);
+                    cachedShootOrigin =
+                        g_FreeFireMemory.Read<Vector3>(startPosVA);
 
                     if (
                         cachedShootOrigin.X == 0.0f &&
@@ -247,13 +304,14 @@ namespace Silent
                     )
                     {
                         posValid = false;
+                        lastPosMs = nowMs;
+
+                        Sleep(2);
                         continue;
                     }
 
                     posValid = true;
-
-                    if (directionVA == 0)
-                    break;
+                    lastPosMs = nowMs;
                 }
 
                 if (!posValid)
@@ -279,6 +337,7 @@ namespace Silent
                     dir.Z == 0.0f
                 )
                 {
+                    Sleep(2);
                     continue;
                 }
 
@@ -327,16 +386,19 @@ namespace Silent
                     dir
                 );
 
-                // if ((i & 2047) == 0 && i > 0)
-                // {
-                //     writeMap.Release();
-
-                //     sched_yield();
-
-                //     if (directionVA == 0)
-                //     break;
-                // }
+                Sleep(
+                    firing
+                        ? WRITE_PACE_FIRING_MS
+                        : WRITE_PACE_IDLE_MS
+                );
             }
+
+            /*
+             * Saiu do laco (alvo trocou/perdeu FOV/desligou): respira
+             * 4ms antes de readquirir — evita girar a secao de aquisicao
+             * (weaponPtr + cadeia de leitura) em spin contra a ponte.
+             */
+            Sleep(4);
         }
 
         InterlockedExchange(

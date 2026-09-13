@@ -841,9 +841,20 @@ namespace
     /*
      * Log detalhado das primeiras operações de cada tipo, depois
      * só erros + estatística periódica (o volume de reads é alto).
+     *
+     * FIX "LOG SÓ MOSTRA ERRO MESMO COM WRITE FUNCIONANDO": antes os
+     * sucessos eram logados apenas nas PRIMEIRAS amostras (16 writes /
+     * 8 reads) e os erros eram logados SEMPRE — depois das primeiras
+     * amostras o log só mostrava "ERRO", mesmo com ~100% de sucesso.
+     * Agora: sucessos continuam sendo amostrados periodicamente
+     * (1 log a cada N ok) e erros passam a ter contador acumulado
+     * (1 log a cada M falhas, mostrando o total) — o log fica fiel
+     * nos dois sentidos sem virar spam.
      */
     static std::atomic<uint64_t> g_LogSampleReads{ 0 };
     static std::atomic<uint64_t> g_LogSampleWrites{ 0 };
+    static std::atomic<uint64_t> g_ReadErrTotal{ 0 };
+    static std::atomic<uint64_t> g_WriteErrTotal{ 0 };
 
     void HandleRequest(
         int clientFd,
@@ -914,20 +925,31 @@ namespace
 
                     g_TotalReads++;
 
-                    if (g_LogSampleReads.fetch_add(1) < 8)
+                    /*
+                     * Sucesso: 8 primeiros detalhados + 1 amostra a cada
+                     * 2000 (o volume de reads é alto; a amostra prova que
+                     * a leitura segue saudável no log).
+                     */
+                    const uint64_t readSample =
+                        g_LogSampleReads.fetch_add(1);
+
+                    if (readSample < 8 ||
+                        (readSample % 2000) == 0)
                     {
                         LOGI(
-                            "[READ] pid=%u addr=0x%llX size=%u OK",
+                            "[READ] pid=%u addr=0x%llX size=%u OK (total=%llu)",
                             req.Pid,
                             (unsigned long long)req.Address,
-                            req.Size
+                            req.Size,
+                            (unsigned long long)(readSample + 1)
                         );
 
                         FileLog(
-                            "READ pid=%u addr=0x%llX size=%u ok",
+                            "READ pid=%u addr=0x%llX size=%u ok (total=%llu)",
                             req.Pid,
                             (unsigned long long)req.Address,
-                            req.Size
+                            req.Size,
+                            (unsigned long long)(readSample + 1)
                         );
                     }
                 }
@@ -942,21 +964,34 @@ namespace
 
                     g_TotalErrors++;
 
-                    LOGE(
-                        "[READ] pid=%u addr=0x%llX size=%u FALHOU: %s",
-                        req.Pid,
-                        (unsigned long long)req.Address,
-                        req.Size,
-                        strerror(errno)
-                    );
+                    /*
+                     * Erro: 16 primeiros detalhados + 1 a cada 200 com
+                     * total acumulado (antes: LOGE SEMPRE — spam que
+                     * escondia os sucessos no log).
+                     */
+                    const uint64_t readErr =
+                        g_ReadErrTotal.fetch_add(1) + 1;
 
-                    FileLog(
-                        "READ pid=%u addr=0x%llX size=%u ERRO: %s",
-                        req.Pid,
-                        (unsigned long long)req.Address,
-                        req.Size,
-                        strerror(errno)
-                    );
+                    if (readErr <= 16 || (readErr % 200) == 0)
+                    {
+                        LOGE(
+                            "[READ] pid=%u addr=0x%llX size=%u FALHOU (%s) erros=%llu",
+                            req.Pid,
+                            (unsigned long long)req.Address,
+                            req.Size,
+                            strerror(errno),
+                            (unsigned long long)readErr
+                        );
+
+                        FileLog(
+                            "READ pid=%u addr=0x%llX size=%u ERRO (%s) erros=%llu",
+                            req.Pid,
+                            (unsigned long long)req.Address,
+                            req.Size,
+                            strerror(errno),
+                            (unsigned long long)readErr
+                        );
+                    }
                 }
 
                 break;
@@ -988,20 +1023,31 @@ namespace
 
                     g_TotalWrites++;
 
-                    if (g_LogSampleWrites.fetch_add(1) < 16)
+                    /*
+                     * Sucesso: 16 primeiros detalhados + 1 amostra a cada
+                     * 200 (antes parava de logar "ok" para sempre após a
+                     * 16ª — o log parecia 100% erro mesmo escrevendo).
+                     */
+                    const uint64_t writeSample =
+                        g_LogSampleWrites.fetch_add(1);
+
+                    if (writeSample < 16 ||
+                        (writeSample % 200) == 0)
                     {
                         LOGI(
-                            "[WRITE] pid=%u addr=0x%llX size=%u OK",
+                            "[WRITE] pid=%u addr=0x%llX size=%u OK (total=%llu)",
                             req.Pid,
                             (unsigned long long)req.Address,
-                            req.Size
+                            req.Size,
+                            (unsigned long long)(writeSample + 1)
                         );
 
                         FileLog(
-                            "WRITE pid=%u addr=0x%llX size=%u ok",
+                            "WRITE pid=%u addr=0x%llX size=%u ok (total=%llu)",
                             req.Pid,
                             (unsigned long long)req.Address,
-                            req.Size
+                            req.Size,
+                            (unsigned long long)(writeSample + 1)
                         );
                     }
                 }
@@ -1014,21 +1060,33 @@ namespace
 
                     g_TotalErrors++;
 
-                    LOGE(
-                        "[WRITE] pid=%u addr=0x%llX size=%u FALHOU: %s",
-                        req.Pid,
-                        (unsigned long long)req.Address,
-                        req.Size,
-                        strerror(errno)
-                    );
+                    /*
+                     * Erro: 16 primeiros detalhados + 1 a cada 100 com
+                     * total acumulado (antes: LOGE SEMPRE).
+                     */
+                    const uint64_t writeErr =
+                        g_WriteErrTotal.fetch_add(1) + 1;
 
-                    FileLog(
-                        "WRITE pid=%u addr=0x%llX size=%u ERRO: %s",
-                        req.Pid,
-                        (unsigned long long)req.Address,
-                        req.Size,
-                        strerror(errno)
-                    );
+                    if (writeErr <= 16 || (writeErr % 100) == 0)
+                    {
+                        LOGE(
+                            "[WRITE] pid=%u addr=0x%llX size=%u FALHOU (%s) erros=%llu",
+                            req.Pid,
+                            (unsigned long long)req.Address,
+                            req.Size,
+                            strerror(errno),
+                            (unsigned long long)writeErr
+                        );
+
+                        FileLog(
+                            "WRITE pid=%u addr=0x%llX size=%u ERRO (%s) erros=%llu",
+                            req.Pid,
+                            (unsigned long long)req.Address,
+                            req.Size,
+                            strerror(errno),
+                            (unsigned long long)writeErr
+                        );
+                    }
                 }
 
                 break;
@@ -1111,10 +1169,19 @@ namespace
 
                 if (failed != 0)
                 {
-                    LOGE(
-                        "[READBATCH] pid=%u itens=%zu falhas=%zu total=%zu",
-                        req.Pid, itemCount, failed, totalBytes
-                    );
+                    static std::atomic<uint64_t> s_BatchErrTotal{ 0 };
+
+                    const uint64_t batchErr =
+                        s_BatchErrTotal.fetch_add(1) + 1;
+
+                    if (batchErr <= 8 || (batchErr % 100) == 0)
+                    {
+                        LOGE(
+                            "[READBATCH] pid=%u itens=%zu falhas=%zu total=%zu (ocorrencias=%llu)",
+                            req.Pid, itemCount, failed, totalBytes,
+                            (unsigned long long)batchErr
+                        );
+                    }
                 }
 
                 break;
