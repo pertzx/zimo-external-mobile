@@ -181,20 +181,62 @@ static bool IsCursorVisibleNow( )
         return true;
 }
 
-// ==================== Disparo do player local (Player::UGCStartFiring) ====================
+// ==================== Disparo do player local (Player::IsFiring) ====================
 // Le o campo do JOGO que indica que o player esta atirando. E a fonte da
-// verdade para o aimbot (so pode agir enquanto atira) — o MouseDown[0] do
-// ImGui no Android nao corresponde ao botao de fogo do jogo.
-// Se o offset nao estiver preenchido (perfil v8a ainda com TODO) ou a leitura
-// falhar, devolve true: degrada para o comportamento antigo (so tecla) em vez
-// de desligar o aimbot do usuario.
+// verdade para o aimbot (so pode agir enquanto atira).
 static bool ReadLocalFiring( uintptr_t localPlayer )
 {
+        /*
+         * Perfil sem offset (v8a TODO): nao ha como ler disparo — devolve
+         * true para nao desligar o aimbot de quem usa outro perfil (degrada
+         * para o comportamento antigo, so-tecla).
+         */
         if ( localPlayer == 0 || Offsets::Player::IsFiring == 0 )
                 return true;
-        bool isFiring = g_FreeFireMemory.Read<bool>( localPlayer + Offsets::Player::IsFiring );
-        LOGI("IS FIRING: %p", isFiring);
-        return isFiring;
+
+        /*
+         * FIX "TÁ ATIRANDO E O AIMBOT NAO VAI": Read<T> devolve ZERO/FALSE
+         * quando a leitura pela ponte FALHA — e no meio da troca de tiro a
+         * ponte esta no limite (silent + ESP + aimbot disputando o socket),
+         * entao falhas transitorias eram interpretadas como "nao atirando"
+         * e o aimbot morria EXATAMENTE durante o combate.
+         *
+         * Agora: 3 tentativas (2ms entre elas) e, persistindo a falha, usa
+         * o ULTIMO valor lido com sucesso (valido por 500ms) antes de
+         * concluir. Falso-negativo de falha nao derruba mais o aimbot.
+         */
+        static LONGLONG s_LastGoodFireTickMs = 0;
+        static bool s_LastGoodFireValue = false;
+        static bool s_LastLoggedFire = false;
+        static LONGLONG s_LastFireLogMs = 0;
+
+        for ( int attempt = 0; attempt < 3; ++attempt )
+        {
+                bool value = false;
+
+                if ( g_FreeFireMemory.Read( localPlayer + Offsets::Player::IsFiring, &value, 1 ) )
+                {
+                        s_LastGoodFireValue = value;
+                        s_LastGoodFireTickMs = ( LONGLONG )GetTickCount64( );
+
+                        /* Log so na MUDANCA de estado (ou 1x/2s) — o LOGI por
+                         * frame virava spam e escondia o sinal no logcat. */
+                        const LONGLONG nowLogMs = ( LONGLONG )GetTickCount64( );
+                        if ( value != s_LastLoggedFire || ( nowLogMs - s_LastFireLogMs ) > 2000 )
+                        {
+                                s_LastLoggedFire = value;
+                                s_LastFireLogMs = nowLogMs;
+                                DiagLog( "[firing] IsFiring=%s", value ? "TRUE (atirando)" : "false" );
+                        }
+
+                        return value;
+                }
+
+                Sleep( 2 );
+        }
+
+        return s_LastGoodFireValue &&
+               ( ( LONGLONG )GetTickCount64( ) - s_LastGoodFireTickMs ) < 500;
 }
 
 bool ghostActive = false;
@@ -1625,7 +1667,19 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                 uintptr_t neckVal = ReadPtr( neckAddr );
                 uintptr_t hipVal = ReadPtr( hipAddr );
-                if ( neckVal == 0 || hipVal == 0 ) return false;
+                if ( neckVal == 0 || hipVal == 0 )
+                {
+                        // Sinal de diagnostico: offsets nao resolveram ponteiro
+                        static LONGLONG lastBsNull = 0;
+                        const LONGLONG nowBsNull = ( LONGLONG )GetTickCount64( );
+                        if ( nowBsNull - lastBsNull > 5000 )
+                        {
+                                lastBsNull = nowBsNull;
+                                DiagLog( "[aimbot] boneswap: neck=0x%lX hip=0x%lX invalidos (ent=0x%lX)",
+                                        ( unsigned long )neckVal, ( unsigned long )hipVal, ( unsigned long )ent );
+                        }
+                        return false;
+                }
 
                 BS_NeckAddr = neckAddr;
                 BS_HipAddr = hipAddr;
@@ -1637,6 +1691,15 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                 BS_LastTarget = ent;
                 BS_Applied = true;
+
+                // SINAL NO LOG: confirma que o aimbot aplicou a troca de ossos.
+                static LONGLONG lastBsApplyLog = 0;
+                const LONGLONG nowBs = ( LONGLONG )GetTickCount64( );
+                if ( nowBs - lastBsApplyLog > 3000 )
+                {
+                        lastBsApplyLog = nowBs;
+                        DiagLog( "[aimbot] boneswap APLICADO em ent=0x%lX (neck<->hip trocados)", ( unsigned long )ent );
+                }
                 return true;
         };
 
@@ -1902,6 +1965,21 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         {
                 ghostActive = false;
                 ghostSkeletonExists = false;
+        }
+
+        /*
+         * FIX "SILENT TEM ALGO QUE IMPEDE" (CAUSA RAIZ): a thread do silent
+         * NUNCA nasce se Silent::Start() nao e chamado — o toggle ligava, o
+         * alvo era selecionado la embaixo, mas nao existia thread nenhuma
+         * para consumir o alvo e escrever o RayDir (nem sinal no log). O
+         * bootstrap existia no .bak e se perdeu na integracao dos patches.
+         * A thread nasce no primeiro frame com o silent ligado (e renasce
+         * sozinha se morreu); desligado, ela dorme (3ms) sem escrever nada.
+         */
+        if ( g_Globals.Silent.Enabled && Silent::g_Running == 0 )
+        {
+                Silent::Start( );
+                DiagLog( "[silent] thread iniciada (Enabled=1, aguardando alvo)" );
         }
 
         // ==================== TelaParada ====================
@@ -2387,11 +2465,57 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         // ==================== Silent Aim Target ====================
         // Usa o alvo PRÓPRIO do silent (SilentClosestEntity), selecionado com
         // Silent.Fov/Silent.MaxDistance — independente do aimbot.
+        //
+        // FIX "SILENT NAO FICA CONSTANTE": quando a ponte satura no combate,
+        // o snapshot engasga (snapshotFresh=false por alguns frames) e
+        // SilentClosestEntity zera — o ClearTarget derrubava o silent
+        // EXATAMENTE no meio do spray. Agora o último alvo válido sobrevive
+        // 600ms (keep-alive) até o snapshot voltar a ficar fresco.
+        static uintptr_t s_SilentKeepAliveTarget = 0;
+        static LONGLONG s_SilentKeepAliveTickMs = 0;
 
         if ( SilentClosestEntity != 0 )
-                Silent::SetTarget( localPlayer, SilentClosestEntity );
+        {
+                s_SilentKeepAliveTarget = SilentClosestEntity;
+                s_SilentKeepAliveTickMs = ( LONGLONG )GetTickCount64( );
+        }
+
+        uintptr_t silentTargetNow = SilentClosestEntity;
+
+        if ( silentTargetNow == 0 && s_SilentKeepAliveTarget != 0 &&
+             ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < 600 )
+        {
+                silentTargetNow = s_SilentKeepAliveTarget;
+        }
+
+        if ( silentTargetNow != 0 && localPlayer != 0 )
+                Silent::SetTarget( localPlayer, silentTargetNow );
         else
                 Silent::ClearTarget( );
+
+        
+        // ==================== Silent Firing Feed ====================
+        // Publica o estado de tiro pro Silent::NotifyFiring — 2a fonte do
+        // modo burst (a 1a e o IsFiring lido pela feed do silent). Usa a
+        // leitura que o Draw ja conhece (ReadLocalFiring), com throttling
+        // de 32ms: custo de 31 reads/s, nada pra ponte.
+        {
+                static LONGLONG s_SilFireLastMs = 0;
+                static bool s_SilFireCache = false;
+
+                const LONGLONG nowSilFireMs = ( LONGLONG )GetTickCount64( );
+
+                if ( nowSilFireMs - s_SilFireLastMs >= 32 )
+                {
+                        s_SilFireLastMs = nowSilFireMs;
+
+                        s_SilFireCache = localPlayer != 0 &&
+                                         Offsets::Player::IsFiring != 0 &&
+                                         ReadLocalFiring( localPlayer );
+                }
+
+                Silent::NotifyFiring( s_SilFireCache );
+        }
 
         // ==================== Rage Aimbot ====================
 
@@ -2423,6 +2547,16 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 if ( !s_AimFloodRunning )
                                 {
                                         s_AimFloodRunning = true;
+
+                                        // SINAL NO LOG: o flood do rage comecou (mira presa ao alvo).
+                                        static LONGLONG s_LastRageLog = 0;
+                                        const LONGLONG nowRage = ( LONGLONG )GetTickCount64( );
+                                        if ( nowRage - s_LastRageLog > 3000 )
+                                        {
+                                                s_LastRageLog = nowRage;
+                                                DiagLog( "[aimbot] rage: flood iniciado (ent=0x%lX, disparando)", ( unsigned long )ClosestEntity );
+                                        }
+
                                         std::thread( [ localPlayer, MainCamera, N32 ] ( )
                                         {
                                                 // Qualquer saida (inclusive excecao) libera o flag do
@@ -2491,7 +2625,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                         aimAssistModified = true;
                                                 }
 
-                                                if ( !AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) || IsCursorVisibleNow() ) 
+                                                if ( !firingNow( ) || !AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) || IsCursorVisibleNow( ) )
                                                 {
                                                         if ( aimAssistModified )
                                                                 g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
@@ -2504,9 +2638,15 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                         if ( IsCursorVisibleNow( ) )
                                                                 break;
 
-                                                        bool isStillShooting = firingNow( ); // so enquanto ATIRA (UGCStartFiring fresco)
-                                                        bool isKeyStillPressed = AndroidInput::IsKeyPressed( g_Globals.AimBot.KeyBind );
-                                                        if ( !AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) )
+                                                        /*
+                                                         * FIX "NAO TÁ ATIRANDO E O AIMBOT CONTINUA": o
+                                                         * disparo TEM que valer no break — na integracao
+                                                         * o firingNow() ficou calculado mas FORA da
+                                                         * condicao, e o rage seguia colado no alvo com
+                                                         * IsFiring=false (so parava soltando a tecla).
+                                                         */
+                                                        const bool isStillShooting = firingNow( );
+                                                        if ( !( isStillShooting && AimTriggerHeld( g_Globals.AimBot.KeyBind, g_Globals.AimBot.Enabled ) ) )
                                                                 break;
 
                                                         // Relê o HP do alvo SEMPRE (com ou sem IgnoreKnocked):

@@ -33,7 +33,13 @@ namespace Cheat {
         {
             bool Enabled = false;
             int KeyBind = 0;
-            int Fov = 30;
+            /*
+             * FOV em PIXELS (cabeca vs centro da tela). 30 era colado na
+             * mira: o recoil arrastava a cabeca pra fora do circulo no
+             * meio do spray e a selecao derrubava o alvo (silent
+             * intermitente). 150+ mantem o alvo selecionado o spray todo.
+             */
+            int Fov = 150;
             int MaxDistance = 100;
         } Silent;
         struct Visuals

@@ -8,32 +8,66 @@
 namespace Silent
 {
     /*
-     * JITTER do direction escrito no RayDir (HitObjectInfo). Valores pequenos
-     * para o tiro cair na cabeca com desvio humano.
+     * JITTER do direction escrito no RayDir (HitObjectInfo). Valores
+     * pequenos para o tiro cair na cabeca com desvio humano.
      */
-    constexpr float SMOOTH_MIN = 0.0015f;
-    constexpr float SMOOTH_MAX = 0.0035f;
+    constexpr float SMOOTH_MIN = 0.0008f;
+    constexpr float SMOOTH_MAX = 0.0022f;
 
     /*
-     * CADENCIA DO LOOP (a ponte e um socket: cada read/write custa um
-     * roundtrip — o volume decide a latencia, nao o brute force).
+     * ====================================================================
+     * ARQUITETURA "REUSO DO SNAPSHOT DA ESP"
+     * (fix: silent fraco + ESP bugada enquanto atira)
+     * ====================================================================
+     * Diagnostico das versoes anteriores: a ponte (socket do daemon) tem
+     * throughput FIXO — cada read/write e um roundtrip, e TODOS os modulos
+     * dividem o mesmo cano. O silent somava:
+     *   - thread leitora propia (cadeia da cabeca: 7-15 roundtrips a cada
+     *     6-8ms = milhares de reads/s) e
+     *   - burst de writes sem freio (monopolizava o mutex da ponte).
+     * Resultado: a ESP perdia update (bugada) e a posicao do alvo
+     * envelhecia (silent fraco/torta) — exatamente quando o usuario atira.
      *
-     * Enquanto o player local esta ATIRANDO (Player::IsPrepareAttack):
-     *   - direcao reescrita a cada 2ms (500/s)
-     *   - posicao da cabeca/origem relida a cada 8ms
-     * Fora do disparo (modo morno, mantem o ray "quente" pro 1o tiro):
-     *   - direcao reescrita a cada 20ms (50/s)
-     *   - posicao/origem relidas a cada 20ms
-     * A matriz de view (FovCheck) e recopiada a cada 33ms e o estado de
-     * disparo e rechecado a cada 48ms. Troca de alvo e detectada em TODA
-     * iteracao (leitura atomica, custo zero).
+     * AGORA:
+     *   - A cabeca do alvo NAO e lida na ponte: o writer busca direto do
+     *     snapshot que a ESP ja atualizou (Data::GetPlayers, campo
+     *     HeadWorld, lido pelo ReadLoop da ESP). Custo de socket: ZERO.
+     *   - weaponPtr/StartPosition/IsFiring passam a ser lidos AQUI com
+     *     throttle largo (250ms / 16ms / 100ms) — dezenas de ops/s.
+     *   - Escrita em ritmo CONSTANTE de 3ms atirando (~330/s): "ultimo a
+     *     escrever ganha a bala" nao exige burst de milhares — exige
+     *     densidade estavel SEM estrangular a ponte que a ESP usa.
+     *
+     * Volume total do silent: ~400 ops/s contra ~3000+ das versoes
+     * anteriores. A ESP volta a atualizar e a cabeca volta a ser fresca
+     * (e a MESMA posicao que a ESP desenha) — silent constante.
      */
-    constexpr LONGLONG WRITE_PACE_FIRING_MS = 2;
-    constexpr LONGLONG WRITE_PACE_IDLE_MS = 20;
-    constexpr LONGLONG POS_REFRESH_FIRING_MS = 8;
-    constexpr LONGLONG POS_REFRESH_IDLE_MS = 20;
+
+    /* Escrita do RayDir: ritmo constante no CANAL DEDICADO (nao disputa
+    * mutex com a ESP — por isso pode ser agressivo de novo). */
+    constexpr LONGLONG WRITE_PACE_FIRING_MS = 1;   // atirando (~800-1200 writes/s)
+    constexpr LONGLONG WRITE_PACE_IDLE_MS   = 5;  // parado (quente pro 1o tiro)
+
+    /* Leituras propias do writer, throttled (dezenas de ops/s, nao milhares). */
+    constexpr LONGLONG WEAPON_REFRESH_MS  = 250;  // m_LastAimingInfoFromWeapon
+    constexpr LONGLONG ORIGIN_REFRESH_MS  = 16;   // HitObjectInfo::StartPosition
+    constexpr LONGLONG FIRE_FALLBACK_MS   = 100;  // IsFiring caso a UI nao publique
+
+    /* Copia LOCAL da view matrix pro FovCheck do write quente (zero socket). */
     constexpr LONGLONG MATRIX_REFRESH_MS = 33;
-    constexpr LONGLONG FIRE_CHECK_MS = 48;
+
+    /*
+     * Frescor da cabeca (vinda do snapshot da ESP). Achou o alvo na lista
+     * da ESP = usa LastSeenTick dele. Nao achou (snapshot engasgado) =
+     * usa a ultima boa por ate 600ms, depois para (atirar em fantasma
+     * nao — a ESP vai voltar a atualizar com a ponte aliviada).
+     * 350ms era apertado demais: um ciclo lento do ReadLoop parava o
+     * write no meio do spray.
+     */
+    constexpr LONGLONG HEAD_STALE_MAX_MS = 600;
+
+    /* Ponte falhando no write: backoff antes de tentar de novo. */
+    constexpr LONGLONG WRITE_FAIL_BACKOFF_MS = 25;
 
     extern volatile LONG g_Running;
 
@@ -45,6 +79,14 @@ namespace Silent
         uintptr_t localPlayer,
         uintptr_t targetEntity
     );
+
+    /*
+     * Publicado pelo Draw a cada frame (leitura propria dele, sem custo
+     * novo de ponte): 2a fonte do estado de tiro pro writer, caso o
+     * IsFiring lido pelo silent falhe no pico do combate. Frescor
+     * exigido pelo consumidor: 250ms.
+     */
+    void NotifyFiring(bool firing);
 
     void ClearTarget();
 }
