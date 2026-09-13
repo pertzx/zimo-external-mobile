@@ -149,18 +149,18 @@ bool Data::m_ThreadV31 = false;
 // reprojeta com lixo e, portanto, nunca "some" por causa de um frame ruim.
 static bool IsValidViewMatrix( const Matrix4x4& m )
 {
-	for ( int i = 0; i < 16; i++ )
-	{
-		if ( !std::isfinite( m.v [ i ] ) )
-			return false;
-	}
-	float s = 0.f;
-	for ( int r = 0; r < 4; r++ )
-	{
-		for ( int c = 0; c < 4; c++ )
-			s += m.m [ r ][ c ] * m.m [ r ][ c ];
-	}
-	return ( s > 1e-4f && s < 1e12f );
+        for ( int i = 0; i < 16; i++ )
+        {
+                if ( !std::isfinite( m.v [ i ] ) )
+                        return false;
+        }
+        float s = 0.f;
+        for ( int r = 0; r < 4; r++ )
+        {
+                for ( int c = 0; c < 4; c++ )
+                        s += m.m [ r ][ c ] * m.m [ r ][ c ];
+        }
+        return ( s > 1e-4f && s < 1e12f );
 }
 
 // Constants
@@ -172,13 +172,13 @@ constexpr float kStackGap = 2.0f;
 // Globals
 static bool IsCursorVisibleNow( )
 {
-	CURSORINFO ci = { };
-	ci.cbSize = sizeof( ci );
-	if ( GetCursorInfo( &ci ) )
-	{
-		return ( ci.flags & 0x00000001 ) != 0;
-	}
-	return true;
+        CURSORINFO ci = { };
+        ci.cbSize = sizeof( ci );
+        if ( GetCursorInfo( &ci ) )
+        {
+                return ( ci.flags & 0x00000001 ) != 0;
+        }
+        return true;
 }
 
 bool ghostActive = false;
@@ -199,120 +199,120 @@ static std::vector<float> g_SmoothedHealth;
 // quando a base esta invalida).
 static void DrawEspEntityOverlay( const PlayerData& p, ImDrawList* DL, const struct Cheat::Globals::Visuals::ESP& ESP, const Matrix4x4& ViewMatrix, bool N32, bool V31, bool drawSkeleton )
 {
-	if ( ESP.RenderDistance > 0 && p.Distance > ESP.RenderDistance )
-		return;
+        if ( ESP.RenderDistance > 0 && p.Distance > ESP.RenderDistance )
+                return;
 
-	// Jogador morto NUNCA e desenhado — nem no caminho ao vivo nem no
-	// congelado. A captura ja filtra (CurrentHealth <= 0), mas o snapshot
-	// congelado segurava cadavers por ate 25s com a leitura engasgada
-	// ("ESP de morto" grudada na tela). O knocked (pose 8) tem HP > 0 e
-	// continua aparecendo em vermelho, como esperado.
-	if ( p.CurrentHealth <= 0 )
-		return;
+        // Jogador morto NUNCA e desenhado — nem no caminho ao vivo nem no
+        // congelado. A captura ja filtra (CurrentHealth <= 0), mas o snapshot
+        // congelado segurava cadavers por ate 25s com a leitura engasgada
+        // ("ESP de morto" grudada na tela). O knocked (pose 8) tem HP > 0 e
+        // continua aparecendo em vermelho, como esperado.
+        if ( p.CurrentHealth <= 0 )
+                return;
 
-	Vector3 headScreen = p.HeadScreen;
-	Vector3 feetScreen = p.FeetScreen;
+        Vector3 headScreen = p.HeadScreen;
+        Vector3 feetScreen = p.FeetScreen;
 
-	if ( ViewMatrix.m [ 0 ][ 0 ] != 0.f && p.HeadWorld != Vector3::Zero( ) )
-	{
-		headScreen = W2S::World2Screen( ViewMatrix, p.HeadWorld );
-		feetScreen = W2S::World2Screen( ViewMatrix, p.FeetWorld );
+        if ( ViewMatrix.m [ 0 ][ 0 ] != 0.f && p.HeadWorld != Vector3::Zero( ) )
+        {
+                headScreen = W2S::World2Screen( ViewMatrix, p.HeadWorld );
+                feetScreen = W2S::World2Screen( ViewMatrix, p.FeetWorld );
 
-		// So a cabeca atras da camera derruba o jogador. Pes atras (inimigo
-		// muito perto / camera baixa) NAO pode descartar a entidade inteira —
-		// era isso que fazia a snapline (e o resto da ESP) piscar e sumir com
-		// inimigo proximo. Usa a cabeca como fallback dos pes nesse caso.
-		if ( headScreen.Z <= 0 )
-		{
-			// Cabeca atras mas pes na frente = inimigo colado/abaixo da camera
-			// (melee). Usa os pes como referencial em vez de descartar o
-			// jogador inteiro — antes esse jogador sumia da ESP ate se afastar.
-			if ( feetScreen.Z > 0 )
-				headScreen = feetScreen;
-			else
-				return;
-		}
-		if ( feetScreen.Z <= 0 )
-			feetScreen = headScreen;
-	}
-	else if ( headScreen == Vector3::Zero( ) || feetScreen == Vector3::Zero( ) )
-	{
-		// Sem view matrix valida e a entidade nunca projetou (snapshot gravado
-		// com matrix ruim): nao ha o que desenhar neste frame.
-		return;
-	}
+                // So a cabeca atras da camera derruba o jogador. Pes atras (inimigo
+                // muito perto / camera baixa) NAO pode descartar a entidade inteira —
+                // era isso que fazia a snapline (e o resto da ESP) piscar e sumir com
+                // inimigo proximo. Usa a cabeca como fallback dos pes nesse caso.
+                if ( headScreen.Z <= 0 )
+                {
+                        // Cabeca atras mas pes na frente = inimigo colado/abaixo da camera
+                        // (melee). Usa os pes como referencial em vez de descartar o
+                        // jogador inteiro — antes esse jogador sumia da ESP ate se afastar.
+                        if ( feetScreen.Z > 0 )
+                                headScreen = feetScreen;
+                        else
+                                return;
+                }
+                if ( feetScreen.Z <= 0 )
+                        feetScreen = headScreen;
+        }
+        else if ( headScreen == Vector3::Zero( ) || feetScreen == Vector3::Zero( ) )
+        {
+                // Sem view matrix valida e a entidade nunca projetou (snapshot gravado
+                // com matrix ruim): nao ha o que desenhar neste frame.
+                return;
+        }
 
-	const float Height = fabsf( feetScreen.Y - headScreen.Y );
-	// Altura minima: com os pes atras da camera (fallback da cabeca) a altura
-	// colapsa a 0 e box/healthbar/weapon somem para aquele inimigo — parece
-	// que a ESP parou. Mantem um tamanho minimo visivel.
-	const float HeightSafe = ( Height < 2.0f ) ? 2.0f : Height;
-	const float Width = HeightSafe * 0.5f;
+        const float Height = fabsf( feetScreen.Y - headScreen.Y );
+        // Altura minima: com os pes atras da camera (fallback da cabeca) a altura
+        // colapsa a 0 e box/healthbar/weapon somem para aquele inimigo — parece
+        // que a ESP parou. Mantem um tamanho minimo visivel.
+        const float HeightSafe = ( Height < 2.0f ) ? 2.0f : Height;
+        const float Width = HeightSafe * 0.5f;
 
-	// Cor do elemento: aliado (cor de time) > caido (vermelho) > cor da opcao.
-	auto pickColor = [ &ESP, &p ] ( const float c [ 4 ] ) -> ImColor
-	{
-		if ( p.IsTeammate )
-			return ImColor( ESP.TeamColor [ 0 ], ESP.TeamColor [ 1 ], ESP.TeamColor [ 2 ], ESP.TeamColor [ 3 ] );
-		if ( p.IsKnocked )
-			return ImColor( 1.f, 0.f, 0.f, 1.f );
-		return ImColor( c [ 0 ], c [ 1 ], c [ 2 ], c [ 3 ] );
-	};
+        // Cor do elemento: aliado (cor de time) > caido (vermelho) > cor da opcao.
+        auto pickColor = [ &ESP, &p ] ( const float c [ 4 ] ) -> ImColor
+        {
+                if ( p.IsTeammate )
+                        return ImColor( ESP.TeamColor [ 0 ], ESP.TeamColor [ 1 ], ESP.TeamColor [ 2 ], ESP.TeamColor [ 3 ] );
+                if ( p.IsKnocked )
+                        return ImColor( 1.f, 0.f, 0.f, 1.f );
+                return ImColor( c [ 0 ], c [ 1 ], c [ 2 ], c [ 3 ] );
+        };
 
-	// --- Name ---
-	if ( ESP.ShowName )
-	{
-		ImColor nameColor = pickColor( ESP.NameColor );
-		ImVec2 TextSize = Utils::CalcTextSize( Fonts::Gff, ESP.TextSize, p.Name.c_str( ) );
-		ImVec2 NamePos( ( headScreen.X - Width * 0.5f ) + ( Width * 0.5f ) - ( TextSize.x * 0.5f ), headScreen.Y - kNameOffset );
-		DL->AddText( Fonts::Gff, ESP.TextSize, NamePos, nameColor, p.Name.c_str( ) );
-	}
+        // --- Name ---
+        if ( ESP.ShowName )
+        {
+                ImColor nameColor = pickColor( ESP.NameColor );
+                ImVec2 TextSize = Utils::CalcTextSize( Fonts::Gff, ESP.TextSize, p.Name.c_str( ) );
+                ImVec2 NamePos( ( headScreen.X - Width * 0.5f ) + ( Width * 0.5f ) - ( TextSize.x * 0.5f ), headScreen.Y - kNameOffset );
+                DL->AddText( Fonts::Gff, ESP.TextSize, NamePos, nameColor, p.Name.c_str( ) );
+        }
 
-	// --- Box ---
-	if ( ESP.Box )
-	{
-		ImColor Color = pickColor( ESP.BoxColor );
-		ImColor ColorFilled = pickColor( ESP.FilledBoxColor );
-		Data::DrawBox( headScreen.X - Width * 0.5f, headScreen.Y, Width, HeightSafe, Color, ColorFilled, ESP.Thickness, ESP.BoxStyle );
-	}
+        // --- Box ---
+        if ( ESP.Box )
+        {
+                ImColor Color = pickColor( ESP.BoxColor );
+                ImColor ColorFilled = pickColor( ESP.FilledBoxColor );
+                Data::DrawBox( headScreen.X - Width * 0.5f, headScreen.Y, Width, HeightSafe, Color, ColorFilled, ESP.Thickness, ESP.BoxStyle );
+        }
 
-	// --- SnapLine ---
-	if ( ESP.SnapLines )
-	{
-		ImColor Color = pickColor( ESP.SnapLinesColor );
-		const bool healthTop = ( ESP.HealthBarStyle == 3 );
-		Data::DrawSnapLine( headScreen, feetScreen, ESP.ShowName, healthTop, Color, ESP.Thickness, ESP.SnapLinesPos );
-	}
+        // --- SnapLine ---
+        if ( ESP.SnapLines )
+        {
+                ImColor Color = pickColor( ESP.SnapLinesColor );
+                const bool healthTop = ( ESP.HealthBarStyle == 3 );
+                Data::DrawSnapLine( headScreen, feetScreen, ESP.ShowName, healthTop, Color, ESP.Thickness, ESP.SnapLinesPos );
+        }
 
-	// --- HealthBar ---
-	if ( ESP.HealthBar )
-	{
-		Data::DrawHealthBar( p.CurrentHealth, p.MaxHealth, ImVec2( headScreen.X, headScreen.Y ), ImVec2( feetScreen.X, feetScreen.Y ), Width, HeightSafe, ( uintptr_t )p.Entity );
-	}
+        // --- HealthBar ---
+        if ( ESP.HealthBar )
+        {
+                Data::DrawHealthBar( p.CurrentHealth, p.MaxHealth, ImVec2( headScreen.X, headScreen.Y ), ImVec2( feetScreen.X, feetScreen.Y ), Width, HeightSafe, ( uintptr_t )p.Entity );
+        }
 
-	// --- Weapon ---
-	if ( ESP.Weapon )
-	{
-		Data::DrawWeapon( p.WeaponID, p.IsKnocked, headScreen, HeightSafe );
-	}
+        // --- Weapon ---
+        if ( ESP.Weapon )
+        {
+                Data::DrawWeapon( p.WeaponID, p.IsKnocked, headScreen, HeightSafe );
+        }
 
-	// --- Distance ---
-	if ( ESP.Distance )
-	{
-		int mRounded = ( int )( p.Distance + 0.5f );
-		char distanceText [ 16 ];
-		snprintf( distanceText, sizeof( distanceText ), XorStr( "%dm" ), mRounded );
+        // --- Distance ---
+        if ( ESP.Distance )
+        {
+                int mRounded = ( int )( p.Distance + 0.5f );
+                char distanceText [ 16 ];
+                snprintf( distanceText, sizeof( distanceText ), XorStr( "%dm" ), mRounded );
 
-		ImGui::PushFont( Fonts::Verdana );
-		ImColor Color = pickColor( ESP.DistanceColor );
-		ImVec2 sz = Utils::CalcTextSize( Fonts::Verdana, ESP.TextSize, distanceText );
-		DL->AddText( Fonts::Verdana, ESP.TextSize, ImVec2( headScreen.X - sz.x * 0.5f, feetScreen.Y + 5 ), Color, distanceText );
-		ImGui::PopFont( );
-	}
+                ImGui::PushFont( Fonts::Verdana );
+                ImColor Color = pickColor( ESP.DistanceColor );
+                ImVec2 sz = Utils::CalcTextSize( Fonts::Verdana, ESP.TextSize, distanceText );
+                DL->AddText( Fonts::Verdana, ESP.TextSize, ImVec2( headScreen.X - sz.x * 0.5f, feetScreen.Y + 5 ), Color, distanceText );
+                ImGui::PopFont( );
+        }
 
-	// --- Skeleton ---
-	if ( drawSkeleton )
-		Skeleton::DrawPlayer( DL, p.Entity, p.UMAData, p.IsKnocked, ViewMatrix, p.FeetWorld, N32, V31 );
+        // --- Skeleton ---
+        if ( drawSkeleton )
+                Skeleton::DrawPlayer( DL, p.Entity, p.UMAData, p.IsKnocked, ViewMatrix, p.FeetWorld, N32, V31 );
 }
 
 // ==================== Read Thread ====================
@@ -329,8 +329,12 @@ void Data::StartReadThread()
     if (m_Running.load())
         return;
 
-	// ENABLE: LIGA o READ/WRITE de cada operacao do daemon
-	Memory::EnableOpLogging(true);
+        /*
+         * LOG DE OPERACAO DESLIGADO: logar cada READ no logd custa uma
+         * escrita de log POR LEITURA e o volume da thread de leitura e
+         * altissimo - isso sozinho derrubava a taxa de atualizacao do ESP.
+         * (Diagnostico: ligue manualmente com Memory::EnableOpLogging(true))
+         */
 
     m_Running.store(true);
 
@@ -653,145 +657,533 @@ void Data::ReadLoop( )
                         int entTeam = 0, entPri = 0, entHp = 0, entPos = 0;
                         bool sampleLogged = false;
 
-                        for ( int i = 0; i < dictCount; i++ )
+
+                        // ═══════════════════════════════════════════════════════════
+                        // LEITURA EM ONDAS (READ BATCH pela ponte)
+                        //
+                        // O loop antigo fazia ~30 round-trips de socket POR
+                        // ENTIDADE (cada Read<T> = 1 viagem ao daemon). Com 50
+                        // entidades eram ~1500 viagens por tick — o ESP levava
+                        // centenas de ms pra atualizar.
+                        //
+                        // Agora cada ONDA le N enderecos (todas as entidades)
+                        // em UM unico round-trip (BRIDGE_CMD_READ_BATCH), e a
+                        // montagem/ filtros ficam 100% locais. O frame inteiro
+                        // custa ~20-25 round-trips FIXOS, independente do
+                        // numero de players. Semantica preservada:
+                        //   - ponteiro lido como 0 = falha (igual Read<T>)
+                        //   - mesma ordem de descarte e mesmos contadores
+                        // ═══════════════════════════════════════════════════════════
+
+                        // ---------- helpers ----------
+                        struct BatchReq { uintptr_t addr; uint32_t size; void* out; };
+
+                        auto RunWave = [](std::vector<BatchReq>& reqs)
                         {
-                                uintptr_t Entity = EntityList->GetItem( i );
-                                if ( Entity == 0 ) continue;
+                                if (reqs.empty()) return;
 
-                                // Mesmo do codigo que funcionava: a lista pode conter o
-                                // proprio jogador local — nunca processar ele.
-                                if ( Entity == LocalPlayer ) { entLocal++; continue; }
+                                std::vector<Memory::BatchItem> items(reqs.size());
+                                size_t total = 0;
 
-                                PlayerType type = Data::GetPlayerType( Entity, N32 );
-                                if ( type == PLAYER_UNKNOWN ) { entClasse++; continue; }
+                                for (size_t i = 0; i < reqs.size(); i++)
+                                {
+                                        items[i].address = reqs[i].addr;
+                                        items[i].size    = reqs[i].size;
+                                        total           += reqs[i].size;
+                                }
 
-                                // Amostra da 1a entidade valida: prova no logcat a cadeia
-                                // completa (classe/avatar/HP) de uma entidade real.
-                                if ( !sampleLogged )
+                                std::vector<uint8_t> blob;
+
+                                if (!Memory::ReadBatch(items.data(), items.size(), blob) || blob.size() < total)
+                                        blob.resize(total, 0);   // ponte falhou: tudo zero (entidades saem por 1 frame, igual a falha de leitura antiga)
+
+                                size_t off = 0;
+
+                                for (size_t i = 0; i < reqs.size(); i++)
+                                {
+                                        memcpy(reqs[i].out, blob.data() + off, reqs[i].size);
+                                        off += reqs[i].size;
+                                }
+
+                                reqs.clear();
+                        };
+
+                        const uint32_t kPtrSz = N32 ? 4u : 8u;
+
+                        auto addPtr = [kPtrSz](std::vector<BatchReq>& w, uintptr_t base, uintptr_t off, void* out)
+                        {
+                                if (base != 0)
+                                        w.push_back({ base + off, kPtrSz, out });
+                        };
+
+                        struct WalkSt
+                        {
+                                uintptr_t tf = 0, transObj = 0, matObj = 0, matList = 0, matIdx = 0;
+                                uintptr_t idx = 0;
+                                int iters = 0;
+                                bool ok = false;
+                                Vector3 acc = Vector3::Zero( );
+                                TMatrix tm = { };
+                                bool active = false;
+                        };
+
+                        struct EntWork
+                        {
+                                uintptr_t Entity = 0;
+                                bool alive = true;
+                                // nivel 1
+                                uintptr_t klass = 0, klassNamePtr = 0;
+                                uintptr_t avatarMgr = 0, priPool = 0, shadow = 0, profile = 0;
+                                uintptr_t cachedTF = 0, fireCol = 0, headNode = 0;
+                                uint8_t isBot = 0, isFemale = 0;
+                                // nivel 2
+                                uintptr_t avatar = 0, datas = 0, nick = 0;
+                                // nivel 3
+                                uintptr_t umaData = 0, hCur = 0, hMax = 0, weaponPtr = 0;
+                                int pose = 0, hpCur = 0, hpMax = 0, weaponId = -1, nameLen = 0;
+                                uint8_t isTeam = 0;
+                                // head collider chain
+                                uintptr_t hcTfc = 0, hcLoc = 0, hcH1 = 0, hcH2 = 0, hcH3 = 0;
+                                Vector3 headPos = Vector3::Zero( );
+                                uintptr_t headTf2 = 0;
+                                // walkers
+                                WalkSt feetWalk, headWalk;
+                                Vector3 feetPos = Vector3::Zero( );
+                                // nome
+                                uint16_t nameChars[48] = { 0 };
+                        };
+
+                        std::vector<EntWork> ents;
+                        ents.reserve(dictCount);
+
+                        std::vector<BatchReq> wave;
+
+                        // ---------- posicao da camera: UMA vez por frame ----------
+                        // (o codigo antigo re-liava a camera DENTRO do loop por
+                        // entidade — a mesma cadeia de 10+ leituras repetida N vezes)
+                        Vector3 MainPos = (MainCamera != 0)
+                                ? Transform::get_position_Injected(MainCamera, N32)
+                                : Vector3::Zero( );
+
+                        // ---------- ONDA 0: array base + ponteiros das entidades ----------
+                        uintptr_t itemsBase = EntityList->GetItems();
+                        if (itemsBase == 0)
+                        {
+                                ChainFailLog(ReadChain::EntityList,
+                                             "array de itens nulo (Match=0x%lX + 0x%lX)",
+                                             (unsigned long)Match, (unsigned long)Offsets::Match::m_AttackableEntities);
+                                break;
+                        }
+
+                        std::vector<uint64_t> itemPtrs(dictCount, 0);
+
+                        for (int i = 0; i < dictCount; i++)
+                                addPtr(wave, itemsBase, (N32 ? 0x4 : 0x8) * (uintptr_t)i, &itemPtrs[i]);
+                        RunWave(wave);
+
+                        for (int i = 0; i < dictCount; i++)
+                        {
+                                if (itemPtrs[i] == 0)
+                                        continue;
+
+                                EntWork e;
+                                e.Entity = (uintptr_t)itemPtrs[i];
+                                ents.push_back(e);
+                        }
+
+                        // ---------- ONDA 1a: klass (obj->klass, primeiro campo) ----------
+                        for (auto& e : ents)
+                                addPtr(wave, e.Entity, 0, &e.klass);
+                        RunWave(wave);
+
+                        // ---------- ONDA 1b: klass->name (klass lido na onda anterior) ----------
+                        for (auto& e : ents)
+                                addPtr(wave, e.klass, N32 ? 0x8 : 0x10, &e.klassNamePtr);
+                        RunWave(wave);
+
+                        // ---------- descarte por classe (antes do PlayerType UNKNOWN) ----------
+                        std::vector<EntWork> valid;
+                        valid.reserve(ents.size());
+
+                        for (auto& e : ents)
+                        {
+                                if (e.Entity == LocalPlayer) { entLocal++; continue; }
+                                if (e.klass == 0 || e.klassNamePtr == 0) { entClasse++; continue; }
+
+                                // Amostra da 1a entidade valida (mesmo proposito do log antigo)
+                                if (!sampleLogged)
                                 {
                                         sampleLogged = true;
-                                        uintptr_t sAv = ReadPtr( Entity + Offsets::Player::m_AvatarManager );
-                                        uintptr_t sAva = ( sAv != 0 ) ? ReadPtr( sAv + Offsets::AvatarManager::m_Avatar ) : 0;
-                                        uintptr_t sUMA = ( sAva != 0 ) ? ReadPtr( sAva + Offsets::UMAAvatarBase::umaData ) : 0;
-                                        uintptr_t sPri = ReadPtr( Entity + Offsets::ReplicationEntity::m_PRIDataPool );
-                                        uintptr_t sDat = ( sPri != 0 ) ? ReadPtr( sPri + Offsets::ReplicationEntity::m_Datas ) : 0;
-                                        uintptr_t sCur = ( sDat != 0 ) ? ReadPtr( sDat + Offsets::ReplicationEntity::HealthCurrentPtr ) : 0;
-                                        uintptr_t sMax = ( sDat != 0 ) ? ReadPtr( sDat + Offsets::ReplicationEntity::HealthMaxPtr ) : 0;
-                                        int sHPc = ( sCur != 0 ) ? g_FreeFireMemory.Read<int>( sCur + Offsets::ReplicationEntity::Value ) : -1;
-                                        int sHPm = ( sMax != 0 ) ? g_FreeFireMemory.Read<int>( sMax + Offsets::ReplicationEntity::Value ) : -1;
-                                        DiagLog( "[ENTITY] amostra ent=0x%lX classe=%s av=0x%lX avatar=0x%lX uma=0x%lX pri=0x%lX datas=0x%lX hp=%d/%d",
-                                                  ( unsigned long )Entity, Data::GetPlayerTypeName( type ),
-                                                  ( unsigned long )sAv, ( unsigned long )sAva, ( unsigned long )sUMA,
-                                                  ( unsigned long )sPri, ( unsigned long )sDat, sHPc, sHPm );
+                                        DiagLog("[ENTITY] amostra ent=0x%lX classe=%s",
+                                                (unsigned long)e.Entity, Data::GetPlayerTypeName(PLAYER_NETWORK));
                                 }
 
-                                seenThisFrame.insert( Entity );
+                                seenThisFrame.insert(e.Entity);
+                                valid.push_back(e);
+                        }
 
-                                uintptr_t m_AvatarManager = ReadPtr( Entity + Offsets::Player::m_AvatarManager );
-                                if ( m_AvatarManager == 0 ) { entAvatar++; continue; }
+                        ents.swap(valid);
 
-                                uintptr_t m_Avatar = ReadPtr( m_AvatarManager + Offsets::AvatarManager::m_Avatar );
-                                if ( m_Avatar == 0 ) { entAvatar++; continue; }
+                        // ---------- ONDA 2: ponteiros de nivel 1 ----------
+                        for (auto& e : ents)
+                        {
+                                addPtr(wave, e.Entity, Offsets::Player::m_AvatarManager, &e.avatarMgr);
+                                addPtr(wave, e.Entity, Offsets::ReplicationEntity::m_PRIDataPool, &e.priPool);
+                                addPtr(wave, e.Entity, Offsets::PlayerNetwork::m_ShadowState, &e.shadow);
+                                addPtr(wave, e.Entity, Offsets::PlayerNetwork::m_Profile, &e.profile);
+                                addPtr(wave, e.Entity, Offsets::PlayerTransformNode::m_CachedTransform, &e.cachedTF);
+                                addPtr(wave, e.Entity, Offsets::Player::m_fireColliders, &e.fireCol);
+                                addPtr(wave, e.Entity, Offsets::Player::HeadNode, &e.headNode);
 
-                                uintptr_t UMAData = ReadPtr( m_Avatar + Offsets::UMAAvatarBase::umaData );
-                                if ( UMAData == 0 ) { entAvatar++; continue; }
-
-                                // Sem filtro de visibilidade do mesh: IsVisible=0 (mesh oculto
-                                // em veiculo/animacao/revive/paraquedas) derrubava players
-                                // legitimos da ESP — "alguns players nao aparecem". Todo player
-                                // valido entra no snapshot; a visibilidade visual fica por
-                                // conta do VisibleCheck do aimbot/silent, nao da ESP.
-
-                                bool IsTeam = g_FreeFireMemory.Read<bool>( UMAData + Offsets::UMAData::isTeammate );
-                                // "Mostrar time" (ESP.ShowTeam): aliados entram no snapshot
-                                // marcados como IsTeammate — desenhados com cor de time e
-                                // nunca viram alvo do aimbot/silent. Desligado = filtro antigo.
-                                if ( IsTeam && !g_Globals.Visuals.ESP.ShowTeam ) { entTeam++; continue; }
-
-                                uintptr_t m_PRIDataPoolPtr = ReadPtr( Entity + Offsets::ReplicationEntity::m_PRIDataPool );
-                                if ( m_PRIDataPoolPtr == 0 ) { entPri++; continue; }
-
-                                uintptr_t dataArrayPtr = ReadPtr( m_PRIDataPoolPtr + Offsets::ReplicationEntity::m_Datas );
-                                if ( dataArrayPtr == 0 ) { entPri++; continue; }
-
-                                uintptr_t CurrentHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthCurrentPtr );
-                                uintptr_t MaxHealthptr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::HealthMaxPtr );
-                                if ( CurrentHealthptr == 0 || MaxHealthptr == 0 ) { entPri++; continue; }
-
-                                bool IsKnocked = false;
-                                uintptr_t ShadowBase = ReadPtr( Entity + Offsets::PlayerNetwork::m_ShadowState );
-                                if ( ShadowBase != 0 )
+                                if (e.Entity != 0)
                                 {
-                                        int PlayerPose = g_FreeFireMemory.Read<int>( ShadowBase + Offsets::ShadowState::TargetPhysXPose );
-                                        IsKnocked = ( PlayerPose == 8 );
+                                        wave.push_back({ e.Entity + Offsets::Player::IsClientBot, 1, &e.isBot });
+                                        wave.push_back({ e.Entity + Offsets::Player::IsFemale, 1, &e.isFemale });
+                                }
+                        }
+                        RunWave(wave);
+
+                        // ---------- ONDA 3: nivel 2 (avatar/datas/nick) ----------
+                        for (auto& e : ents)
+                        {
+                                addPtr(wave, e.avatarMgr, Offsets::AvatarManager::m_Avatar, &e.avatar);
+                                addPtr(wave, e.priPool, Offsets::ReplicationEntity::m_Datas, &e.datas);
+                                addPtr(wave, e.profile, Offsets::BaseProfileInfo::NickName, &e.nick);
+                        }
+                        RunWave(wave);
+
+                        // ---------- ONDA 4: nivel 3 (umaData/hp ptrs/weapon ptr) ----------
+                        for (auto& e : ents)
+                        {
+                                addPtr(wave, e.avatar, Offsets::UMAAvatarBase::umaData, &e.umaData);
+                                addPtr(wave, e.datas, Offsets::ReplicationEntity::HealthCurrentPtr, &e.hCur);
+                                addPtr(wave, e.datas, Offsets::ReplicationEntity::HealthMaxPtr, &e.hMax);
+                                addPtr(wave, e.datas, Offsets::ReplicationEntity::WeaponPtr, &e.weaponPtr);
+                        }
+                        RunWave(wave);
+
+                        // ---------- ONDA 5: valores (pose/hp/weapon/isTeam) ----------
+                        for (auto& e : ents)
+                        {
+                                if (e.shadow != 0)
+                                        wave.push_back({ e.shadow + Offsets::ShadowState::TargetPhysXPose, 4, &e.pose });
+                                if (e.hCur != 0)
+                                        wave.push_back({ e.hCur + Offsets::ReplicationEntity::Value, 4, &e.hpCur });
+                                if (e.hMax != 0)
+                                        wave.push_back({ e.hMax + Offsets::ReplicationEntity::Value, 4, &e.hpMax });
+                                if (e.weaponPtr != 0)
+                                        wave.push_back({ e.weaponPtr + Offsets::ReplicationEntity::Value, 4, &e.weaponId });
+                                if (e.umaData != 0)
+                                        wave.push_back({ e.umaData + Offsets::UMAData::isTeammate, 1, &e.isTeam });
+                        }
+                        RunWave(wave);
+
+                        // ---------- descartes (mesma ordem do loop antigo) ----------
+                        {
+                                std::vector<EntWork> keep;
+                                keep.reserve(ents.size());
+
+                                for (auto& e : ents)
+                                {
+                                        if (e.avatarMgr == 0 || e.avatar == 0 || e.umaData == 0) { entAvatar++; continue; }
+
+                                        bool IsTeam = (e.isTeam != 0);
+                                        if (IsTeam && !g_Globals.Visuals.ESP.ShowTeam) { entTeam++; continue; }
+
+                                        if (e.priPool == 0 || e.datas == 0 || e.hCur == 0 || e.hMax == 0) { entPri++; continue; }
+
+                                        if (e.hpMax == 0 || e.hpCur <= 0) { entHp++; continue; }
+
+                                        keep.push_back(e);
                                 }
 
-                                int CurrentHealth = g_FreeFireMemory.Read<int>( CurrentHealthptr + Offsets::ReplicationEntity::Value );
-                                int MaxHealth = g_FreeFireMemory.Read<int>( MaxHealthptr + Offsets::ReplicationEntity::Value );
-                                if ( MaxHealth == 0 || CurrentHealth <= 0 ) { entHp++; continue; }
+                                ents.swap(keep);
+                        }
 
-                                float HealthPercent = ( float )CurrentHealth / ( float )MaxHealth;
+                        // ---------- ONDA 6: nome (len e chars) ----------
+                        for (auto& e : ents)
+                        {
+                                if (e.isBot || e.nick == 0)
+                                        continue;
 
-                                uintptr_t WeaponPtr = ReadPtr( dataArrayPtr + Offsets::ReplicationEntity::WeaponPtr );
-                                // Falha transitoria do ponteiro de arma NAO derruba o player da
-                                // ESP (era um dos motivos de players sumirem): fica com
-                                // WeaponID=-1 e a linha da arma apenas nao e desenhada.
-                                int WeaponID = -1;
-                                if ( WeaponPtr != 0 )
-                                        WeaponID = g_FreeFireMemory.Read<int>( WeaponPtr + Offsets::ReplicationEntity::Value );
+                                wave.push_back({ e.nick + (N32 ? 0x8 : 0x10), 4, &e.nameLen });
+                        }
+                        RunWave(wave);
 
-                                // Name
-                                std::string nameStr = "BOT";
-                                bool IsClientBot = false;
-                                g_FreeFireMemory.Read<bool>( Entity + Offsets::Player::IsClientBot, IsClientBot );
-                                if ( !IsClientBot )
+                        for (auto& e : ents)
+                        {
+                                if (e.isBot || e.nick == 0)
+                                        continue;
+
+                                if (e.nameLen <= 0 || e.nameLen > 44)
+                                        continue;
+
+                                wave.push_back({
+                                        e.nick + (N32 ? 0xC : 0x14),
+                                        (uint32_t)(e.nameLen * 2),
+                                        e.nameChars });
+                        }
+                        RunWave(wave);
+
+                        auto Utf16ToStd = [](const uint16_t* chars, int len) -> std::string
+                        {
+                                std::string result;
+                                result.reserve((size_t)len);
+
+                                for (int i = 0; i < len; i++)
                                 {
-                                        uintptr_t profilePtr = ReadPtr( Entity + Offsets::PlayerNetwork::m_Profile );
-                                        if ( profilePtr != 0 )
+                                        uint16_t c = chars[i];
+
+                                        if (c == 0) break;
+
+                                        if (c < 0x80)
+                                                result.push_back((char)c);
+                                        else if (c < 0x800)
                                         {
-                                                uintptr_t PlayerName = ReadPtr( profilePtr + Offsets::BaseProfileInfo::NickName );
-                                                if ( PlayerName != 0 )
-                                                {
-                                                        if constexpr ( N32 )
-                                                        {
-                                                                nameStr = ObterStr( PlayerName + 0xC, g_FreeFireMemory.Read<int>( PlayerName + 0x8 ) );
-                                                        }
-                                                        else
-                                                        {
-                                                                nameStr = ObterStr( PlayerName + 0x14, g_FreeFireMemory.Read<int>( PlayerName + 0x10 ) );
-                                                        }
-                                                        if ( nameStr.empty( ) )
-                                                        {
-                                                                nameStr = XorStr( "BOT" );
-                                                        }
-                                                }
+                                                result.push_back((char)(0xC0 | (c >> 6)));
+                                                result.push_back((char)(0x80 | (c & 0x3F)));
+                                        }
+                                        else
+                                        {
+                                                result.push_back((char)(0xE0 | (c >> 12)));
+                                                result.push_back((char)(0x80 | ((c >> 6) & 0x3F)));
+                                                result.push_back((char)(0x80 | (c & 0x3F)));
                                         }
                                 }
 
-                                Vector3 PosHeadEntity = Transform::GetHeadPosition( Entity, N32 );
-                                if ( PosHeadEntity == Vector3::Zero( ) ) { entPos++; continue; }
+                                return result;
+                        };
 
-                                Vector3 PosEntity = Transform::GetPosition( Entity, N32 );
-                                if ( PosEntity == Vector3::Zero( ) ) { entPos++; continue; }
+                        // ---------- HEAD: cadeia do collider em ondas ----------
+                        // h2: collider transform + head transform (bases independentes, mesma onda)
+                        for (auto& e : ents)
+                        {
+                                addPtr(wave, e.fireCol, Offsets::GetPosWorld::ColliderTransform, &e.hcTfc);
+                                addPtr(wave, e.headNode, Offsets::PlayerTransformNode::Transform, &e.headTf2);
+                        }
+                        RunWave(wave);
 
-                                Vector3 MainPos = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
-                                float Distancia = ( MainPos != Vector3::Zero( ) ) ? Vector3::Distance( PosEntity, MainPos ) : 0.0f;
+                        // h3..h6: encadeia o collider
+                        for (auto& e : ents)
+                        {
+                                const uintptr_t headColliderOff = e.isFemale
+                                        ? Offsets::GetPosWorld::HeadColliderFemale
+                                        : Offsets::GetPosWorld::HeadColliderMale;
 
-                                Vector3 HeadWorld = PosHeadEntity + ( Vector3::Up( ) * 0.20f );
-                                Vector3 FeetWorld = PosEntity + ( Vector3::Down( ) * 0.1f );
+                                addPtr(wave, e.hcTfc, headColliderOff, &e.hcLoc);
+                        }
+                        RunWave(wave);
 
-                                // Projecao de leitura NAO pode descartar a entidade: se a view
-                                // matrix estiver ruim/rasgada por um frame (escrita concorrente do
-                                // jogo), descartar todas as entidades esvazia o snapshot e o ESP
-                                // some e volta. Guarda o mundo sempre; a projecao em tela fica
-                                // como fallback (congelado) e a reprojecao acontece no desenho.
-                                Vector3 HeadPos = W2S::World2Screen( ViewMatrix, HeadWorld );
-                                Vector3 EntityPos = W2S::World2Screen( ViewMatrix, FeetWorld );
-                                // Projecao so vale com tela real: no boot (antes do primeiro
-                                // render) ScreenWidth/Height sao 0 e W2S devolve (0,0) — gravar
-                                // isso no snapshot fazia os inimigos aparecerem amontoados no
-                                // canto do caminho congelado.
-                                bool projOk = ( ScreenWidth > 0 && ScreenHeight > 0 && HeadPos.Z > 0 && EntityPos.Z > 0 );
+                        for (auto& e : ents)
+                                addPtr(wave, e.hcLoc, Offsets::GetPosWorld::ColliderTransform, &e.hcH1);
+                        RunWave(wave);
+
+                        for (auto& e : ents)
+                                addPtr(wave, e.hcH1, Offsets::GetPosWorld::BoundsCenter_1, &e.hcH2);
+                        RunWave(wave);
+
+                        for (auto& e : ents)
+                                addPtr(wave, e.hcH2, Offsets::GetPosWorld::BoundsCenter_2, &e.hcH3);
+                        RunWave(wave);
+
+                        {
+                                // h7: o Vector3 final + prepara os walkers de fallback
+                                std::vector<BatchReq> w7;
+
+                                for (auto& e : ents)
+                                {
+                                        if (e.hcH3 != 0)
+                                                w7.push_back({ e.hcH3 + Offsets::GetPosWorld::BoundsCenter_3, sizeof(Vector3), &e.headPos });
+
+                                        // Fallback da cadeia (só se o collider NAO produziu head):
+                                        // walker pelo HeadNode, como no GetHeadPosition original
+                                        const bool colliderChainOk = (e.hcTfc != 0 && e.hcLoc != 0 &&
+                                                e.hcH1 != 0 && e.hcH2 != 0 && e.hcH3 != 0);
+
+                                        if (!colliderChainOk && e.headTf2 != 0)
+                                        {
+                                                e.headWalk.tf = e.headTf2;
+                                                e.headWalk.active = true;
+                                        }
+
+                                        // Feet: walker pelo cachedTransform
+                                        if (e.cachedTF != 0)
+                                        {
+                                                e.feetWalk.tf = e.cachedTF;
+                                                e.feetWalk.active = true;
+                                        }
+                                }
+
+                                RunWave(w7);
+                        }
+
+                        // ---------- WALKERS (feet + head fallback) em lockstep ----------
+                        // Reproduz o get_position_Injected: transObj -> matrix/index ->
+                        // matrix_list/matrix_indices -> composicao da cadeia de pais.
+                        std::vector<WalkSt*> walkers;
+
+                        for (auto& e : ents)
+                        {
+                                if (e.feetWalk.active) walkers.push_back(&e.feetWalk);
+                                if (e.headWalk.active) walkers.push_back(&e.headWalk);
+                        }
+
+                        // w1: transObj
+                        for (auto* w : walkers)
+                                addPtr(wave, w->tf, Offsets::GetPosWorld::transObj, &w->transObj);
+                        RunWave(wave);
+
+                        // w2: matrix + index
+                        for (auto* w : walkers)
+                        {
+                                addPtr(wave, w->transObj, Offsets::GetPosWorld::matrix, &w->matObj);
+                                addPtr(wave, w->transObj, Offsets::GetPosWorld::index, &w->idx);
+                        }
+                        RunWave(wave);
+
+                        // w3: matrix_list + matrix_indices
+                        for (auto* w : walkers)
+                        {
+                                addPtr(wave, w->matObj, Offsets::GetPosWorld::matrix_list, &w->matList);
+                                addPtr(wave, w->matObj, Offsets::GetPosWorld::matrix_indices, &w->matIdx);
+                        }
+                        RunWave(wave);
+
+                        // w4: posicao local + primeiro indice pai
+                        {
+                                struct W4 { WalkSt* w; };
+                                for (auto* w : walkers)
+                                {
+                                        if (w->matList == 0 || w->matIdx == 0)
+                                                continue;
+
+                                        w->ok = true;
+                                        wave.push_back({ w->matList + sizeof(TMatrix) * w->idx, sizeof(Vector3), &w->acc });
+                                }
+                                RunWave(wave);
+
+                                std::vector<BatchReq> w4b;
+                                for (auto* w : walkers)
+                                {
+                                        if (!w->ok)
+                                                continue;
+
+                                        // o indice inicial e um valor (nao ponteiro): lido como uint32
+                                        w4b.push_back({ w->matIdx + sizeof(int) * w->idx, 4, &w->idx });
+                                }
+                                RunWave(w4b);
+                        }
+
+                        // w5+: um nivel de hierarquia por onda (todas as entidades juntas)
+                        for (int level = 0; level < 60; level++)
+                        {
+                                bool any = false;
+
+                                for (auto* w : walkers)
+                                        if (w->ok && (int)w->idx >= 0 && w->iters < 60)
+                                                any = true;
+
+                                if (!any) break;
+
+                                struct TmReq { WalkSt* w; };
+                                std::vector<TmReq> lvl;
+
+                                for (auto* w : walkers)
+                                {
+                                        if (!w->ok || (int)w->idx < 0 || w->iters >= 60)
+                                                continue;
+
+                                        lvl.push_back({ w });
+                                }
+
+                                // TMatrix + proximo indice: bases distintas (matrix_list /
+                                // matrix_indices), podem ir na MESMA onda
+                                for (auto& r : lvl)
+                                {
+                                        wave.push_back({ r.w->matList + sizeof(TMatrix) * r.w->idx, sizeof(TMatrix), &r.w->tm });
+                                }
+                                // proximo indice depois (precisa do TMatrix? nao: o proximo
+                                // indice depende so do indice atual, que ja temos)
+                                std::vector<BatchReq> nextIdx;
+                                for (auto& r : lvl)
+                                        nextIdx.push_back({ r.w->matIdx + sizeof(int) * r.w->idx, 4, &r.w->idx });
+
+                                RunWave(wave);
+                                RunWave(nextIdx);
+
+                                // compor localmente (mesma matematica do get_position_Injected)
+                                for (auto& r : lvl)
+                                {
+                                        WalkSt* w = r.w;
+                                        TMatrix tm = w->tm;
+
+                                        float rotX = tm.Rotation.x;
+                                        float rotY = tm.Rotation.y;
+                                        float rotZ = tm.Rotation.z;
+                                        float rotW = tm.Rotation.w;
+
+                                        float scaleX = w->acc.X * tm.Scale.x;
+                                        float scaleY = w->acc.Y * tm.Scale.y;
+                                        float scaleZ = w->acc.Z * tm.Scale.z;
+
+                                        Vector3 next;
+                                        next.X = tm.Position.x + scaleX + ( scaleX * ( ( rotY * rotY * -2.0 ) - ( rotZ * rotZ * 2.0 ) ) ) + ( scaleY * ( ( rotW * rotZ * -2.0 ) - ( rotY * rotX * -2.0 ) ) ) + ( scaleZ * ( ( rotZ * rotX * 2.0 ) - ( rotW * rotY * -2.0 ) ) );
+                                        next.Y = tm.Position.y + scaleY + ( scaleX * ( ( rotX * rotY * 2.0 ) - ( rotW * rotZ * -2.0 ) ) ) + ( scaleY * ( ( rotZ * rotZ * -2.0 ) - ( rotX * rotX * 2.0 ) ) ) + ( scaleZ * ( ( rotW * rotX * -2.0 ) - ( rotZ * rotY * -2.0 ) ) );
+                                        next.Z = tm.Position.z + scaleZ + ( scaleX * ( ( rotW * rotY * -2.0 ) - ( rotX * rotZ * -2.0 ) ) ) + ( scaleY * ( ( rotY * rotZ * 2.0 ) - ( rotW * rotX * -2.0 ) ) ) + ( scaleZ * ( ( rotX * rotX * -2.0 ) - ( rotY * rotY * 2.0 ) ) );
+
+                                        w->acc = next;
+                                        w->iters++;
+                                }
+                        }
+
+                        for (auto& e : ents)
+                        {
+                                e.feetPos = (e.feetWalk.ok && e.feetWalk.acc != Vector3::Zero( ))
+                                        ? e.feetWalk.acc
+                                        : Vector3::Zero( );
+
+                                if (e.headPos == Vector3::Zero( ) && e.headWalk.ok)
+                                        e.headPos = (e.headWalk.acc != Vector3::Zero( ))
+                                                ? e.headWalk.acc
+                                                : Vector3::Zero( );
+                        }
+
+                        // ---------- montagem (mesma semantica do loop antigo) ----------
+                        for (auto& e : ents)
+                        {
+                                if (e.headPos == Vector3::Zero( )) { entPos++; continue; }
+                                if (e.feetPos == Vector3::Zero( )) { entPos++; continue; }
+
+                                bool IsKnocked = (e.shadow != 0 && e.pose == 8);
+                                int CurrentHealth = e.hpCur;
+                                int MaxHealth = e.hpMax;
+                                float HealthPercent = (float)CurrentHealth / (float)MaxHealth;
+
+                                int WeaponID = -1;
+                                if (e.weaponPtr != 0)
+                                        WeaponID = e.weaponId;
+
+                                std::string nameStr = XorStr("BOT");
+                                if (!e.isBot && e.nick != 0 && e.nameLen > 0 && e.nameLen <= 44)
+                                {
+                                        std::string converted = Utf16ToStd(e.nameChars, e.nameLen);
+                                        if (!converted.empty())
+                                                nameStr = converted;
+                                }
+
+                                Vector3 PosHeadEntity = e.headPos;
+                                Vector3 PosEntity = e.feetPos;
+
+                                float Distancia = (MainPos != Vector3::Zero( ))
+                                        ? Vector3::Distance(PosEntity, MainPos)
+                                        : 0.0f;
+
+                                Vector3 HeadWorld = PosHeadEntity + (Vector3::Up( ) * 0.20f);
+                                Vector3 FeetWorld = PosEntity + (Vector3::Down( ) * 0.1f);
+
+                                Vector3 HeadPos = W2S::World2Screen(ViewMatrix, HeadWorld);
+                                Vector3 EntityPos = W2S::World2Screen(ViewMatrix, FeetWorld);
+                                bool projOk = (ScreenWidth > 0 && ScreenHeight > 0 && HeadPos.Z > 0 && EntityPos.Z > 0);
 
                                 PlayerData pd;
                                 pd.HeadScreen = projOk ? HeadPos : Vector3::Zero( );
@@ -800,16 +1192,16 @@ void Data::ReadLoop( )
                                 pd.FeetWorld = FeetWorld;
                                 pd.HealthPercent = HealthPercent;
                                 pd.IsKnocked = IsKnocked;
-                                pd.IsTeammate = IsTeam;
+                                pd.IsTeammate = (e.isTeam != 0);
                                 pd.WeaponID = WeaponID;
-                                pd.Entity = Entity;
-                                pd.UMAData = UMAData;
+                                pd.Entity = e.Entity;
+                                pd.UMAData = e.umaData;
                                 pd.Name = nameStr;
                                 pd.Distance = Distancia;
-                                pd.CurrentHealth = ( short )CurrentHealth;
-                                pd.MaxHealth = ( short )MaxHealth;
+                                pd.CurrentHealth = (short)CurrentHealth;
+                                pd.MaxHealth = (short)MaxHealth;
                                 pd.LastSeenTick = GetTickCount64( );
-                                tempPlayers.push_back( pd );
+                                tempPlayers.push_back(pd);
                                 entOk++;
                         }
 
@@ -988,8 +1380,8 @@ template void Data::ReadLoop<false, true>( );    // v31 64-bit
 
 GameContext Data::GetContext( )
 {
-	std::lock_guard<std::mutex> lock( m_Mutex );
-	return m_Context;
+        std::lock_guard<std::mutex> lock( m_Mutex );
+        return m_Context;
 }
 
 void Data::Draw( int width, int height, bool N32, bool V31 )
@@ -1031,8 +1423,8 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 StartReadThread( );
         }
 
-		// BYPASS pra sem auth
-		g_Globals.General.EnableFuncs = 1;
+                // BYPASS pra sem auth
+                g_Globals.General.EnableFuncs = 1;
         if ( g_Globals.General.EnableFuncs == 0 )
         {
                 static LONGLONG lastGateLog = 0;
@@ -1096,1531 +1488,1531 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 return;
         }
 
-	auto ReadPtr = [ N32 ] ( uintptr_t addr ) -> uintptr_t
-	{
-		return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
-	};
+        auto ReadPtr = [ N32 ] ( uintptr_t addr ) -> uintptr_t
+        {
+                return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
+        };
 
-	auto WritePtr = [ N32 ] ( uintptr_t addr, uintptr_t val )
-	{
-		N32 ? g_FreeFireMemory.Write<uint32_t>( addr, ( uint32_t )val ) : g_FreeFireMemory.Write<uint64_t>( addr, ( uint64_t )val );
-	};
+        auto WritePtr = [ N32 ] ( uintptr_t addr, uintptr_t val )
+        {
+                N32 ? g_FreeFireMemory.Write<uint32_t>( addr, ( uint32_t )val ) : g_FreeFireMemory.Write<uint64_t>( addr, ( uint64_t )val );
+        };
 
-	const auto& ESP = g_Globals.Visuals.ESP;
-	const auto& AimCfg = g_Globals.AimBot;
-	const float fovSq = AimCfg.Fov * AimCfg.Fov;
-	const float silentFovSq = g_Globals.Silent.Fov * g_Globals.Silent.Fov;
+        const auto& ESP = g_Globals.Visuals.ESP;
+        const auto& AimCfg = g_Globals.AimBot;
+        const float fovSq = AimCfg.Fov * AimCfg.Fov;
+        const float silentFovSq = g_Globals.Silent.Fov * g_Globals.Silent.Fov;
 
-	ImDrawList* DL = ImGui::GetForegroundDrawList( );
-	const ImVec2 screenCenter( ( float )ScreenWidth * 0.5f, ( float )ScreenHeight * 0.5f );
+        ImDrawList* DL = ImGui::GetForegroundDrawList( );
+        const ImVec2 screenCenter( ( float )ScreenWidth * 0.5f, ( float )ScreenHeight * 0.5f );
 
-	float ClosestDistSq = FLT_MAX;
-	uintptr_t ClosestEntity = 0;
-	short ClosestHP = 0;
+        float ClosestDistSq = FLT_MAX;
+        uintptr_t ClosestEntity = 0;
+        short ClosestHP = 0;
 
-	// Alvo do silent: selecao independente, com FOV/distancia proprios
-	// (nao herda nada do AimCfg).
-	float SilentDistSq = FLT_MAX;
-	uintptr_t SilentClosestEntity = 0;
+        // Alvo do silent: selecao independente, com FOV/distancia proprios
+        // (nao herda nada do AimCfg).
+        float SilentDistSq = FLT_MAX;
+        uintptr_t SilentClosestEntity = 0;
 
-	int enemyCountFrame = 0;
-	ImVec2 closestHead2D( 0.f, 0.f );
-	float minDistance2Dsq = FLT_MAX;
+        int enemyCountFrame = 0;
+        ImVec2 closestHead2D( 0.f, 0.f );
+        float minDistance2Dsq = FLT_MAX;
 
-	int _lastEnemyCount = -1;
-	std::string _cachedEnemyText = XorStr( "Enemies Detected: 0" );
+        int _lastEnemyCount = -1;
+        std::string _cachedEnemyText = XorStr( "Enemies Detected: 0" );
 
-	static Matrix4x4 CurrentMatrix;
+        static Matrix4x4 CurrentMatrix;
 
-	static uintptr_t BS_LastTarget = 0;
-	static uintptr_t BS_SavedNeck = 0;
-	static uintptr_t BS_SavedHip = 0;
-	static uintptr_t BS_NeckAddr = 0;
-	static uintptr_t BS_HipAddr = 0;
-	static bool BS_Applied = false;
-	static bool BS_ActiveByCursor = false;
+        static uintptr_t BS_LastTarget = 0;
+        static uintptr_t BS_SavedNeck = 0;
+        static uintptr_t BS_SavedHip = 0;
+        static uintptr_t BS_NeckAddr = 0;
+        static uintptr_t BS_HipAddr = 0;
+        static bool BS_Applied = false;
+        static bool BS_ActiveByCursor = false;
 
-	auto BS_Restore = [ & ] ( )
-	{
-		if ( BS_Applied && BS_LastTarget && BS_NeckAddr && BS_HipAddr )
-		{
-			WritePtr( BS_NeckAddr, BS_SavedNeck );
-			WritePtr( BS_HipAddr, BS_SavedHip );
-		}
-		BS_Applied = false;
-		BS_LastTarget = 0;
-		BS_SavedNeck = 0;
-		BS_SavedHip = 0;
-		BS_NeckAddr = 0;
-		BS_HipAddr = 0;
-	};
+        auto BS_Restore = [ & ] ( )
+        {
+                if ( BS_Applied && BS_LastTarget && BS_NeckAddr && BS_HipAddr )
+                {
+                        WritePtr( BS_NeckAddr, BS_SavedNeck );
+                        WritePtr( BS_HipAddr, BS_SavedHip );
+                }
+                BS_Applied = false;
+                BS_LastTarget = 0;
+                BS_SavedNeck = 0;
+                BS_SavedHip = 0;
+                BS_NeckAddr = 0;
+                BS_HipAddr = 0;
+        };
 
-	auto BS_Apply = [ & ] ( uintptr_t ent ) -> bool
-	{
-		if ( ent == 0 ) return false;
+        auto BS_Apply = [ & ] ( uintptr_t ent ) -> bool
+        {
+                if ( ent == 0 ) return false;
 
-		uintptr_t neckAddr = ent + Offsets::Player::m_HipNode;
-		uintptr_t hipAddr = ent + Offsets::Player::m_BloodEffectNode;
-		if ( g_Globals.AimBot.Target == 1 )
-			hipAddr = ent + Offsets::Player::m_RightArmNode;
+                uintptr_t neckAddr = ent + Offsets::Player::m_HipNode;
+                uintptr_t hipAddr = ent + Offsets::Player::m_BloodEffectNode;
+                if ( g_Globals.AimBot.Target == 1 )
+                        hipAddr = ent + Offsets::Player::m_RightArmNode;
 
-		uintptr_t neckVal = ReadPtr( neckAddr );
-		uintptr_t hipVal = ReadPtr( hipAddr );
-		if ( neckVal == 0 || hipVal == 0 ) return false;
+                uintptr_t neckVal = ReadPtr( neckAddr );
+                uintptr_t hipVal = ReadPtr( hipAddr );
+                if ( neckVal == 0 || hipVal == 0 ) return false;
 
-		BS_NeckAddr = neckAddr;
-		BS_HipAddr = hipAddr;
-		BS_SavedNeck = neckVal;
-		BS_SavedHip = hipVal;
+                BS_NeckAddr = neckAddr;
+                BS_HipAddr = hipAddr;
+                BS_SavedNeck = neckVal;
+                BS_SavedHip = hipVal;
 
-		WritePtr( neckAddr, hipVal );
-		WritePtr( hipAddr, neckVal );
+                WritePtr( neckAddr, hipVal );
+                WritePtr( hipAddr, neckVal );
 
-		BS_LastTarget = ent;
-		BS_Applied = true;
-		return true;
-	};
+                BS_LastTarget = ent;
+                BS_Applied = true;
+                return true;
+        };
 
-	if ( !AimCfg.Enabled && BS_Applied )
-	{
-		BS_Restore( );
-		BS_ActiveByCursor = false;
-	}
+        if ( !AimCfg.Enabled && BS_Applied )
+        {
+                BS_Restore( );
+                BS_ActiveByCursor = false;
+        }
 
-	/* Se o perfil nao preencheu GameVarDef_TypeInfo (ex: v8a vazio),
+        /* Se o perfil nao preencheu GameVarDef_TypeInfo (ex: v8a vazio),
     * pula — sem isso lia o proprio ELF (0x464C457F) como TypeInfo. */
     uintptr_t GameVar_TI = ( Offsets::GameVarDef::GameVarDef_TypeInfo != 0 )
                 ? ReadPtr( Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo ) : 0;
     uintptr_t GameVar = ( GameVar_TI != 0 )
                 ? ReadPtr( GameVar_TI + Offsets::AccessClass ) : 0;
 
-	// --- BugarPixel ---
-	if ( GameVar != 0 )
-	{
-		static bool lastBugarPixelState = false;
-		float currentValue = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold );
-		if ( g_Globals.Misc.Exploits.LocalPlayer.BugarPixel )
-		{
-			if ( currentValue != 0.0f )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 0.0f );
-		}
-		else
-		{
-			if ( lastBugarPixelState )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 1.5f );
-		}
-		lastBugarPixelState = g_Globals.Misc.Exploits.LocalPlayer.BugarPixel;
-
-		// --- Precision ---
-		static bool lastPrecisionState = false;
-		if ( g_Globals.Misc.Exploits.LocalPlayer.Precision )
-		{
-			float curRotMin = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin );
-			float curRotMax = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax );
-			float curAimMin = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin );
-			float curAimMax = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax );
-
-			if ( curRotMin != 15.0625f )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin, 15.0625f );
-			if ( curRotMax != 3.40939e-05f )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax, 3.40939e-05f );
-			if ( curAimMin != 15.125f )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin, 15.125f );
-			if ( curAimMax != 3184.0f )
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax, 3184.0f );
-		}
-		else
-		{
-			if ( lastPrecisionState )
-			{
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin, 15.0f );
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax, 35.0f );
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin, 10.0f );
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax, 20.0f );
-			}
-		}
-		lastPrecisionState = g_Globals.Misc.Exploits.LocalPlayer.Precision;
-
-		// --- BackJump ---
-		static bool LastBackJumpState = false;
-		bool AccelerationOnFallingValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling );
-		bool FallingSwapWeaponValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon );
-		if ( g_Globals.Misc.Exploits.LocalPlayer.BackJump )
-		{
-			if ( AccelerationOnFallingValue == true || FallingSwapWeaponValue == false )
-			{
-				g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, false );
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
-			}
-		}
-		else
-		{
-			if ( LastBackJumpState )
-			{
-				g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, true );
-				g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
-			}
-		}
-		LastBackJumpState = g_Globals.Misc.Exploits.LocalPlayer.BackJump;
-	}
-
-	// ==================== Snapshot ====================
-
-	std::vector<PlayerData> snapshot;
-	GameContext ctx;
-	bool snapshotFresh = false;
-	{
-		std::lock_guard<std::mutex> lock( m_Mutex );
-		snapshot = m_Players;
-		ctx = m_Context;
-		snapshotFresh = m_SnapshotFresh;
-	}
-
-	// ==================== Watchdog de recuperacao (ESP nunca desliga) ====================
-	// Se o snapshot nao fica fresco por ~2s, o processo do jogo provavelmente
-	// reiniciou ou o CR3 envelheceu. Acoes, sem depender do usuario:
-	//   < 6s  -> RefreshCR3 (barato, 1x/seg)
-	//   >= 6s -> RestartAsync (re-localiza a base; single-flight + cooldown)
-	// Se a thread de leitura morreu (crash fora do alcance do try/catch do
-	// ReadLoop), recria a thread aqui — a ESP se recupera sozinha.
-	if ( !snapshotFresh )
-	{
-		LONGLONG staleMs = GetTickCount64( ) - m_LastFreshTick.load( );
-		if ( staleMs > 1500 )
-		{
-			static LONGLONG lastWatchdogAct = 0;
-			LONGLONG nowWd = GetTickCount64( );
-			if ( nowWd - lastWatchdogAct > 1000 )
-			{
-				lastWatchdogAct = nowWd;
-				if ( staleMs > 4000 )
-				{
-					DiagLog( "[diag] watchdog: %lldms sem leitura fresca — restart forcado", ( long long )staleMs );
-					g_FreeFireMemory.RestartAsync( );
-				}
-				else
-				{
-					Memory::RefreshCR3( );
-				}
-			}
-			if (m_ThreadValid && !m_Running.load())
-			{
-				pthread_join(
-					m_ThreadHandle,
-					nullptr
-				);
-
-				m_ThreadValid = false;
-
-				DiagLog(
-					"[diag] watchdog: thread de leitura morta — recriando"
-				);
-
-				StartReadThread();
-			}
-		}
-	}
-
-	uintptr_t localPlayer = ctx.LocalPlayer;
-	uintptr_t MainCamera = ctx.MainCamera;
-	Matrix4x4 ViewMatrix = ctx.ViewMatrix;
-	bool IsObserving = ctx.IsObserving;
-
-	// ==================== View Matrix ao vivo (espelho do FF) ====================
-	// O cheat de referencia relê a view matrix a cada frame no loop de desenho;
-	// por isso o ESP dele reprojeta SEMPRE com a câmera atual e nunca fica
-	// grudado quando a leitura de entidades engasga. Aqui a releitura usa apenas
-	// a cadeia de câmera (MatchGame -> controller -> camera -> cachedPtr) com o
-	// mesmo vetor de offsets do ReadLoop; se falhar, fica a matriz do snapshot;
-	// se as duas falharem, cai no caminho congelado abaixo.
-	if ( ctx.MatchGame != 0 )
-	{
-		uintptr_t ccm = ReadPtr( ctx.MatchGame + Offsets::MatchGame::m_CameraControllerManager );
-		if ( ccm != 0 )
-		{
-			uintptr_t cam = ReadPtr( ccm + Offsets::CameraControllerManager::m_Camera );
-			if ( cam != 0 )
-			{
-				uintptr_t cached = ReadPtr( cam + Offsets::Camera::m_CachedPtr );
-				if ( cached != 0 )
-				{
-					Matrix4x4 live = g_FreeFireMemory.Read<Matrix4x4>( cached + Offsets::Camera::ViewMatrix );
-					if ( IsValidViewMatrix( live ) )
-					{
-						ViewMatrix = live;
-						{
-							std::lock_guard<std::mutex> lock( m_Mutex );
-							m_Context.ViewMatrix = live;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if ( localPlayer == 0 || !IsValidViewMatrix( ViewMatrix ) )
-	{
-		// Contexto invalido (transicao de partida/lobby/loading): mesmo sem
-		// localPlayer/view matrix, desenha o overlay do ultimo snapshot (posicoes
-		// de tela congeladas) para o ESP nao desligar do nada. Exploits e aimbot
-		// nao rodam nesse caminho.
-		static LONGLONG lastFrozenLog = 0;
-		LONGLONG now = GetTickCount64( );
-		if ( now - lastFrozenLog > 1000 )
-		{
-			lastFrozenLog = now;
-			DiagLog( "[diag] frozen: localPlayer=%llx matrixValid=%d snapshot=%d",
-				( unsigned long long )localPlayer, IsValidViewMatrix( ViewMatrix ) ? 1 : 0, ( int )snapshot.size( ) );
-		}
-		DrawFrozenEsp( ViewMatrix );
-		return;
-	}
-
-	Silent::UpdateViewMatrix( ViewMatrix );
-
-	// ==================== Ghost Skeleton Rendering ====================
-
-	if ( ghostSkeletonExists )
-	{
-		Vector3 world = ghostSkeletonPos;
-		Vector3 screen = W2S::World2Screen( ViewMatrix, world );
-
-		if ( W2S::IsOnScreen( screen ) )
-		{
-			float size = 10.0f;
-			ImColor color = ImColor( 0.f, 1.f, 1.f, 1.f );
-
-			DL->AddLine( ImVec2( screen.X, screen.Y - size ), ImVec2( screen.X, screen.Y + size ), color, 2.0f );
-			DL->AddLine( ImVec2( screen.X - size, screen.Y ), ImVec2( screen.X + size, screen.Y ), color, 2.0f );
-		}
-	}
-
-	// ==================== FastMedkit ====================
-
-	uintptr_t PlayerAttributes = ReadPtr( localPlayer + Offsets::Player::m_Attributes );
-
-	// ==================== Atributar Armas ====================
-	if (g_Globals.Misc.Exploits.LocalPlayer.AtributarArma)
-	{
-		if (PlayerAttributes != 0)
-		{
-			// Níveis interpolados do original(1.0) até o level max(0.75)
-			float fireIntervalLevels[4] = { 0.90f, 0.85f, 0.75f, 0.65f };
-			int level = g_Globals.Misc.Exploits.LocalPlayer.AtributarArmaLevel;
-			if (level < 0 || level > 3) level = 0;
-			
-			g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, fireIntervalLevels[level]);
-		}
-	}
-	else
-	{
-		if (PlayerAttributes != 0)
-		{
-			g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, 1.0f);
-		}
-	}
-  	
-  	// ==================== Ghost Toggle ====================
-
-	bool ghostKeyHeld = ( GetAsyncKeyState( g_Globals.AimBot.ghostkey ) & 0x8000 );
-	if ( g_Globals.AimBot.ghost )
-	{
-		if ( ghostKeyHeld && !ghostActive )
-		{
-			ghostActive = true;
-			g_FreeFireMemory.Write<bool>( localPlayer + Offsets::Player::m_WaitForForceSync, true );
-			ghostSkeletonPos = Transform::GetPosition( localPlayer, N32 );
-			ghostSkeletonExists = true;
-		}
-		else if ( !ghostKeyHeld && ghostActive )
-		{
-			ghostActive = false;
-			g_FreeFireMemory.Write<bool>( localPlayer + Offsets::Player::m_WaitForForceSync, false );
-			ghostSkeletonExists = false;
-		}
-	}
-	else
-	{
-		ghostActive = false;
-		ghostSkeletonExists = false;
-	}
-
-	// ==================== TelaParada ====================
-	if ( g_Globals.Misc.Exploits.LocalPlayer.telaparada )
-	{
-		uintptr_t userControl = ReadPtr( localPlayer + Offsets::Player::m_UserControl );
-		if ( userControl != 0 )
-		{
-			uintptr_t axisDataArray = ReadPtr( userControl + Offsets::UserControlHandler::m_AxisData );
-			if ( axisDataArray != 0 )
-			{
-				uintptr_t moveAxisData = ReadPtr( axisDataArray + ( N32 ? 0x10 : 0x20 ) );
-				if ( moveAxisData != 0 )
-				{
-					bool isTouched = g_FreeFireMemory.Read<bool>( moveAxisData + Offsets::UserControlHandler::m_IsTouched );
-					if ( isTouched )
-					{
-						g_FreeFireMemory.Write<bool>( userControl + Offsets::UserControlHandler::m_LockFingerInDashArea, false );
-						g_FreeFireMemory.Write<bool>( userControl + Offsets::UserControlHandler::m_DashByMovingJoystick, true );
-						g_FreeFireMemory.Write<int>( userControl + Offsets::UserControlHandler::m_FingerInDashArea, 1 );
-					}
-					else
-					{
-						g_FreeFireMemory.Write<int>( userControl + Offsets::UserControlHandler::m_FingerInDashArea, 0 );
-					}
-				}
-			}
-		}
-	}
-
-	// ==================== ESP Rendering Loop ====================
-
-	if ( snapshot.empty( ) )
-	{
-		Skeleton::ClearCache( );
-	}
-
-
-	const float centerX = ( float )ScreenWidth * 0.5f;
-	const float centerY = ( float )ScreenHeight * 0.5f;
-
-	// ==================== Aimbot/Silent target selection ====================
-	// Desacoplado do loop de render: roda mesmo com "ESP Player" (master do
-	// Visuals.ESP) desligado, porque silent, boneswap, magnet e rage dependem
-	// de ClosestEntity. Só mira quando o snapshot é fresco (leitura do frame
-	// atual). Em falha transitória o ESP continua desenhando a posição
-	// congelada, mas o aimbot não trava em alvo antigo — evita tiro que
-	// "acerta" e não conta dano.
-	if ( AimCfg.Enabled || g_Globals.Silent.Enabled || AimCfg.aimmagnect )
-	{
-		for ( size_t i = 0; i < snapshot.size( ); i++ )
-		{
-			const auto& p = snapshot [ i ];
-
-			// Aliado nunca vira alvo — ShowTeam so afeta o desenho da ESP,
-			// nunca a selecao de alvo do aimbot/silent/magnet.
-			if ( p.IsTeammate ) continue;
-
-			if ( snapshotFresh && p.Distance >= 0 && p.Distance <= AimCfg.MaxDistance )
-			{
-				enemiesvisible = true;
-
-				// Visible check
-				if ( g_Globals.AimBot.VisibleCheck )
-				{
-					bool anyVisible = false;
-
-					uintptr_t aimAssist = ReadPtr( localPlayer + Offsets::Player::m_AimAssist );
-					if ( aimAssist != 0 )
-					{
-						uintptr_t targetInfo = ReadPtr( aimAssist + Offsets::AimAssistAutoLock::m_TargetHeuristic );
-						if ( targetInfo != 0 )
-							anyVisible = true;
-					}
-
-					uintptr_t aimAssistSighting = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
-					if ( aimAssistSighting != 0 )
-					{
-						uintptr_t targetInfo = ReadPtr( aimAssistSighting + Offsets::AimAssistAutoLock::m_TargetHeuristic );
-						if ( targetInfo != 0 )
-							anyVisible = true;
-					}
-
-					if ( !anyVisible )
-					{
-						enemiesvisible = false;
-						continue;
-					}
-				}
-
-				// Ignore bots and knocked
-				bool IsClientBot = false;
-				g_FreeFireMemory.Read<bool>( p.Entity + Offsets::Player::IsClientBot, IsClientBot );
-
-				if ( ( !AimCfg.IgnoreKnocked || !p.IsKnocked ) && ( !AimCfg.IgnoreBots || !IsClientBot ) )
-				{
-					float dx = p.HeadScreen.X - centerX;
-					float dy = p.HeadScreen.Y - centerY;
-					float crosshairDistSq = dx * dx + dy * dy;
-
-					if ( crosshairDistSq < fovSq && crosshairDistSq < ClosestDistSq )
-					{
-						ClosestDistSq = crosshairDistSq;
-						ClosestEntity = p.Entity;
-						ClosestHP = p.CurrentHealth;
-					}
-				}
-			}
-
-			// Alvo do silent: config propria (Silent.Fov e Silent.MaxDistance),
-			// sem VisibleCheck e sem IgnoreKnocked/IgnoreBots do aimbot.
-			if ( g_Globals.Silent.Enabled && snapshotFresh && p.Distance >= 0 && p.Distance <= g_Globals.Silent.MaxDistance )
-			{
-				float sdx = p.HeadScreen.X - centerX;
-				float sdy = p.HeadScreen.Y - centerY;
-				float silentCrosshairDistSq = sdx * sdx + sdy * sdy;
-
-				if ( silentCrosshairDistSq < silentFovSq && silentCrosshairDistSq < SilentDistSq )
-				{
-					SilentDistSq = silentCrosshairDistSq;
-					SilentClosestEntity = p.Entity;
-				}
-			}
-		}
-	}
-
-	// Partida ativa (localPlayer + view matrix validos): desenha o snapshot
-	// SEMPRE, mesmo quando a leitura de entidades engasga por segundos — as
-	// posicoes de mundo congeladas sao reprojetadas com a camera ao vivo e o
-	// ESP segue os inimigos em vez de sumir. O snapshot so desaparece quando o
-	// ReadLoop realmente limpa (lobby-clear 1200 frames sem Match / empty-clear
-	// 900 frames vazios), ou seja, quando a partida de fato acabou. O watchdog
-	// acima recupera a leitura viva em paralelo.
-	for ( size_t i = 0; i < snapshot.size( ); i++ )
-	{
-		const auto& p = snapshot [ i ];
-
-		if ( ESP.RenderDistance > 0 && p.Distance > ESP.RenderDistance ) continue;
-
-		// Master "ESP Player": so controla o desenho. Aimbot/silent ja
-		// selecionaram alvo no bloco acima e continuam funcionando.
-		if ( !ESP.Enabled ) continue;
-
-		// Isolamento por entidade: uma entidade/skeleton com problema nunca
-		// pode abortar o resto do frame — que roda magnet, boneswap, o feed
-		// do silent e o rage abaixo. A ESP pula a entidade e segue; aimbot
-		// e silent ficam imunes a falha de desenho da ESP (e vice-versa).
-		try
-		{
-			DrawEspEntityOverlay( p, DL, ESP, ViewMatrix, N32, V31, true );
-		}
-		catch ( ... )
-		{
-			static LONGLONG lastSkipLog = 0;
-			LONGLONG nowSkip = GetTickCount64( );
-			if ( nowSkip - lastSkipLog > 5000 )
-			{
-				lastSkipLog = nowSkip;
-				DiagLog( "[diag] esp: entidade %zu pulada (excecao no desenho)", ( size_t )i );
-			}
-		}
-
-		// --- Enemy counter (aliados de time nao contam) ---
-		if ( ESP.Enemy && !p.IsTeammate )
-		{
-			enemyCountFrame++;
-			float dx = p.HeadScreen.X - centerX;
-			float dy = p.HeadScreen.Y - centerY;
-			float d2 = dx * dx + dy * dy;
-			if ( d2 < minDistance2Dsq && p.Distance < ESP.RenderDistance )
-			{
-				minDistance2Dsq = d2;
-				closestHead2D = ImVec2( p.HeadScreen.X, p.HeadScreen.Y );
-			}
-		}
-	} // end for entities
-
-	// ==================== Skeleton Cleanup ====================
-	{
-		std::unordered_set<uintptr_t> activeEntities;
-		for ( const auto& p : snapshot )
-			activeEntities.insert( p.Entity );
-		Skeleton::CleanupCache( activeEntities );
-	}
-
-	// ==================== Watermark ====================
-
-	if ( ESP.Enabled && ESP.Watermark )
-	{
-		ImGui::PushFont( Fonts::Verdana );
-
-		const char* text =  "STORM CHEATS" ;
-		float fontScale = ESP.TextSize / 15.0f;
-		float fontSize = Fonts::Verdana->FontSize * fontScale;
-
-		ImVec2 baseSize = ImGui::CalcTextSize( text );
-		ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
-		ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
-		ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, 75.0f );
-
-		ImColor textColor( ESP.WatermarkColor [ 0 ], ESP.WatermarkColor [ 1 ], ESP.WatermarkColor [ 2 ], ESP.WatermarkColor [ 3 ] );
-		ImU32 shadowColor = 0xFF000000;
-
-		DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, text );
-		DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, text );
-
-		ImGui::PopFont( );
-	}
-
-	// ==================== Enemy text ====================
-
-	if ( ESP.Enabled && ESP.Enemy )
-	{
-		if ( _lastEnemyCount != enemyCountFrame )
-		{
-			_cachedEnemyText = XorStr( "Enemies Detected: " ) + std::to_string( enemyCountFrame );
-			_lastEnemyCount = enemyCountFrame;
-		}
-
-		ImGui::PushFont( Fonts::Verdana );
-
-		float fontScale = ESP.TextSize / 15.0f;
-		float fontSize = Fonts::Verdana->FontSize * fontScale;
-
-		ImVec2 baseSize = ImGui::CalcTextSize( _cachedEnemyText.c_str( ) );
-		ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
-		ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
-		ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, 75.0f + textSize.y + 3.0f );
-
-		ImColor textColor( ESP.EnemyColor [ 0 ], ESP.EnemyColor [ 1 ], ESP.EnemyColor [ 2 ], ESP.EnemyColor [ 3 ] );
-		ImU32 shadowColor = 0xFF000000;
-
-		DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, _cachedEnemyText.c_str( ) );
-		DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, _cachedEnemyText.c_str( ) );
-
-		ImGui::PopFont( );
-	}
-
-	// ==================== Ghost Distance Text ====================
-
-	if ( g_Globals.AimBot.ghost && ghostSkeletonExists )
-	{
-		Vector3 currentPos = Transform::GetPosition( localPlayer, N32 );
-		float ghostDistance = Vector3::Distance( currentPos, ghostSkeletonPos );
-
-		const char* ghostText = ( ghostDistance <= 4.60f ) ? ( "Ghost Damage: ON" ) : ( "Ghost Damage: FAKE" );
-		ImColor textColor = ( ghostDistance <= 4.60f ) ? ImColor( 0.0f, 1.0f, 0.0f, 1.0f ) : ImColor( 1.0f, 0.0f, 0.0f, 1.0f );
-
-		ImGui::PushFont( Fonts::Verdana );
-
-		float fontScale = ESP.TextSize / 10.0f;
-		float fontSize = Fonts::Verdana->FontSize * fontScale;
-
-		ImVec2 baseSize = ImGui::CalcTextSize( ghostText );
-		ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
-		ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
-
-		float yBase = 75.0f;
-		float yOffset = textSize.y * 1.5f;
-		ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, yBase + yOffset );
-		textPos.y -= 2.5f;
-
-		ImU32 shadowColor = 0xFF000000;
-
-		DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, ghostText );
-		DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, ghostText );
-
-		ImGui::PopFont( );
-	}
-
-	// ==================== Magnet Aimbot ====================
-
-	if ( AimCfg.aimmagnect )
-	{
-		static bool isHolding = false;
-		static Vector3 lockedRootPos = { 0.f, 0.f, 0.f };
-		static uintptr_t lockedMatrixAddr = 0;
-		static std::thread magnetThread;
-
-		const bool keyPressed =
+        // --- BugarPixel ---
+        if ( GameVar != 0 )
+        {
+                static bool lastBugarPixelState = false;
+                float currentValue = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold );
+                if ( g_Globals.Misc.Exploits.LocalPlayer.BugarPixel )
+                {
+                        if ( currentValue != 0.0f )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 0.0f );
+                }
+                else
+                {
+                        if ( lastBugarPixelState )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 1.5f );
+                }
+                lastBugarPixelState = g_Globals.Misc.Exploits.LocalPlayer.BugarPixel;
+
+                // --- Precision ---
+                static bool lastPrecisionState = false;
+                if ( g_Globals.Misc.Exploits.LocalPlayer.Precision )
+                {
+                        float curRotMin = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin );
+                        float curRotMax = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax );
+                        float curAimMin = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin );
+                        float curAimMax = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax );
+
+                        if ( curRotMin != 15.0625f )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin, 15.0625f );
+                        if ( curRotMax != 3.40939e-05f )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax, 3.40939e-05f );
+                        if ( curAimMin != 15.125f )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin, 15.125f );
+                        if ( curAimMax != 3184.0f )
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax, 3184.0f );
+                }
+                else
+                {
+                        if ( lastPrecisionState )
+                        {
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMin, 15.0f );
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::RotationSensitivityMax, 35.0f );
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMin, 10.0f );
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::AimRotationSensitivityMax, 20.0f );
+                        }
+                }
+                lastPrecisionState = g_Globals.Misc.Exploits.LocalPlayer.Precision;
+
+                // --- BackJump ---
+                static bool LastBackJumpState = false;
+                bool AccelerationOnFallingValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling );
+                bool FallingSwapWeaponValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon );
+                if ( g_Globals.Misc.Exploits.LocalPlayer.BackJump )
+                {
+                        if ( AccelerationOnFallingValue == true || FallingSwapWeaponValue == false )
+                        {
+                                g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, false );
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
+                        }
+                }
+                else
+                {
+                        if ( LastBackJumpState )
+                        {
+                                g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, true );
+                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
+                        }
+                }
+                LastBackJumpState = g_Globals.Misc.Exploits.LocalPlayer.BackJump;
+        }
+
+        // ==================== Snapshot ====================
+
+        std::vector<PlayerData> snapshot;
+        GameContext ctx;
+        bool snapshotFresh = false;
+        {
+                std::lock_guard<std::mutex> lock( m_Mutex );
+                snapshot = m_Players;
+                ctx = m_Context;
+                snapshotFresh = m_SnapshotFresh;
+        }
+
+        // ==================== Watchdog de recuperacao (ESP nunca desliga) ====================
+        // Se o snapshot nao fica fresco por ~2s, o processo do jogo provavelmente
+        // reiniciou ou o CR3 envelheceu. Acoes, sem depender do usuario:
+        //   < 6s  -> RefreshCR3 (barato, 1x/seg)
+        //   >= 6s -> RestartAsync (re-localiza a base; single-flight + cooldown)
+        // Se a thread de leitura morreu (crash fora do alcance do try/catch do
+        // ReadLoop), recria a thread aqui — a ESP se recupera sozinha.
+        if ( !snapshotFresh )
+        {
+                LONGLONG staleMs = GetTickCount64( ) - m_LastFreshTick.load( );
+                if ( staleMs > 1500 )
+                {
+                        static LONGLONG lastWatchdogAct = 0;
+                        LONGLONG nowWd = GetTickCount64( );
+                        if ( nowWd - lastWatchdogAct > 1000 )
+                        {
+                                lastWatchdogAct = nowWd;
+                                if ( staleMs > 4000 )
+                                {
+                                        DiagLog( "[diag] watchdog: %lldms sem leitura fresca — restart forcado", ( long long )staleMs );
+                                        g_FreeFireMemory.RestartAsync( );
+                                }
+                                else
+                                {
+                                        Memory::RefreshCR3( );
+                                }
+                        }
+                        if (m_ThreadValid && !m_Running.load())
+                        {
+                                pthread_join(
+                                        m_ThreadHandle,
+                                        nullptr
+                                );
+
+                                m_ThreadValid = false;
+
+                                DiagLog(
+                                        "[diag] watchdog: thread de leitura morta — recriando"
+                                );
+
+                                StartReadThread();
+                        }
+                }
+        }
+
+        uintptr_t localPlayer = ctx.LocalPlayer;
+        uintptr_t MainCamera = ctx.MainCamera;
+        Matrix4x4 ViewMatrix = ctx.ViewMatrix;
+        bool IsObserving = ctx.IsObserving;
+
+        // ==================== View Matrix ao vivo (espelho do FF) ====================
+        // O cheat de referencia relê a view matrix a cada frame no loop de desenho;
+        // por isso o ESP dele reprojeta SEMPRE com a câmera atual e nunca fica
+        // grudado quando a leitura de entidades engasga. Aqui a releitura usa apenas
+        // a cadeia de câmera (MatchGame -> controller -> camera -> cachedPtr) com o
+        // mesmo vetor de offsets do ReadLoop; se falhar, fica a matriz do snapshot;
+        // se as duas falharem, cai no caminho congelado abaixo.
+        if ( ctx.MatchGame != 0 )
+        {
+                uintptr_t ccm = ReadPtr( ctx.MatchGame + Offsets::MatchGame::m_CameraControllerManager );
+                if ( ccm != 0 )
+                {
+                        uintptr_t cam = ReadPtr( ccm + Offsets::CameraControllerManager::m_Camera );
+                        if ( cam != 0 )
+                        {
+                                uintptr_t cached = ReadPtr( cam + Offsets::Camera::m_CachedPtr );
+                                if ( cached != 0 )
+                                {
+                                        Matrix4x4 live = g_FreeFireMemory.Read<Matrix4x4>( cached + Offsets::Camera::ViewMatrix );
+                                        if ( IsValidViewMatrix( live ) )
+                                        {
+                                                ViewMatrix = live;
+                                                {
+                                                        std::lock_guard<std::mutex> lock( m_Mutex );
+                                                        m_Context.ViewMatrix = live;
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+
+        if ( localPlayer == 0 || !IsValidViewMatrix( ViewMatrix ) )
+        {
+                // Contexto invalido (transicao de partida/lobby/loading): mesmo sem
+                // localPlayer/view matrix, desenha o overlay do ultimo snapshot (posicoes
+                // de tela congeladas) para o ESP nao desligar do nada. Exploits e aimbot
+                // nao rodam nesse caminho.
+                static LONGLONG lastFrozenLog = 0;
+                LONGLONG now = GetTickCount64( );
+                if ( now - lastFrozenLog > 1000 )
+                {
+                        lastFrozenLog = now;
+                        DiagLog( "[diag] frozen: localPlayer=%llx matrixValid=%d snapshot=%d",
+                                ( unsigned long long )localPlayer, IsValidViewMatrix( ViewMatrix ) ? 1 : 0, ( int )snapshot.size( ) );
+                }
+                DrawFrozenEsp( ViewMatrix );
+                return;
+        }
+
+        Silent::UpdateViewMatrix( ViewMatrix );
+
+        // ==================== Ghost Skeleton Rendering ====================
+
+        if ( ghostSkeletonExists )
+        {
+                Vector3 world = ghostSkeletonPos;
+                Vector3 screen = W2S::World2Screen( ViewMatrix, world );
+
+                if ( W2S::IsOnScreen( screen ) )
+                {
+                        float size = 10.0f;
+                        ImColor color = ImColor( 0.f, 1.f, 1.f, 1.f );
+
+                        DL->AddLine( ImVec2( screen.X, screen.Y - size ), ImVec2( screen.X, screen.Y + size ), color, 2.0f );
+                        DL->AddLine( ImVec2( screen.X - size, screen.Y ), ImVec2( screen.X + size, screen.Y ), color, 2.0f );
+                }
+        }
+
+        // ==================== FastMedkit ====================
+
+        uintptr_t PlayerAttributes = ReadPtr( localPlayer + Offsets::Player::m_Attributes );
+
+        // ==================== Atributar Armas ====================
+        if (g_Globals.Misc.Exploits.LocalPlayer.AtributarArma)
+        {
+                if (PlayerAttributes != 0)
+                {
+                        // Níveis interpolados do original(1.0) até o level max(0.75)
+                        float fireIntervalLevels[4] = { 0.90f, 0.85f, 0.75f, 0.65f };
+                        int level = g_Globals.Misc.Exploits.LocalPlayer.AtributarArmaLevel;
+                        if (level < 0 || level > 3) level = 0;
+                        
+                        g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, fireIntervalLevels[level]);
+                }
+        }
+        else
+        {
+                if (PlayerAttributes != 0)
+                {
+                        g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, 1.0f);
+                }
+        }
+        
+        // ==================== Ghost Toggle ====================
+
+        bool ghostKeyHeld = AndroidInput::IsKeyPressed( g_Globals.AimBot.ghostkey );
+        if ( g_Globals.AimBot.ghost )
+        {
+                if ( ghostKeyHeld && !ghostActive )
+                {
+                        ghostActive = true;
+                        g_FreeFireMemory.Write<bool>( localPlayer + Offsets::Player::m_WaitForForceSync, true );
+                        ghostSkeletonPos = Transform::GetPosition( localPlayer, N32 );
+                        ghostSkeletonExists = true;
+                }
+                else if ( !ghostKeyHeld && ghostActive )
+                {
+                        ghostActive = false;
+                        g_FreeFireMemory.Write<bool>( localPlayer + Offsets::Player::m_WaitForForceSync, false );
+                        ghostSkeletonExists = false;
+                }
+        }
+        else
+        {
+                ghostActive = false;
+                ghostSkeletonExists = false;
+        }
+
+        // ==================== TelaParada ====================
+        if ( g_Globals.Misc.Exploits.LocalPlayer.telaparada )
+        {
+                uintptr_t userControl = ReadPtr( localPlayer + Offsets::Player::m_UserControl );
+                if ( userControl != 0 )
+                {
+                        uintptr_t axisDataArray = ReadPtr( userControl + Offsets::UserControlHandler::m_AxisData );
+                        if ( axisDataArray != 0 )
+                        {
+                                uintptr_t moveAxisData = ReadPtr( axisDataArray + ( N32 ? 0x10 : 0x20 ) );
+                                if ( moveAxisData != 0 )
+                                {
+                                        bool isTouched = g_FreeFireMemory.Read<bool>( moveAxisData + Offsets::UserControlHandler::m_IsTouched );
+                                        if ( isTouched )
+                                        {
+                                                g_FreeFireMemory.Write<bool>( userControl + Offsets::UserControlHandler::m_LockFingerInDashArea, false );
+                                                g_FreeFireMemory.Write<bool>( userControl + Offsets::UserControlHandler::m_DashByMovingJoystick, true );
+                                                g_FreeFireMemory.Write<int>( userControl + Offsets::UserControlHandler::m_FingerInDashArea, 1 );
+                                        }
+                                        else
+                                        {
+                                                g_FreeFireMemory.Write<int>( userControl + Offsets::UserControlHandler::m_FingerInDashArea, 0 );
+                                        }
+                                }
+                        }
+                }
+        }
+
+        // ==================== ESP Rendering Loop ====================
+
+        if ( snapshot.empty( ) )
+        {
+                Skeleton::ClearCache( );
+        }
+
+
+        const float centerX = ( float )ScreenWidth * 0.5f;
+        const float centerY = ( float )ScreenHeight * 0.5f;
+
+        // ==================== Aimbot/Silent target selection ====================
+        // Desacoplado do loop de render: roda mesmo com "ESP Player" (master do
+        // Visuals.ESP) desligado, porque silent, boneswap, magnet e rage dependem
+        // de ClosestEntity. Só mira quando o snapshot é fresco (leitura do frame
+        // atual). Em falha transitória o ESP continua desenhando a posição
+        // congelada, mas o aimbot não trava em alvo antigo — evita tiro que
+        // "acerta" e não conta dano.
+        if ( AimCfg.Enabled || g_Globals.Silent.Enabled || AimCfg.aimmagnect )
+        {
+                for ( size_t i = 0; i < snapshot.size( ); i++ )
+                {
+                        const auto& p = snapshot [ i ];
+
+                        // Aliado nunca vira alvo — ShowTeam so afeta o desenho da ESP,
+                        // nunca a selecao de alvo do aimbot/silent/magnet.
+                        if ( p.IsTeammate ) continue;
+
+                        if ( snapshotFresh && p.Distance >= 0 && p.Distance <= AimCfg.MaxDistance )
+                        {
+                                enemiesvisible = true;
+
+                                // Visible check
+                                if ( g_Globals.AimBot.VisibleCheck )
+                                {
+                                        bool anyVisible = false;
+
+                                        uintptr_t aimAssist = ReadPtr( localPlayer + Offsets::Player::m_AimAssist );
+                                        if ( aimAssist != 0 )
+                                        {
+                                                uintptr_t targetInfo = ReadPtr( aimAssist + Offsets::AimAssistAutoLock::m_TargetHeuristic );
+                                                if ( targetInfo != 0 )
+                                                        anyVisible = true;
+                                        }
+
+                                        uintptr_t aimAssistSighting = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
+                                        if ( aimAssistSighting != 0 )
+                                        {
+                                                uintptr_t targetInfo = ReadPtr( aimAssistSighting + Offsets::AimAssistAutoLock::m_TargetHeuristic );
+                                                if ( targetInfo != 0 )
+                                                        anyVisible = true;
+                                        }
+
+                                        if ( !anyVisible )
+                                        {
+                                                enemiesvisible = false;
+                                                continue;
+                                        }
+                                }
+
+                                // Ignore bots and knocked
+                                bool IsClientBot = false;
+                                g_FreeFireMemory.Read<bool>( p.Entity + Offsets::Player::IsClientBot, IsClientBot );
+
+                                if ( ( !AimCfg.IgnoreKnocked || !p.IsKnocked ) && ( !AimCfg.IgnoreBots || !IsClientBot ) )
+                                {
+                                        float dx = p.HeadScreen.X - centerX;
+                                        float dy = p.HeadScreen.Y - centerY;
+                                        float crosshairDistSq = dx * dx + dy * dy;
+
+                                        if ( crosshairDistSq < fovSq && crosshairDistSq < ClosestDistSq )
+                                        {
+                                                ClosestDistSq = crosshairDistSq;
+                                                ClosestEntity = p.Entity;
+                                                ClosestHP = p.CurrentHealth;
+                                        }
+                                }
+                        }
+
+                        // Alvo do silent: config propria (Silent.Fov e Silent.MaxDistance),
+                        // sem VisibleCheck e sem IgnoreKnocked/IgnoreBots do aimbot.
+                        if ( g_Globals.Silent.Enabled && snapshotFresh && p.Distance >= 0 && p.Distance <= g_Globals.Silent.MaxDistance )
+                        {
+                                float sdx = p.HeadScreen.X - centerX;
+                                float sdy = p.HeadScreen.Y - centerY;
+                                float silentCrosshairDistSq = sdx * sdx + sdy * sdy;
+
+                                if ( silentCrosshairDistSq < silentFovSq && silentCrosshairDistSq < SilentDistSq )
+                                {
+                                        SilentDistSq = silentCrosshairDistSq;
+                                        SilentClosestEntity = p.Entity;
+                                }
+                        }
+                }
+        }
+
+        // Partida ativa (localPlayer + view matrix validos): desenha o snapshot
+        // SEMPRE, mesmo quando a leitura de entidades engasga por segundos — as
+        // posicoes de mundo congeladas sao reprojetadas com a camera ao vivo e o
+        // ESP segue os inimigos em vez de sumir. O snapshot so desaparece quando o
+        // ReadLoop realmente limpa (lobby-clear 1200 frames sem Match / empty-clear
+        // 900 frames vazios), ou seja, quando a partida de fato acabou. O watchdog
+        // acima recupera a leitura viva em paralelo.
+        for ( size_t i = 0; i < snapshot.size( ); i++ )
+        {
+                const auto& p = snapshot [ i ];
+
+                if ( ESP.RenderDistance > 0 && p.Distance > ESP.RenderDistance ) continue;
+
+                // Master "ESP Player": so controla o desenho. Aimbot/silent ja
+                // selecionaram alvo no bloco acima e continuam funcionando.
+                if ( !ESP.Enabled ) continue;
+
+                // Isolamento por entidade: uma entidade/skeleton com problema nunca
+                // pode abortar o resto do frame — que roda magnet, boneswap, o feed
+                // do silent e o rage abaixo. A ESP pula a entidade e segue; aimbot
+                // e silent ficam imunes a falha de desenho da ESP (e vice-versa).
+                try
+                {
+                        DrawEspEntityOverlay( p, DL, ESP, ViewMatrix, N32, V31, true );
+                }
+                catch ( ... )
+                {
+                        static LONGLONG lastSkipLog = 0;
+                        LONGLONG nowSkip = GetTickCount64( );
+                        if ( nowSkip - lastSkipLog > 5000 )
+                        {
+                                lastSkipLog = nowSkip;
+                                DiagLog( "[diag] esp: entidade %zu pulada (excecao no desenho)", ( size_t )i );
+                        }
+                }
+
+                // --- Enemy counter (aliados de time nao contam) ---
+                if ( ESP.Enemy && !p.IsTeammate )
+                {
+                        enemyCountFrame++;
+                        float dx = p.HeadScreen.X - centerX;
+                        float dy = p.HeadScreen.Y - centerY;
+                        float d2 = dx * dx + dy * dy;
+                        if ( d2 < minDistance2Dsq && p.Distance < ESP.RenderDistance )
+                        {
+                                minDistance2Dsq = d2;
+                                closestHead2D = ImVec2( p.HeadScreen.X, p.HeadScreen.Y );
+                        }
+                }
+        } // end for entities
+
+        // ==================== Skeleton Cleanup ====================
+        {
+                std::unordered_set<uintptr_t> activeEntities;
+                for ( const auto& p : snapshot )
+                        activeEntities.insert( p.Entity );
+                Skeleton::CleanupCache( activeEntities );
+        }
+
+        // ==================== Watermark ====================
+
+        if ( ESP.Enabled && ESP.Watermark )
+        {
+                ImGui::PushFont( Fonts::Verdana );
+
+                const char* text =  "STORM CHEATS" ;
+                float fontScale = ESP.TextSize / 15.0f;
+                float fontSize = Fonts::Verdana->FontSize * fontScale;
+
+                ImVec2 baseSize = ImGui::CalcTextSize( text );
+                ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
+                ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
+                ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, 75.0f );
+
+                ImColor textColor( ESP.WatermarkColor [ 0 ], ESP.WatermarkColor [ 1 ], ESP.WatermarkColor [ 2 ], ESP.WatermarkColor [ 3 ] );
+                ImU32 shadowColor = 0xFF000000;
+
+                DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, text );
+                DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, text );
+
+                ImGui::PopFont( );
+        }
+
+        // ==================== Enemy text ====================
+
+        if ( ESP.Enabled && ESP.Enemy )
+        {
+                if ( _lastEnemyCount != enemyCountFrame )
+                {
+                        _cachedEnemyText = XorStr( "Enemies Detected: " ) + std::to_string( enemyCountFrame );
+                        _lastEnemyCount = enemyCountFrame;
+                }
+
+                ImGui::PushFont( Fonts::Verdana );
+
+                float fontScale = ESP.TextSize / 15.0f;
+                float fontSize = Fonts::Verdana->FontSize * fontScale;
+
+                ImVec2 baseSize = ImGui::CalcTextSize( _cachedEnemyText.c_str( ) );
+                ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
+                ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
+                ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, 75.0f + textSize.y + 3.0f );
+
+                ImColor textColor( ESP.EnemyColor [ 0 ], ESP.EnemyColor [ 1 ], ESP.EnemyColor [ 2 ], ESP.EnemyColor [ 3 ] );
+                ImU32 shadowColor = 0xFF000000;
+
+                DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, _cachedEnemyText.c_str( ) );
+                DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, _cachedEnemyText.c_str( ) );
+
+                ImGui::PopFont( );
+        }
+
+        // ==================== Ghost Distance Text ====================
+
+        if ( g_Globals.AimBot.ghost && ghostSkeletonExists )
+        {
+                Vector3 currentPos = Transform::GetPosition( localPlayer, N32 );
+                float ghostDistance = Vector3::Distance( currentPos, ghostSkeletonPos );
+
+                const char* ghostText = ( ghostDistance <= 4.60f ) ? ( "Ghost Damage: ON" ) : ( "Ghost Damage: FAKE" );
+                ImColor textColor = ( ghostDistance <= 4.60f ) ? ImColor( 0.0f, 1.0f, 0.0f, 1.0f ) : ImColor( 1.0f, 0.0f, 0.0f, 1.0f );
+
+                ImGui::PushFont( Fonts::Verdana );
+
+                float fontScale = ESP.TextSize / 10.0f;
+                float fontSize = Fonts::Verdana->FontSize * fontScale;
+
+                ImVec2 baseSize = ImGui::CalcTextSize( ghostText );
+                ImVec2 textSize( baseSize.x * fontScale, baseSize.y * fontScale );
+                ImVec2 screenSize = ImGui::GetIO( ).DisplaySize;
+
+                float yBase = 75.0f;
+                float yOffset = textSize.y * 1.5f;
+                ImVec2 textPos( ( screenSize.x - textSize.x ) * 0.5f, yBase + yOffset );
+                textPos.y -= 2.5f;
+
+                ImU32 shadowColor = 0xFF000000;
+
+                DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, ghostText );
+                DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, ghostText );
+
+                ImGui::PopFont( );
+        }
+
+        // ==================== Magnet Aimbot ====================
+
+        if ( AimCfg.aimmagnect )
+        {
+                static bool isHolding = false;
+                static Vector3 lockedRootPos = { 0.f, 0.f, 0.f };
+                static uintptr_t lockedMatrixAddr = 0;
+                static std::thread magnetThread;
+
+                const bool keyPressed =
     AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind);
 
-		if ( keyPressed && !isHolding && ClosestEntity != 0 )
-		{
-			isHolding = true;
-
-			Vector3 cameraPos = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
-			Matrix4x4 invVP{ };
-			if ( cameraPos == Vector3::Zero( ) || !MatrixUtils::Invert( ViewMatrix, invVP ) )
-				goto magnet_end;
-
-			Vector4 nearClip( 0.f, 0.f, 0.f, 1.f );
-			Vector4 farClip( 0.f, 0.f, 1.f, 1.f );
-
-			Vector4 worldNear4 = MatrixUtils::Multiply( nearClip, invVP );
-			Vector4 worldFar4 = MatrixUtils::Multiply( farClip, invVP );
-
-			if ( worldNear4.w == 0 || worldFar4.w == 0 )
-				goto magnet_end;
-
-			Vector3 worldNear( worldNear4.x / worldNear4.w, worldNear4.y / worldNear4.w, worldNear4.z / worldNear4.w );
-			Vector3 worldFar( worldFar4.x / worldFar4.w, worldFar4.y / worldFar4.w, worldFar4.z / worldFar4.w );
-
-			Vector3 cameraForward;
-			cameraForward.X = worldFar.X - worldNear.X;
-			cameraForward.Y = worldFar.Y - worldNear.Y;
-			cameraForward.Z = worldFar.Z - worldNear.Z;
-
-			float len = sqrtf( cameraForward.X * cameraForward.X + cameraForward.Y * cameraForward.Y + cameraForward.Z * cameraForward.Z );
-			if ( len > 0.0001f )
-			{
-				cameraForward.X /= len;
-				cameraForward.Y /= len;
-				cameraForward.Z /= len;
-			}
-			else goto magnet_end;
-
-			Vector3 targetHead = Transform::GetHeadPosition( ClosestEntity, N32 );
-			Vector3 targetRoot = Transform::GetPosition( ClosestEntity, N32 );
-			if ( targetHead == Vector3::Zero( ) || targetRoot == Vector3::Zero( ) )
-				goto magnet_end;
-
-			float distance = Vector3::Distance( cameraPos, targetHead );
-			if ( distance < 0.3f || distance > 500.f )
-				goto magnet_end;
-
-			Vector3 desiredHeadPos = cameraPos + ( cameraForward * distance );
-			Vector3 headOffset = targetHead - targetRoot;
-			if ( headOffset == Vector3::Zero( ) )
-				headOffset = Vector3( 0.f, 0.25f, 0.f );
-
-			lockedRootPos = desiredHeadPos - headOffset;
-
-			// Resolve transform chain for bone root (ternary 32/64)
-			uintptr_t boneRoot = ReadPtr( ClosestEntity + Offsets::Player::m_HipNode );
-			if ( boneRoot )
-			{
-				uintptr_t transformValue = ReadPtr( boneRoot + Offsets::GetPosWorld::transObj );
-				if ( transformValue )
-				{
-					uintptr_t transformObj = ReadPtr( transformValue + Offsets::GetPosWorld::transObj );
-					if ( transformObj )
-					{
-						lockedMatrixAddr = ReadPtr( transformObj + Offsets::GetPosWorld::matrix );
-					}
-				}
-			}
-
-			// Write position offset: 0x80 for 32bit, 0xB0 for 64bit
-			uintptr_t posWriteOffset = N32 ? 0x80 : 0xB0;
-
-			if ( lockedMatrixAddr )
-			{
-				magnetThread = std::thread( [ posWriteOffset ] ( )
-				{
-					#ifdef __ANDROID__
-    					// Android: pthread é usado diretamente.
-					#else
-						HANDLE hThread = GetCurrentThread();
-						SetThreadAffinityMask(hThread, 1 << 0);
-						SetThreadPriority(
-							hThread,
-							THREAD_PRIORITY_TIME_CRITICAL
-						);
-					#endif
-
-					while ( isHolding && lockedMatrixAddr )
-					{
-						g_FreeFireMemory.Write<Vector3>( lockedMatrixAddr + posWriteOffset, lockedRootPos );
-						std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
-					}
-				} );
-				magnetThread.detach( );
-			}
-		}
-
-		if ( !keyPressed && isHolding )
-		{
-			isHolding = false;
-			lockedMatrixAddr = 0;
-			lockedRootPos = { 0.f, 0.f, 0.f };
-		}
-
-	magnet_end:
-		;
-	}
-
-	// ==================== BoneSwap Aimbot ====================
-
-	if ( AimCfg.Enabled && AimCfg.aimtype == 0 )
-	{
-		const bool keyDown = ( GetAsyncKeyState( AimCfg.KeyBind ) & 0x8000 );
-		const bool cursorVisible = IsCursorVisibleNow( );
-
-		if ( !keyDown )
-		{
-			if ( BS_Applied ) BS_Restore( );
-			BS_ActiveByCursor = false;
-		}
-		else
-		{
-			if ( !BS_ActiveByCursor )
-			{
-				if ( cursorVisible == 0 )
-				{
-					BS_ActiveByCursor = true;
-				}
-			}
-
-			if ( BS_ActiveByCursor )
-			{
-				if ( ClosestEntity == 0 )
-				{
-					if ( BS_Applied ) BS_Restore( );
-				}
-				else
-				{
-					if ( !BS_Applied || BS_LastTarget != ClosestEntity )
-					{
-						if ( BS_Applied ) BS_Restore( );
-						if ( ClosestHP > 0 )
-						{
-							BS_Apply( ClosestEntity );
-						}
-						else if ( BS_Applied )
-						{
-							BS_Restore( );
-						}
-					}
-					else
-					{
-						if ( ClosestHP <= 0 && BS_Applied )
-						{
-							BS_Restore( );
-						}
-					}
-				}
-			}
-		}
-	}
-	else if ( BS_Applied )
-	{
-		BS_Restore( );
-		BS_ActiveByCursor = false;
-	}
-
-	// ==================== Silent Aim Target ====================
-	// Usa o alvo PRÓPRIO do silent (SilentClosestEntity), selecionado com
-	// Silent.Fov/Silent.MaxDistance — independente do aimbot.
-
-	if ( SilentClosestEntity != 0 )
-		Silent::SetTarget( localPlayer, SilentClosestEntity );
-	else
-		Silent::ClearTarget( );
-
-	// ==================== Rage Aimbot ====================
-
-	if ( ClosestEntity != 0 )
-	{
-		if ( CurrentMatrix.m [ 0 ][ 0 ] == 0.f )
-		{
-			CurrentMatrix = ViewMatrix;
-		}
-
-		if ( AimCfg.Enabled && AimCfg.aimtype == 1 && ( !g_Globals.AimBot.VisibleCheck || ( g_Globals.AimBot.VisibleCheck && enemiesvisible ) ) )
-		{
-			static bool s_AimFloodRunning = false;
-
-			bool isShooting = ImGui::GetIO().MouseDown[0];
-			bool keyCurrentlyPressed = ( GetAsyncKeyState( AimCfg.KeyBind ) & 0x8000 );
-
-			if ( isShooting && keyCurrentlyPressed && !IsCursorVisibleNow( ) )
-			{
-				RageTarget = ClosestEntity;
-
-				if ( !s_AimFloodRunning )
-				{
-					s_AimFloodRunning = true;
-					std::thread( [ localPlayer, MainCamera, N32 ] ( )
-					{
-						// Qualquer saida (inclusive excecao) libera o flag do
-						// flood. Sem isso, uma excecao dentro da thread deixava
-						// s_AimFloodRunning preso em true e o rage nunca mais
-						// ativava na partida ("para do nada e nao volta").
-						struct FloodReset { bool* p; ~FloodReset( ) { *p = false; } } reset{ &s_AimFloodRunning };
-
-						int originalAimAssist = 0;
-						bool aimAssistModified = false;
-
-						try
-						{
-						auto ReadPtrT = [ N32 ] ( uintptr_t addr ) -> uintptr_t
-						{
-							return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
-						};
-
-						int delayMs = 0;
-						switch ( g_Globals.AimBot.PeitosIndex )
-						{
-							case 1: delayMs = 300; break;
-							case 2: delayMs = 400; break;
-							case 3: delayMs = 450; break;
-							case 4: delayMs = 550; break;
-							case 5: delayMs = ( rand( ) % 450 );
-								break;
-							default: delayMs = 0; break;
-						}
-
-						if ( delayMs > 0 )
-							std::this_thread::sleep_for( std::chrono::milliseconds( delayMs ) );
-
-						if ( delayMs > 0 )
-						{
-							originalAimAssist = g_FreeFireMemory.Read<int>( localPlayer + Offsets::Player::m_EAimAssit );
-							g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, 2 );
-							aimAssistModified = true;
-						}
-
-						if ( !ImGui::GetIO().MouseDown[0] || !AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind) || IsCursorVisibleNow() ) 
-						{
-							if ( aimAssistModified )
-								g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
-							return;
-						}
-
-						// Main aim loop
-						while ( !g_Globals.General.ShutDown )
-						{
-							if ( IsCursorVisibleNow( ) )
-								break;
-
-							bool isStillShooting = ImGui::GetIO().MouseDown[0];
-							bool isKeyStillPressed = ( GetAsyncKeyState( g_Globals.AimBot.KeyBind ) & 0x8000 );
-							if ( !( isStillShooting && isKeyStillPressed ) )
-								break;
-
-							// Relê o HP do alvo SEMPRE (com ou sem IgnoreKnocked):
-							// se o alvo morreu no meio do flood, sai do loop e o
-							// próximo frame re-seleciona o novo alvo. Antes, com
-							// IgnoreKnocked desligado, o flood ficava preso no
-							// cadáver até soltar o botão — parecia travado.
-							int hp = 1;
-							uintptr_t fixedTarget = RageTarget;
-							if ( fixedTarget != 0 )
-							{
-								uintptr_t priPool = ReadPtrT( fixedTarget + Offsets::ReplicationEntity::m_PRIDataPool );
-								if ( priPool != 0 )
-								{
-									uintptr_t datas = ReadPtrT( priPool + Offsets::ReplicationEntity::m_Datas );
-									uintptr_t health = ReadPtrT( datas + Offsets::ReplicationEntity::HealthCurrentPtr );
-									if ( health )
-										hp = g_FreeFireMemory.Read<int>( health + Offsets::ReplicationEntity::Value );
-								}
-
-								bool isKnocked = false;
-								uintptr_t shadowBase = ReadPtrT( fixedTarget + Offsets::PlayerNetwork::m_ShadowState );
-								if ( shadowBase != 0 )
-								{
-									int playerPose = g_FreeFireMemory.Read<int>( shadowBase + Offsets::ShadowState::TargetPhysXPose );
-									isKnocked = ( playerPose == 8 );
-								}
-
-								if ( hp <= 0 || ( g_Globals.AimBot.IgnoreKnocked && isKnocked ) )
-								{
-									// PraCima
-								if (
-									g_Globals.AimBot.PraCima &&
-									g_Globals.AimBot.PraCimaValor > 0.f &&
-									g_Globals.AimBot.PraCimaTempo > 0
-								)
-								{
-									Quaternion qCurrent =
-										g_FreeFireMemory.Read<Quaternion>(
-											localPlayer +
-											Offsets::Player::m_AimRotation
-										);
-
-									const float totalPitchUp =
-										-g_Globals.AimBot.PraCimaValor;
-
-									const int totalTimeMs =
-										g_Globals.AimBot.PraCimaTempo;
-
-									const float pitchPerMs =
-										totalPitchUp /
-										static_cast<float>(totalTimeMs);
-
-									const Quaternion qDelta =
-										Quaternion::FromEuler(
-											pitchPerMs,
-											0.0f,
-											0.0f
-										);
-
-									for (int elapsedMs = 0;
-										elapsedMs < totalTimeMs;
-										++elapsedMs)
-									{
-										qCurrent =
-											Quaternion::Normalized(
-												qDelta * qCurrent
-											);
-
-										g_FreeFireMemory.Write<Quaternion>(
-											localPlayer +
-											Offsets::Player::m_AimRotation,
-											qCurrent
-										);
-
-										usleep(1000);
-									}
-
-									qCurrent =
-										Quaternion::Normalized(qCurrent);
-
-									g_FreeFireMemory.Write<Quaternion>(
-										localPlayer +
-										Offsets::Player::m_AimRotation,
-										qCurrent
-									);
-								}
-
-									Sleep( 300 );
-									break;
-								}
-							}
-							else
-							{
-								break;
-							}
-
-							Vector3 Head = Transform::GetHeadPosition( RageTarget, N32 );
-							Vector3 LocalCamera = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
-							if ( Head == Vector3::Zero( ) || LocalCamera == Vector3::Zero( ) )
-								break;
-
-							auto playerLook = AimBot::GetRotationToLocation( Head, 0.0f, LocalCamera );
-							g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AimRotation, playerLook );
-							std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
-						}
-
-						if ( aimAssistModified )
-							g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
-
-						}
-						catch ( ... )
-						{
-							// Excecao na thread do rage: restaura o assist e sai.
-							// O FloodReset libera o flag — o rage volta a ativar.
-							if ( aimAssistModified )
-								g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
-						}
-
-					} ).detach( );
-				}
-			}
-		}
-	}
-
-	// ==================== Weapon Exploits ====================
-
-	uintptr_t m_InventoryManager = ReadPtr( localPlayer + Offsets::Player::m_InventoryManager );
-	uintptr_t m_itemOnHand = ReadPtr( m_InventoryManager + Offsets::InventoryManager::m_itemOnHand );
-	uintptr_t m_WeaponData = ReadPtr( m_itemOnHand + Offsets::Weapon::m_WeaponData );
-	uintptr_t WeaponParams = m_itemOnHand + Offsets::Weapon::m_WeaponParams;
-
-	// --- NoRecoil ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.NoRecoil )
-	{
-		uintptr_t FireComponent = ReadPtr( m_itemOnHand + Offsets::Weapon::FireComponent );
-		if ( FireComponent != 0 )
-		{
-			float currentRecoil = 0.0f;
-			if ( g_FreeFireMemory.Read<float>( FireComponent + Offsets::Weapon::tangentTheta, currentRecoil ) )
-			{
-				constexpr float baseRecoil = 0.0174825f;
-				float control = static_cast< float >( g_Globals.Misc.Exploits.LocalPlayer.RecoilControl );
-				float newRecoil = baseRecoil * ( 1.0f - ( control / 100.0f ) );
-				if ( fabs( currentRecoil - newRecoil ) > 0.00001f )
-					g_FreeFireMemory.Write<float>( FireComponent + Offsets::Weapon::tangentTheta, newRecoil );
-			}
-		}
-	}
-
-	// --- SpinBot ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.SpinBot && !IsObserving )
-	{
-		SpinBot( localPlayer, N32 );
-	}
-
-	// --- SocoLonge ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.SocoLonge && !IsObserving )
-	{
-		float socolonge = g_FreeFireMemory.Read<float>( WeaponParams + Offsets::WeaponParams::Range );
-		if ( socolonge == 1.35f )
-		{
-			g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::Range, 3.1f );
-		}
-	}
-
-	static float s_FastmeditOriginal = 0.0f;
-	static bool s_FastmeditHasOriginal = false;
-	static bool s_FastmeditRestored = true;
-
-	if (g_Globals.Misc.Exploits.LocalPlayer.FastMedkit)
-	{
-		if (PlayerAttributes != 0)
-		{
-			uintptr_t eatSpeedAddr = PlayerAttributes + Offsets::PlayerAttributes::m_EatSpeedScale;
-			if (eatSpeedAddr != 0)
-			{
-				if (!s_FastmeditHasOriginal)
-				{
-					s_FastmeditOriginal = g_FreeFireMemory.Read<float>(eatSpeedAddr);
-					s_FastmeditHasOriginal = true;
-					s_FastmeditRestored = false;
-				}
-
-				float valueToWrite = s_FastmeditOriginal;
-				if (s_FastmeditOriginal == 1.0f)
-				{
-					valueToWrite = 0.75f;
-				}
-				else if (s_FastmeditOriginal == 0.75f)
-				{
-					valueToWrite = 0.50f;
-				}
-				g_FreeFireMemory.Write<float>(eatSpeedAddr, valueToWrite);
-			}
-		}
-	}
-	else
-	{
-		if (s_FastmeditHasOriginal && !s_FastmeditRestored && PlayerAttributes != 0)
-		{
-			uintptr_t eatSpeedAddr = PlayerAttributes + Offsets::PlayerAttributes::m_EatSpeedScale;
-			if (eatSpeedAddr != 0)
-			{
-				g_FreeFireMemory.Write<float>(eatSpeedAddr, s_FastmeditOriginal);
-				s_FastmeditRestored = true;
-			}
-		}
-	}
-
-	// --- MoreDamage ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.MoreDamage )
-	{
-		g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::FullDamageDistance, 400.0f );
-	}
-
-	// --- FireDelay ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.FireDelay )
-	{
-		g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::PrefireDelay, 0.0f );
-	}
-
-	// --- Aimlock ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.Aimlock )
-	{
-		g_FreeFireMemory.Write<float>( m_itemOnHand + Offsets::Weapon::m_FireDuration, -3.0f );
-	}
-
-	// --- AimLock2x ---
-	if ( g_Globals.Misc.Exploits.LocalPlayer.AimLock2x && AimCfg.aimtype == 0 )
-	{
-		bool isSighting = g_FreeFireMemory.Read<bool>( m_itemOnHand + Offsets::Weapon::m_IsSighting );
-		if ( isSighting )
-		{
-			uintptr_t aimassist = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
-			g_FreeFireMemory.Write<float>( aimassist + Offsets::AimAssistOnSighting::m_fAimAssistCurrentLerpTime, 0.0f );
-		}
-	}
-
-	// --- AimbotAwm ---
-	static std::vector<std::pair<uintptr_t, int>> s_awmOriginals;
-	int WeaponType = g_FreeFireMemory.Read<int>( m_WeaponData + Offsets::Weapon::IntWeaponType );
-	if ( g_Globals.Misc.Exploits.LocalPlayer.AimbotAwm )
-	{
-		if ( WeaponType == 1 )
-		{
-			bool exists = false;
-			for ( const auto& pair : s_awmOriginals )
-			{
-				if ( pair.first == m_WeaponData )
-				{
-					exists = true;
-					break;
-				}
-			}
-			if ( !exists )
-			{
-				s_awmOriginals.emplace_back( m_WeaponData, WeaponType );
-			}
-
-			int currentCheck = g_FreeFireMemory.Read<int>( m_WeaponData + Offsets::Weapon::IntWeaponType );
-			if ( currentCheck != 0 )
-			{
-				g_FreeFireMemory.Write<int>( m_WeaponData + Offsets::Weapon::IntWeaponType, 0 );
-			}
-		}
-	}
-	else
-	{
-		if ( !s_awmOriginals.empty( ) )
-		{
-			for ( const auto& [weaponAddr, original] : s_awmOriginals )
-			{
-				if ( weaponAddr != 0 )
-				{
-					g_FreeFireMemory.Write<int>( weaponAddr + Offsets::Weapon::IntWeaponType, original );
-				}
-			}
-			s_awmOriginals.clear( );
-		}
-	}
-	}
-	catch ( const std::exception& ex )
-	{
-		DiagLog( "[diag] Draw exception: %s", ex.what( ) );
-	}
-	catch ( ... )
-	{
-		DiagLog( "[diag] Draw exception (unknown)" );
-	}
+                if ( keyPressed && !isHolding && ClosestEntity != 0 )
+                {
+                        isHolding = true;
+
+                        Vector3 cameraPos = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
+                        Matrix4x4 invVP{ };
+                        if ( cameraPos == Vector3::Zero( ) || !MatrixUtils::Invert( ViewMatrix, invVP ) )
+                                goto magnet_end;
+
+                        Vector4 nearClip( 0.f, 0.f, 0.f, 1.f );
+                        Vector4 farClip( 0.f, 0.f, 1.f, 1.f );
+
+                        Vector4 worldNear4 = MatrixUtils::Multiply( nearClip, invVP );
+                        Vector4 worldFar4 = MatrixUtils::Multiply( farClip, invVP );
+
+                        if ( worldNear4.w == 0 || worldFar4.w == 0 )
+                                goto magnet_end;
+
+                        Vector3 worldNear( worldNear4.x / worldNear4.w, worldNear4.y / worldNear4.w, worldNear4.z / worldNear4.w );
+                        Vector3 worldFar( worldFar4.x / worldFar4.w, worldFar4.y / worldFar4.w, worldFar4.z / worldFar4.w );
+
+                        Vector3 cameraForward;
+                        cameraForward.X = worldFar.X - worldNear.X;
+                        cameraForward.Y = worldFar.Y - worldNear.Y;
+                        cameraForward.Z = worldFar.Z - worldNear.Z;
+
+                        float len = sqrtf( cameraForward.X * cameraForward.X + cameraForward.Y * cameraForward.Y + cameraForward.Z * cameraForward.Z );
+                        if ( len > 0.0001f )
+                        {
+                                cameraForward.X /= len;
+                                cameraForward.Y /= len;
+                                cameraForward.Z /= len;
+                        }
+                        else goto magnet_end;
+
+                        Vector3 targetHead = Transform::GetHeadPosition( ClosestEntity, N32 );
+                        Vector3 targetRoot = Transform::GetPosition( ClosestEntity, N32 );
+                        if ( targetHead == Vector3::Zero( ) || targetRoot == Vector3::Zero( ) )
+                                goto magnet_end;
+
+                        float distance = Vector3::Distance( cameraPos, targetHead );
+                        if ( distance < 0.3f || distance > 500.f )
+                                goto magnet_end;
+
+                        Vector3 desiredHeadPos = cameraPos + ( cameraForward * distance );
+                        Vector3 headOffset = targetHead - targetRoot;
+                        if ( headOffset == Vector3::Zero( ) )
+                                headOffset = Vector3( 0.f, 0.25f, 0.f );
+
+                        lockedRootPos = desiredHeadPos - headOffset;
+
+                        // Resolve transform chain for bone root (ternary 32/64)
+                        uintptr_t boneRoot = ReadPtr( ClosestEntity + Offsets::Player::m_HipNode );
+                        if ( boneRoot )
+                        {
+                                uintptr_t transformValue = ReadPtr( boneRoot + Offsets::GetPosWorld::transObj );
+                                if ( transformValue )
+                                {
+                                        uintptr_t transformObj = ReadPtr( transformValue + Offsets::GetPosWorld::transObj );
+                                        if ( transformObj )
+                                        {
+                                                lockedMatrixAddr = ReadPtr( transformObj + Offsets::GetPosWorld::matrix );
+                                        }
+                                }
+                        }
+
+                        // Write position offset: 0x80 for 32bit, 0xB0 for 64bit
+                        uintptr_t posWriteOffset = N32 ? 0x80 : 0xB0;
+
+                        if ( lockedMatrixAddr )
+                        {
+                                magnetThread = std::thread( [ posWriteOffset ] ( )
+                                {
+                                        #ifdef __ANDROID__
+                                        // Android: pthread é usado diretamente.
+                                        #else
+                                                HANDLE hThread = GetCurrentThread();
+                                                SetThreadAffinityMask(hThread, 1 << 0);
+                                                SetThreadPriority(
+                                                        hThread,
+                                                        THREAD_PRIORITY_TIME_CRITICAL
+                                                );
+                                        #endif
+
+                                        while ( isHolding && lockedMatrixAddr )
+                                        {
+                                                g_FreeFireMemory.Write<Vector3>( lockedMatrixAddr + posWriteOffset, lockedRootPos );
+                                                std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
+                                        }
+                                } );
+                                magnetThread.detach( );
+                        }
+                }
+
+                if ( !keyPressed && isHolding )
+                {
+                        isHolding = false;
+                        lockedMatrixAddr = 0;
+                        lockedRootPos = { 0.f, 0.f, 0.f };
+                }
+
+        magnet_end:
+                ;
+        }
+
+        // ==================== BoneSwap Aimbot ====================
+
+        if ( AimCfg.Enabled && AimCfg.aimtype == 0 )
+        {
+                const bool keyDown = AndroidInput::IsKeyPressed( AimCfg.KeyBind );
+                const bool cursorVisible = IsCursorVisibleNow( );
+
+                if ( !keyDown )
+                {
+                        if ( BS_Applied ) BS_Restore( );
+                        BS_ActiveByCursor = false;
+                }
+                else
+                {
+                        if ( !BS_ActiveByCursor )
+                        {
+                                if ( cursorVisible == 0 )
+                                {
+                                        BS_ActiveByCursor = true;
+                                }
+                        }
+
+                        if ( BS_ActiveByCursor )
+                        {
+                                if ( ClosestEntity == 0 )
+                                {
+                                        if ( BS_Applied ) BS_Restore( );
+                                }
+                                else
+                                {
+                                        if ( !BS_Applied || BS_LastTarget != ClosestEntity )
+                                        {
+                                                if ( BS_Applied ) BS_Restore( );
+                                                if ( ClosestHP > 0 )
+                                                {
+                                                        BS_Apply( ClosestEntity );
+                                                }
+                                                else if ( BS_Applied )
+                                                {
+                                                        BS_Restore( );
+                                                }
+                                        }
+                                        else
+                                        {
+                                                if ( ClosestHP <= 0 && BS_Applied )
+                                                {
+                                                        BS_Restore( );
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+        else if ( BS_Applied )
+        {
+                BS_Restore( );
+                BS_ActiveByCursor = false;
+        }
+
+        // ==================== Silent Aim Target ====================
+        // Usa o alvo PRÓPRIO do silent (SilentClosestEntity), selecionado com
+        // Silent.Fov/Silent.MaxDistance — independente do aimbot.
+
+        if ( SilentClosestEntity != 0 )
+                Silent::SetTarget( localPlayer, SilentClosestEntity );
+        else
+                Silent::ClearTarget( );
+
+        // ==================== Rage Aimbot ====================
+
+        if ( ClosestEntity != 0 )
+        {
+                if ( CurrentMatrix.m [ 0 ][ 0 ] == 0.f )
+                {
+                        CurrentMatrix = ViewMatrix;
+                }
+
+                if ( AimCfg.Enabled && AimCfg.aimtype == 1 && ( !g_Globals.AimBot.VisibleCheck || ( g_Globals.AimBot.VisibleCheck && enemiesvisible ) ) )
+                {
+                        static bool s_AimFloodRunning = false;
+
+                        bool isShooting = ImGui::GetIO().MouseDown[0];
+                        bool keyCurrentlyPressed = AndroidInput::IsKeyPressed( AimCfg.KeyBind );
+
+                        if ( isShooting && keyCurrentlyPressed && !IsCursorVisibleNow( ) )
+                        {
+                                RageTarget = ClosestEntity;
+
+                                if ( !s_AimFloodRunning )
+                                {
+                                        s_AimFloodRunning = true;
+                                        std::thread( [ localPlayer, MainCamera, N32 ] ( )
+                                        {
+                                                // Qualquer saida (inclusive excecao) libera o flag do
+                                                // flood. Sem isso, uma excecao dentro da thread deixava
+                                                // s_AimFloodRunning preso em true e o rage nunca mais
+                                                // ativava na partida ("para do nada e nao volta").
+                                                struct FloodReset { bool* p; ~FloodReset( ) { *p = false; } } reset{ &s_AimFloodRunning };
+
+                                                int originalAimAssist = 0;
+                                                bool aimAssistModified = false;
+
+                                                try
+                                                {
+                                                auto ReadPtrT = [ N32 ] ( uintptr_t addr ) -> uintptr_t
+                                                {
+                                                        return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
+                                                };
+
+                                                int delayMs = 0;
+                                                switch ( g_Globals.AimBot.PeitosIndex )
+                                                {
+                                                        case 1: delayMs = 300; break;
+                                                        case 2: delayMs = 400; break;
+                                                        case 3: delayMs = 450; break;
+                                                        case 4: delayMs = 550; break;
+                                                        case 5: delayMs = ( rand( ) % 450 );
+                                                                break;
+                                                        default: delayMs = 0; break;
+                                                }
+
+                                                if ( delayMs > 0 )
+                                                        std::this_thread::sleep_for( std::chrono::milliseconds( delayMs ) );
+
+                                                if ( delayMs > 0 )
+                                                {
+                                                        originalAimAssist = g_FreeFireMemory.Read<int>( localPlayer + Offsets::Player::m_EAimAssit );
+                                                        g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, 2 );
+                                                        aimAssistModified = true;
+                                                }
+
+                                                if ( !ImGui::GetIO().MouseDown[0] || !AndroidInput::IsKeyPressed(g_Globals.AimBot.KeyBind) || IsCursorVisibleNow() ) 
+                                                {
+                                                        if ( aimAssistModified )
+                                                                g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
+                                                        return;
+                                                }
+
+                                                // Main aim loop
+                                                while ( !g_Globals.General.ShutDown )
+                                                {
+                                                        if ( IsCursorVisibleNow( ) )
+                                                                break;
+
+                                                        bool isStillShooting = ImGui::GetIO().MouseDown[0];
+                                                        bool isKeyStillPressed = AndroidInput::IsKeyPressed( g_Globals.AimBot.KeyBind );
+                                                        if ( !( isStillShooting && isKeyStillPressed ) )
+                                                                break;
+
+                                                        // Relê o HP do alvo SEMPRE (com ou sem IgnoreKnocked):
+                                                        // se o alvo morreu no meio do flood, sai do loop e o
+                                                        // próximo frame re-seleciona o novo alvo. Antes, com
+                                                        // IgnoreKnocked desligado, o flood ficava preso no
+                                                        // cadáver até soltar o botão — parecia travado.
+                                                        int hp = 1;
+                                                        uintptr_t fixedTarget = RageTarget;
+                                                        if ( fixedTarget != 0 )
+                                                        {
+                                                                uintptr_t priPool = ReadPtrT( fixedTarget + Offsets::ReplicationEntity::m_PRIDataPool );
+                                                                if ( priPool != 0 )
+                                                                {
+                                                                        uintptr_t datas = ReadPtrT( priPool + Offsets::ReplicationEntity::m_Datas );
+                                                                        uintptr_t health = ReadPtrT( datas + Offsets::ReplicationEntity::HealthCurrentPtr );
+                                                                        if ( health )
+                                                                                hp = g_FreeFireMemory.Read<int>( health + Offsets::ReplicationEntity::Value );
+                                                                }
+
+                                                                bool isKnocked = false;
+                                                                uintptr_t shadowBase = ReadPtrT( fixedTarget + Offsets::PlayerNetwork::m_ShadowState );
+                                                                if ( shadowBase != 0 )
+                                                                {
+                                                                        int playerPose = g_FreeFireMemory.Read<int>( shadowBase + Offsets::ShadowState::TargetPhysXPose );
+                                                                        isKnocked = ( playerPose == 8 );
+                                                                }
+
+                                                                if ( hp <= 0 || ( g_Globals.AimBot.IgnoreKnocked && isKnocked ) )
+                                                                {
+                                                                        // PraCima
+                                                                if (
+                                                                        g_Globals.AimBot.PraCima &&
+                                                                        g_Globals.AimBot.PraCimaValor > 0.f &&
+                                                                        g_Globals.AimBot.PraCimaTempo > 0
+                                                                )
+                                                                {
+                                                                        Quaternion qCurrent =
+                                                                                g_FreeFireMemory.Read<Quaternion>(
+                                                                                        localPlayer +
+                                                                                        Offsets::Player::m_AimRotation
+                                                                                );
+
+                                                                        const float totalPitchUp =
+                                                                                -g_Globals.AimBot.PraCimaValor;
+
+                                                                        const int totalTimeMs =
+                                                                                g_Globals.AimBot.PraCimaTempo;
+
+                                                                        const float pitchPerMs =
+                                                                                totalPitchUp /
+                                                                                static_cast<float>(totalTimeMs);
+
+                                                                        const Quaternion qDelta =
+                                                                                Quaternion::FromEuler(
+                                                                                        pitchPerMs,
+                                                                                        0.0f,
+                                                                                        0.0f
+                                                                                );
+
+                                                                        for (int elapsedMs = 0;
+                                                                                elapsedMs < totalTimeMs;
+                                                                                ++elapsedMs)
+                                                                        {
+                                                                                qCurrent =
+                                                                                        Quaternion::Normalized(
+                                                                                                qDelta * qCurrent
+                                                                                        );
+
+                                                                                g_FreeFireMemory.Write<Quaternion>(
+                                                                                        localPlayer +
+                                                                                        Offsets::Player::m_AimRotation,
+                                                                                        qCurrent
+                                                                                );
+
+                                                                                usleep(1000);
+                                                                        }
+
+                                                                        qCurrent =
+                                                                                Quaternion::Normalized(qCurrent);
+
+                                                                        g_FreeFireMemory.Write<Quaternion>(
+                                                                                localPlayer +
+                                                                                Offsets::Player::m_AimRotation,
+                                                                                qCurrent
+                                                                        );
+                                                                }
+
+                                                                        Sleep( 300 );
+                                                                        break;
+                                                                }
+                                                        }
+                                                        else
+                                                        {
+                                                                break;
+                                                        }
+
+                                                        Vector3 Head = Transform::GetHeadPosition( RageTarget, N32 );
+                                                        Vector3 LocalCamera = ( MainCamera != 0 ) ? Transform::get_position_Injected( MainCamera, N32 ) : Vector3::Zero( );
+                                                        if ( Head == Vector3::Zero( ) || LocalCamera == Vector3::Zero( ) )
+                                                                break;
+
+                                                        auto playerLook = AimBot::GetRotationToLocation( Head, 0.0f, LocalCamera );
+                                                        g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AimRotation, playerLook );
+                                                        std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
+                                                }
+
+                                                if ( aimAssistModified )
+                                                        g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
+
+                                                }
+                                                catch ( ... )
+                                                {
+                                                        // Excecao na thread do rage: restaura o assist e sai.
+                                                        // O FloodReset libera o flag — o rage volta a ativar.
+                                                        if ( aimAssistModified )
+                                                                g_FreeFireMemory.Write<int>( localPlayer + Offsets::Player::m_EAimAssit, originalAimAssist );
+                                                }
+
+                                        } ).detach( );
+                                }
+                        }
+                }
+        }
+
+        // ==================== Weapon Exploits ====================
+
+        uintptr_t m_InventoryManager = ReadPtr( localPlayer + Offsets::Player::m_InventoryManager );
+        uintptr_t m_itemOnHand = ReadPtr( m_InventoryManager + Offsets::InventoryManager::m_itemOnHand );
+        uintptr_t m_WeaponData = ReadPtr( m_itemOnHand + Offsets::Weapon::m_WeaponData );
+        uintptr_t WeaponParams = m_itemOnHand + Offsets::Weapon::m_WeaponParams;
+
+        // --- NoRecoil ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.NoRecoil )
+        {
+                uintptr_t FireComponent = ReadPtr( m_itemOnHand + Offsets::Weapon::FireComponent );
+                if ( FireComponent != 0 )
+                {
+                        float currentRecoil = 0.0f;
+                        if ( g_FreeFireMemory.Read<float>( FireComponent + Offsets::Weapon::tangentTheta, currentRecoil ) )
+                        {
+                                constexpr float baseRecoil = 0.0174825f;
+                                float control = static_cast< float >( g_Globals.Misc.Exploits.LocalPlayer.RecoilControl );
+                                float newRecoil = baseRecoil * ( 1.0f - ( control / 100.0f ) );
+                                if ( fabs( currentRecoil - newRecoil ) > 0.00001f )
+                                        g_FreeFireMemory.Write<float>( FireComponent + Offsets::Weapon::tangentTheta, newRecoil );
+                        }
+                }
+        }
+
+        // --- SpinBot ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.SpinBot && !IsObserving )
+        {
+                SpinBot( localPlayer, N32 );
+        }
+
+        // --- SocoLonge ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.SocoLonge && !IsObserving )
+        {
+                float socolonge = g_FreeFireMemory.Read<float>( WeaponParams + Offsets::WeaponParams::Range );
+                if ( socolonge == 1.35f )
+                {
+                        g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::Range, 3.1f );
+                }
+        }
+
+        static float s_FastmeditOriginal = 0.0f;
+        static bool s_FastmeditHasOriginal = false;
+        static bool s_FastmeditRestored = true;
+
+        if (g_Globals.Misc.Exploits.LocalPlayer.FastMedkit)
+        {
+                if (PlayerAttributes != 0)
+                {
+                        uintptr_t eatSpeedAddr = PlayerAttributes + Offsets::PlayerAttributes::m_EatSpeedScale;
+                        if (eatSpeedAddr != 0)
+                        {
+                                if (!s_FastmeditHasOriginal)
+                                {
+                                        s_FastmeditOriginal = g_FreeFireMemory.Read<float>(eatSpeedAddr);
+                                        s_FastmeditHasOriginal = true;
+                                        s_FastmeditRestored = false;
+                                }
+
+                                float valueToWrite = s_FastmeditOriginal;
+                                if (s_FastmeditOriginal == 1.0f)
+                                {
+                                        valueToWrite = 0.75f;
+                                }
+                                else if (s_FastmeditOriginal == 0.75f)
+                                {
+                                        valueToWrite = 0.50f;
+                                }
+                                g_FreeFireMemory.Write<float>(eatSpeedAddr, valueToWrite);
+                        }
+                }
+        }
+        else
+        {
+                if (s_FastmeditHasOriginal && !s_FastmeditRestored && PlayerAttributes != 0)
+                {
+                        uintptr_t eatSpeedAddr = PlayerAttributes + Offsets::PlayerAttributes::m_EatSpeedScale;
+                        if (eatSpeedAddr != 0)
+                        {
+                                g_FreeFireMemory.Write<float>(eatSpeedAddr, s_FastmeditOriginal);
+                                s_FastmeditRestored = true;
+                        }
+                }
+        }
+
+        // --- MoreDamage ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.MoreDamage )
+        {
+                g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::FullDamageDistance, 400.0f );
+        }
+
+        // --- FireDelay ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.FireDelay )
+        {
+                g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::PrefireDelay, 0.0f );
+        }
+
+        // --- Aimlock ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.Aimlock )
+        {
+                g_FreeFireMemory.Write<float>( m_itemOnHand + Offsets::Weapon::m_FireDuration, -3.0f );
+        }
+
+        // --- AimLock2x ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.AimLock2x && AimCfg.aimtype == 0 )
+        {
+                bool isSighting = g_FreeFireMemory.Read<bool>( m_itemOnHand + Offsets::Weapon::m_IsSighting );
+                if ( isSighting )
+                {
+                        uintptr_t aimassist = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
+                        g_FreeFireMemory.Write<float>( aimassist + Offsets::AimAssistOnSighting::m_fAimAssistCurrentLerpTime, 0.0f );
+                }
+        }
+
+        // --- AimbotAwm ---
+        static std::vector<std::pair<uintptr_t, int>> s_awmOriginals;
+        int WeaponType = g_FreeFireMemory.Read<int>( m_WeaponData + Offsets::Weapon::IntWeaponType );
+        if ( g_Globals.Misc.Exploits.LocalPlayer.AimbotAwm )
+        {
+                if ( WeaponType == 1 )
+                {
+                        bool exists = false;
+                        for ( const auto& pair : s_awmOriginals )
+                        {
+                                if ( pair.first == m_WeaponData )
+                                {
+                                        exists = true;
+                                        break;
+                                }
+                        }
+                        if ( !exists )
+                        {
+                                s_awmOriginals.emplace_back( m_WeaponData, WeaponType );
+                        }
+
+                        int currentCheck = g_FreeFireMemory.Read<int>( m_WeaponData + Offsets::Weapon::IntWeaponType );
+                        if ( currentCheck != 0 )
+                        {
+                                g_FreeFireMemory.Write<int>( m_WeaponData + Offsets::Weapon::IntWeaponType, 0 );
+                        }
+                }
+        }
+        else
+        {
+                if ( !s_awmOriginals.empty( ) )
+                {
+                        for ( const auto& [weaponAddr, original] : s_awmOriginals )
+                        {
+                                if ( weaponAddr != 0 )
+                                {
+                                        g_FreeFireMemory.Write<int>( weaponAddr + Offsets::Weapon::IntWeaponType, original );
+                                }
+                        }
+                        s_awmOriginals.clear( );
+                }
+        }
+        }
+        catch ( const std::exception& ex )
+        {
+                DiagLog( "[diag] Draw exception: %s", ex.what( ) );
+        }
+        catch ( ... )
+        {
+                DiagLog( "[diag] Draw exception (unknown)" );
+        }
 }
 
 // ==================== Helper Functions ====================
 
 void Data::DrawBox( float x, float y, float w, float h, ImColor color, ImColor fillColor, float thickness, int Type )
 {
-	ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
+        ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
 
-	if ( Type == 1 )
-	{
-		if ( g_Globals.Visuals.ESP.BoxFilled )
-		{
-			DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
-		}
-		DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
-		return;
-	}
-	else if ( Type == 2 )
-	{
-		float lineW = w / 3.0f;
-		float lineH = h / 3.0f;
+        if ( Type == 1 )
+        {
+                if ( g_Globals.Visuals.ESP.BoxFilled )
+                {
+                        DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
+                }
+                DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
+                return;
+        }
+        else if ( Type == 2 )
+        {
+                float lineW = w / 3.0f;
+                float lineH = h / 3.0f;
 
-		if ( g_Globals.Visuals.ESP.BoxFilled )
-		{
-			DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
-		}
+                if ( g_Globals.Visuals.ESP.BoxFilled )
+                {
+                        DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
+                }
 
-		DrawList->AddLine( ImVec2( x, y - thickness / 2 ), ImVec2( x, y + lineH ), color, thickness );
-		DrawList->AddLine( ImVec2( x - thickness / 2, y ), ImVec2( x + lineW, y ), color, thickness );
-		DrawList->AddLine( ImVec2( x + w - lineW, y ), ImVec2( x + w + thickness / 2, y ), color, thickness );
-		DrawList->AddLine( ImVec2( x + w, y - thickness / 2 ), ImVec2( x + w, y + lineH ), color, thickness );
-		DrawList->AddLine( ImVec2( x, y + h - lineH ), ImVec2( x, y + h + thickness / 2 ), color, thickness );
-		DrawList->AddLine( ImVec2( x - thickness / 2, y + h ), ImVec2( x + lineW, y + h ), color, thickness );
-		DrawList->AddLine( ImVec2( x + w - lineW, y + h ), ImVec2( x + w + thickness / 2, y + h ), color, thickness );
-		DrawList->AddLine( ImVec2( x + w, y + h - lineH ), ImVec2( x + w, y + h + thickness / 2 ), color, thickness );
-		return;
-	}
-	else if ( Type == 3 )
-	{
-		if ( g_Globals.Visuals.ESP.BoxFilled )
-		{
-			DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w ) ) );
-		}
-		DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
-		return;
-	}
-	else
-	{
-		if ( g_Globals.Visuals.ESP.BoxFilled )
-		{
-			DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
-		}
-		DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
-		return;
-	}
+                DrawList->AddLine( ImVec2( x, y - thickness / 2 ), ImVec2( x, y + lineH ), color, thickness );
+                DrawList->AddLine( ImVec2( x - thickness / 2, y ), ImVec2( x + lineW, y ), color, thickness );
+                DrawList->AddLine( ImVec2( x + w - lineW, y ), ImVec2( x + w + thickness / 2, y ), color, thickness );
+                DrawList->AddLine( ImVec2( x + w, y - thickness / 2 ), ImVec2( x + w, y + lineH ), color, thickness );
+                DrawList->AddLine( ImVec2( x, y + h - lineH ), ImVec2( x, y + h + thickness / 2 ), color, thickness );
+                DrawList->AddLine( ImVec2( x - thickness / 2, y + h ), ImVec2( x + lineW, y + h ), color, thickness );
+                DrawList->AddLine( ImVec2( x + w - lineW, y + h ), ImVec2( x + w + thickness / 2, y + h ), color, thickness );
+                DrawList->AddLine( ImVec2( x + w, y + h - lineH ), ImVec2( x + w, y + h + thickness / 2 ), color, thickness );
+                return;
+        }
+        else if ( Type == 3 )
+        {
+                if ( g_Globals.Visuals.ESP.BoxFilled )
+                {
+                        DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w ) ) );
+                }
+                DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
+                return;
+        }
+        else
+        {
+                if ( g_Globals.Visuals.ESP.BoxFilled )
+                {
+                        DrawList->AddRectFilled( ImVec2( x, y ), ImVec2( x + w, y + h ), ImGui::GetColorU32( ImVec4( fillColor.Value.x, fillColor.Value.y, fillColor.Value.z, fillColor.Value.w * 0.3f ) ) );
+                }
+                DrawList->AddRect( ImVec2( x, y ), ImVec2( x + w, y + h ), color, 0.0f, thickness );
+                return;
+        }
 }
 
 void Data::DrawWeapon( int WeaponID, bool IsKnocked, Vector3 HeadPos, float Height )
 {
-	const int Style = g_Globals.Visuals.ESP.WeaponStyle;
-	if ( Style == 0 ) return;
+        const int Style = g_Globals.Visuals.ESP.WeaponStyle;
+        if ( Style == 0 ) return;
 
-	// WeaponID < 0 = leitura de arma falhou (player continua na ESP, so
-	// a linha da arma e pulada).
-	if ( WeaponID < 0 ) return;
+        // WeaponID < 0 = leitura de arma falhou (player continua na ESP, so
+        // a linha da arma e pulada).
+        if ( WeaponID < 0 ) return;
 
-	// "Icones de arma" (ShowIcons): desliga os icones sem desativar a arma
-	// inteira — estilo Icono/Both cai para Texto quando o toggle esta off.
-	bool drawIcons = g_Globals.Visuals.ESP.ShowIcons;
+        // "Icones de arma" (ShowIcons): desliga os icones sem desativar a arma
+        // inteira — estilo Icono/Both cai para Texto quando o toggle esta off.
+        bool drawIcons = g_Globals.Visuals.ESP.ShowIcons;
 
-	static bool namegun_inited = false;
-	if ( !namegun_inited )
-	{
-		Namegun::Init( ); namegun_inited = true;
-	}
+        static bool namegun_inited = false;
+        if ( !namegun_inited )
+        {
+                Namegun::Init( ); namegun_inited = true;
+        }
 
-	ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
+        ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
 
-	const float feetY = HeadPos.Y + Height;
-	const float centerX = HeadPos.X;
+        const float feetY = HeadPos.Y + Height;
+        const float centerX = HeadPos.X;
 
-	ImVec2 iconSz( 0, 0 );
-	ImVec2 textSz( 0, 0 );
-	std::string icon, name;
+        ImVec2 iconSz( 0, 0 );
+        ImVec2 textSz( 0, 0 );
+        std::string icon, name;
 
-	ImColor Color = IsKnocked ? ImColor( 1.f, 0.f, 0.f, 1.f )
-		: ImColor( g_Globals.Visuals.ESP.WeaponColor [ 0 ], g_Globals.Visuals.ESP.WeaponColor [ 1 ],
-			g_Globals.Visuals.ESP.WeaponColor [ 2 ], g_Globals.Visuals.ESP.WeaponColor [ 3 ] );
+        ImColor Color = IsKnocked ? ImColor( 1.f, 0.f, 0.f, 1.f )
+                : ImColor( g_Globals.Visuals.ESP.WeaponColor [ 0 ], g_Globals.Visuals.ESP.WeaponColor [ 1 ],
+                        g_Globals.Visuals.ESP.WeaponColor [ 2 ], g_Globals.Visuals.ESP.WeaponColor [ 3 ] );
 
-	if ( Namegun::HasIcon( WeaponID ) && drawIcons ) icon = Namegun::GetGunIcon( WeaponID );
-	name = Namegun::GetGunName( WeaponID );
+        if ( Namegun::HasIcon( WeaponID ) && drawIcons ) icon = Namegun::GetGunIcon( WeaponID );
+        name = Namegun::GetGunName( WeaponID );
 
-	if ( ( Style == 2 || Style == 3 ) && drawIcons )
-	{
-		if ( !icon.empty( ) )
-		{
-			ImGui::PushFont( Fonts::IconWeapon );
-			iconSz = Utils::CalcTextSize( Fonts::IconWeapon, g_Globals.Visuals.ESP.TextSize, icon.c_str( ) );
-			ImGui::PopFont( );
-		}
-	}
+        if ( ( Style == 2 || Style == 3 ) && drawIcons )
+        {
+                if ( !icon.empty( ) )
+                {
+                        ImGui::PushFont( Fonts::IconWeapon );
+                        iconSz = Utils::CalcTextSize( Fonts::IconWeapon, g_Globals.Visuals.ESP.TextSize, icon.c_str( ) );
+                        ImGui::PopFont( );
+                }
+        }
 
-	// Estilo "Icon" sem icones permitidos cai para texto (fallback)
-	const bool drawText = ( Style == 1 || Style == 3 || ( Style == 2 && !drawIcons ) );
+        // Estilo "Icon" sem icones permitidos cai para texto (fallback)
+        const bool drawText = ( Style == 1 || Style == 3 || ( Style == 2 && !drawIcons ) );
 
-	if ( drawText )
-	{
-		if ( !name.empty( ) )
-		{
-			ImGui::PushFont( Fonts::InterRegular );
-			textSz = Utils::CalcTextSize( Fonts::InterRegular, g_Globals.Visuals.ESP.TextSize, name.c_str( ) );
-			ImGui::PopFont( );
-		}
-	}
+        if ( drawText )
+        {
+                if ( !name.empty( ) )
+                {
+                        ImGui::PushFont( Fonts::InterRegular );
+                        textSz = Utils::CalcTextSize( Fonts::InterRegular, g_Globals.Visuals.ESP.TextSize, name.c_str( ) );
+                        ImGui::PopFont( );
+                }
+        }
 
-	if ( ( Style == 2 || Style == 3 ) && drawIcons )
-	{
-		if ( !icon.empty( ) )
-		{
-			ImGui::PushFont( Fonts::IconWeapon );
-			DrawList->AddText( Fonts::IconWeapon, g_Globals.Visuals.ESP.TextSize,
-				ImVec2( centerX - iconSz.x * 0.5f, feetY + 33.0f ), Color, icon.c_str( ) );
-			ImGui::PopFont( );
-		}
-	}
+        if ( ( Style == 2 || Style == 3 ) && drawIcons )
+        {
+                if ( !icon.empty( ) )
+                {
+                        ImGui::PushFont( Fonts::IconWeapon );
+                        DrawList->AddText( Fonts::IconWeapon, g_Globals.Visuals.ESP.TextSize,
+                                ImVec2( centerX - iconSz.x * 0.5f, feetY + 33.0f ), Color, icon.c_str( ) );
+                        ImGui::PopFont( );
+                }
+        }
 
-	if ( drawText )
-	{
-		if ( !name.empty( ) )
-		{
-			ImGui::PushFont( Fonts::Verdana );
-			float yName = feetY + 20.0f;
-			DrawList->AddText( Fonts::Verdana, g_Globals.Visuals.ESP.TextSize,
-				ImVec2( centerX - textSz.x * 0.5f, yName ), Color, name.c_str( ) );
-			ImGui::PopFont( );
-		}
-	}
+        if ( drawText )
+        {
+                if ( !name.empty( ) )
+                {
+                        ImGui::PushFont( Fonts::Verdana );
+                        float yName = feetY + 20.0f;
+                        DrawList->AddText( Fonts::Verdana, g_Globals.Visuals.ESP.TextSize,
+                                ImVec2( centerX - textSz.x * 0.5f, yName ), Color, name.c_str( ) );
+                        ImGui::PopFont( );
+                }
+        }
 }
 
 void Data::DrawHealthBar( short CurrentHealth, short MaxHealth, ImVec2 HeadPos, ImVec2 EntityPos, float Width, float Height, uintptr_t Entity )
 {
-	struct HealthCacheEntry
-	{
-		uintptr_t Entity;
-		float SmoothedHealth;
-	};
+        struct HealthCacheEntry
+        {
+                uintptr_t Entity;
+                float SmoothedHealth;
+        };
 
-	if ( MaxHealth <= 0 ) return;
+        if ( MaxHealth <= 0 ) return;
 
-	int Style = g_Globals.Visuals.ESP.HealthBarStyle;
-	if ( Style == 0 ) return;
+        int Style = g_Globals.Visuals.ESP.HealthBarStyle;
+        if ( Style == 0 ) return;
 
-	static std::vector<HealthCacheEntry> HealthCache;
-	static const int MAX_HEALTH_ENTITIES = 512;
+        static std::vector<HealthCacheEntry> HealthCache;
+        static const int MAX_HEALTH_ENTITIES = 512;
 
-	ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
-	ImGuiIO& io = ImGui::GetIO( );
+        ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
+        ImGuiIO& io = ImGui::GetIO( );
 
-	float HealthPercentage = static_cast< float >( CurrentHealth ) / MaxHealth;
-	float* SmoothedHealthPtr = nullptr;
+        float HealthPercentage = static_cast< float >( CurrentHealth ) / MaxHealth;
+        float* SmoothedHealthPtr = nullptr;
 
-	for ( auto& entry : HealthCache )
-	{
-		if ( entry.Entity == Entity )
-		{
-			SmoothedHealthPtr = &entry.SmoothedHealth;
-			break;
-		}
-	}
+        for ( auto& entry : HealthCache )
+        {
+                if ( entry.Entity == Entity )
+                {
+                        SmoothedHealthPtr = &entry.SmoothedHealth;
+                        break;
+                }
+        }
 
-	if ( !SmoothedHealthPtr )
-	{
-		if ( HealthCache.size( ) < MAX_HEALTH_ENTITIES )
-		{
-			HealthCache.push_back( { Entity, HealthPercentage } );
-			SmoothedHealthPtr = &HealthCache.back( ).SmoothedHealth;
-		}
-		else
-		{
-			int index = Entity % MAX_HEALTH_ENTITIES;
-			HealthCache [ index ] = { Entity, HealthPercentage };
-			SmoothedHealthPtr = &HealthCache [ index ].SmoothedHealth;
-		}
-	}
+        if ( !SmoothedHealthPtr )
+        {
+                if ( HealthCache.size( ) < MAX_HEALTH_ENTITIES )
+                {
+                        HealthCache.push_back( { Entity, HealthPercentage } );
+                        SmoothedHealthPtr = &HealthCache.back( ).SmoothedHealth;
+                }
+                else
+                {
+                        int index = Entity % MAX_HEALTH_ENTITIES;
+                        HealthCache [ index ] = { Entity, HealthPercentage };
+                        SmoothedHealthPtr = &HealthCache [ index ].SmoothedHealth;
+                }
+        }
 
-	float& SmoothedHealth = *SmoothedHealthPtr;
-	SmoothedHealth = ImLerp( SmoothedHealth, HealthPercentage, io.DeltaTime * 10.0f );
+        float& SmoothedHealth = *SmoothedHealthPtr;
+        SmoothedHealth = ImLerp( SmoothedHealth, HealthPercentage, io.DeltaTime * 10.0f );
 
-	ImVec4 GreenColor = ImVec4( 0.0f, 1.0f, 0.0f, 1.0f );
-	ImVec4 YellowColor = ImVec4( 1.0f, 1.0f, 0.0f, 1.0f );
-	ImVec4 RedColor = ImVec4( 1.0f, 0.0f, 0.0f, 1.0f );
+        ImVec4 GreenColor = ImVec4( 0.0f, 1.0f, 0.0f, 1.0f );
+        ImVec4 YellowColor = ImVec4( 1.0f, 1.0f, 0.0f, 1.0f );
+        ImVec4 RedColor = ImVec4( 1.0f, 0.0f, 0.0f, 1.0f );
 
-	ImVec4 HealthBarColor;
-	if ( SmoothedHealth > 0.5f )
-		HealthBarColor = ImLerp( GreenColor, YellowColor, ( 1.0f - SmoothedHealth ) * 2.0f );
-	else
-		HealthBarColor = ImLerp( YellowColor, RedColor, ( 0.5f - SmoothedHealth ) * 2.0f );
+        ImVec4 HealthBarColor;
+        if ( SmoothedHealth > 0.5f )
+                HealthBarColor = ImLerp( GreenColor, YellowColor, ( 1.0f - SmoothedHealth ) * 2.0f );
+        else
+                HealthBarColor = ImLerp( YellowColor, RedColor, ( 0.5f - SmoothedHealth ) * 2.0f );
 
-	if ( Style == 1 )
-	{
-		ImVec2 Position( HeadPos.x - ( Width * 0.5f ) - 5.0f, HeadPos.y );
-		float BarWidth = 2.5f;
-		float FilledBarHeight = Height * SmoothedHealth;
+        if ( Style == 1 )
+        {
+                ImVec2 Position( HeadPos.x - ( Width * 0.5f ) - 5.0f, HeadPos.y );
+                float BarWidth = 2.5f;
+                float FilledBarHeight = Height * SmoothedHealth;
 
-		DrawList->AddRectFilled( ImVec2( Position.x, Position.y ), ImVec2( Position.x + BarWidth, Position.y + Height ), IM_COL32( 0, 0, 0, 128 ) );
-		DrawList->AddRectFilled( ImVec2( Position.x, Position.y + ( Height - FilledBarHeight ) ), ImVec2( Position.x + BarWidth, Position.y + Height ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
-	}
-	else if ( Style == 2 )
-	{
-		ImVec2 Position( HeadPos.x + ( Width * 0.5f ) + 3.0f, HeadPos.y );
-		float BarWidth = 2.5f;
-		float FilledBarHeight = Height * SmoothedHealth;
+                DrawList->AddRectFilled( ImVec2( Position.x, Position.y ), ImVec2( Position.x + BarWidth, Position.y + Height ), IM_COL32( 0, 0, 0, 128 ) );
+                DrawList->AddRectFilled( ImVec2( Position.x, Position.y + ( Height - FilledBarHeight ) ), ImVec2( Position.x + BarWidth, Position.y + Height ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
+        }
+        else if ( Style == 2 )
+        {
+                ImVec2 Position( HeadPos.x + ( Width * 0.5f ) + 3.0f, HeadPos.y );
+                float BarWidth = 2.5f;
+                float FilledBarHeight = Height * SmoothedHealth;
 
-		DrawList->AddRectFilled( ImVec2( Position.x, Position.y ), ImVec2( Position.x + BarWidth, Position.y + Height ), IM_COL32( 0, 0, 0, 128 ) );
-		DrawList->AddRectFilled( ImVec2( Position.x, Position.y + ( Height - FilledBarHeight ) ), ImVec2( Position.x + BarWidth, Position.y + Height ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
-	}
-	else if ( Style == 3 )
-	{
-		const bool showName = g_Globals.Visuals.ESP.ShowName;
-		float dynamicTopOffset = showName ? ( kNameOffset + kStackGap + kHealthBarHeight )
-			: kHealthOffsetBase;
+                DrawList->AddRectFilled( ImVec2( Position.x, Position.y ), ImVec2( Position.x + BarWidth, Position.y + Height ), IM_COL32( 0, 0, 0, 128 ) );
+                DrawList->AddRectFilled( ImVec2( Position.x, Position.y + ( Height - FilledBarHeight ) ), ImVec2( Position.x + BarWidth, Position.y + Height ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
+        }
+        else if ( Style == 3 )
+        {
+                const bool showName = g_Globals.Visuals.ESP.ShowName;
+                float dynamicTopOffset = showName ? ( kNameOffset + kStackGap + kHealthBarHeight )
+                        : kHealthOffsetBase;
 
-		ImVec2 Position( HeadPos.x - Width * 0.5f, HeadPos.y - dynamicTopOffset );
-		float BarHeight = kHealthBarHeight;
-		float FilledWidth = Width * SmoothedHealth;
+                ImVec2 Position( HeadPos.x - Width * 0.5f, HeadPos.y - dynamicTopOffset );
+                float BarHeight = kHealthBarHeight;
+                float FilledWidth = Width * SmoothedHealth;
 
-		DrawList->AddRectFilled( Position, ImVec2( Position.x + Width, Position.y + BarHeight ), IM_COL32( 0, 0, 0, 128 ) );
-		DrawList->AddRectFilled( Position, ImVec2( Position.x + FilledWidth, Position.y + BarHeight ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
-	}
-	else if ( Style == 4 )
-	{
-		ImVec2 Position( HeadPos.x - ( Width * 0.5f ), EntityPos.y + 5.0f );
-		float BarHeight = 2.5f;
-		float FilledWidth = Width * SmoothedHealth;
+                DrawList->AddRectFilled( Position, ImVec2( Position.x + Width, Position.y + BarHeight ), IM_COL32( 0, 0, 0, 128 ) );
+                DrawList->AddRectFilled( Position, ImVec2( Position.x + FilledWidth, Position.y + BarHeight ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
+        }
+        else if ( Style == 4 )
+        {
+                ImVec2 Position( HeadPos.x - ( Width * 0.5f ), EntityPos.y + 5.0f );
+                float BarHeight = 2.5f;
+                float FilledWidth = Width * SmoothedHealth;
 
-		DrawList->AddRectFilled( Position, ImVec2( Position.x + Width, Position.y + BarHeight ), IM_COL32( 0, 0, 0, 128 ) );
-		DrawList->AddRectFilled( Position, ImVec2( Position.x + FilledWidth, Position.y + BarHeight ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
-	}
-	else if ( Style == 5 )
-	{
-		ImGui::PushFont( Fonts::Gff );
-		char healthText [ 16 ];
-		snprintf( healthText, sizeof( healthText ), "HP: %d", ( int )CurrentHealth );
-		ImVec2 TextSize = Utils::CalcTextSize( Fonts::Gff, 13.0f, healthText );
-		ImVec2 barPos( HeadPos.x - Width * 0.5f, HeadPos.y - 3.0f );
-		ImVec2 textPos( HeadPos.x - ( TextSize.x * 0.5f ), barPos.y - TextSize.y - 2.0f );
-		DrawList->AddText( Fonts::Gff, 13.0f, textPos, ImColor( 255, 255, 255, 255 ), healthText );
-		ImGui::PopFont( );
-	}
+                DrawList->AddRectFilled( Position, ImVec2( Position.x + Width, Position.y + BarHeight ), IM_COL32( 0, 0, 0, 128 ) );
+                DrawList->AddRectFilled( Position, ImVec2( Position.x + FilledWidth, Position.y + BarHeight ), ImGui::ColorConvertFloat4ToU32( HealthBarColor ) );
+        }
+        else if ( Style == 5 )
+        {
+                ImGui::PushFont( Fonts::Gff );
+                char healthText [ 16 ];
+                snprintf( healthText, sizeof( healthText ), "HP: %d", ( int )CurrentHealth );
+                ImVec2 TextSize = Utils::CalcTextSize( Fonts::Gff, 13.0f, healthText );
+                ImVec2 barPos( HeadPos.x - Width * 0.5f, HeadPos.y - 3.0f );
+                ImVec2 textPos( HeadPos.x - ( TextSize.x * 0.5f ), barPos.y - TextSize.y - 2.0f );
+                DrawList->AddText( Fonts::Gff, 13.0f, textPos, ImColor( 255, 255, 255, 255 ), healthText );
+                ImGui::PopFont( );
+        }
 }
 
 void Data::DrawSnapLine( const Vector3& HeadPos, const Vector3& EntityPos, bool showName, bool healthTop, ImColor color, float thickness, int type )
 {
-	if ( type == 0 ) return;
+        if ( type == 0 ) return;
 
-	float topOffset = healthTop ? ( showName ? ( kNameOffset + kStackGap + kHealthBarHeight )
-		: kHealthOffsetBase )
-		: ( showName ? kNameOffset : 1.0f );
+        float topOffset = healthTop ? ( showName ? ( kNameOffset + kStackGap + kHealthBarHeight )
+                : kHealthOffsetBase )
+                : ( showName ? kNameOffset : 1.0f );
 
-	float targetX = HeadPos.X;
-	float targetY = HeadPos.Y;
+        float targetX = HeadPos.X;
+        float targetY = HeadPos.Y;
 
-	switch ( type )
-	{
-		case 1: targetY = HeadPos.Y - topOffset; break;
-		case 2: targetY = EntityPos.Y + 1.0f; break;
-		default: targetY = HeadPos.Y; break;
-	}
+        switch ( type )
+        {
+                case 1: targetY = HeadPos.Y - topOffset; break;
+                case 2: targetY = EntityPos.Y + 1.0f; break;
+                default: targetY = HeadPos.Y; break;
+        }
 
-	ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
-	ImVec2 startPoint = ( type == 2 )
-		? ImVec2( ScreenWidth * 0.5f, ( float )ScreenHeight )
-		: ImVec2( ScreenWidth * 0.5f, ScreenHeight * 0.03f );
+        ImDrawList* DrawList = ImGui::GetForegroundDrawList( );
+        ImVec2 startPoint = ( type == 2 )
+                ? ImVec2( ScreenWidth * 0.5f, ( float )ScreenHeight )
+                : ImVec2( ScreenWidth * 0.5f, ScreenHeight * 0.03f );
 
-	// Alvo fora dos limites da tela NAO pode fazer a linha sumir: clamped para
-	// a borda mais proxima, a snapline continua "pegando" (aponta a direcao)
-	// mesmo com o inimigo fora do enquadramento.
-	float targetXClamped = ImClamp( targetX, 0.0f, ( float )( ScreenWidth - 1 ) );
-	float targetYClamped = ImClamp( targetY, 0.0f, ( float )( ScreenHeight - 1 ) );
+        // Alvo fora dos limites da tela NAO pode fazer a linha sumir: clamped para
+        // a borda mais proxima, a snapline continua "pegando" (aponta a direcao)
+        // mesmo com o inimigo fora do enquadramento.
+        float targetXClamped = ImClamp( targetX, 0.0f, ( float )( ScreenWidth - 1 ) );
+        float targetYClamped = ImClamp( targetY, 0.0f, ( float )( ScreenHeight - 1 ) );
 
-	ImVec2 endPoint( targetXClamped, targetYClamped );
-	DrawList->AddLine( startPoint, endPoint, color, thickness );
+        ImVec2 endPoint( targetXClamped, targetYClamped );
+        DrawList->AddLine( startPoint, endPoint, color, thickness );
 }
 
 void Data::SpinBot( uintptr_t LocalPlayer, bool N32 )
 {
-	if ( LocalPlayer == 0 ) return;
+        if ( LocalPlayer == 0 ) return;
 
-	auto ReadPtr = [ N32 ] ( uintptr_t addr ) -> uintptr_t
-	{
-		return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
-	};
+        auto ReadPtr = [ N32 ] ( uintptr_t addr ) -> uintptr_t
+        {
+                return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
+        };
 
-	uintptr_t transform = ReadPtr( LocalPlayer + Offsets::PlayerTransformNode::m_CachedTransform );
-	if ( !transform ) return;
+        uintptr_t transform = ReadPtr( LocalPlayer + Offsets::PlayerTransformNode::m_CachedTransform );
+        if ( !transform ) return;
 
-	uintptr_t transformObj = ReadPtr( transform + Offsets::GetPosWorld::transObj );
-	if ( !transformObj ) return;
+        uintptr_t transformObj = ReadPtr( transform + Offsets::GetPosWorld::transObj );
+        if ( !transformObj ) return;
 
-	uintptr_t matrix = ReadPtr( transformObj + Offsets::GetPosWorld::matrix );
-	if ( !matrix ) return;
+        uintptr_t matrix = ReadPtr( transformObj + Offsets::GetPosWorld::matrix );
+        if ( !matrix ) return;
 
-	int index = g_FreeFireMemory.Read<int>( transformObj + Offsets::GetPosWorld::index );
+        int index = g_FreeFireMemory.Read<int>( transformObj + Offsets::GetPosWorld::index );
 
-	uintptr_t matrixList = ReadPtr( matrix + Offsets::GetPosWorld::matrix_list );
-	uintptr_t matrixIndices = ReadPtr( matrix + Offsets::GetPosWorld::matrix_indices );
+        uintptr_t matrixList = ReadPtr( matrix + Offsets::GetPosWorld::matrix_list );
+        uintptr_t matrixIndices = ReadPtr( matrix + Offsets::GetPosWorld::matrix_indices );
 
-	if ( !matrixList || !matrixIndices ) return;
+        if ( !matrixList || !matrixIndices ) return;
 
-	bool isShooting = ImGui::GetIO().MouseDown[0];
-	uintptr_t userControl = ReadPtr( LocalPlayer + Offsets::Player::m_UserControl );
-	if ( userControl != 0 )
-	{
-		uintptr_t axisDataArray = ReadPtr( userControl + Offsets::UserControlHandler::m_AxisData );
-		if ( axisDataArray != 0 )
-		{
-			uintptr_t moveAxisData = ReadPtr( axisDataArray + ( N32 ? 0x10 : 0x20 ) );
-			if ( moveAxisData != 0 )
-			{
-				bool isTouched = g_FreeFireMemory.Read<bool>( moveAxisData + Offsets::UserControlHandler::m_IsTouched );
-				if ( isTouched && !isShooting )
-				{
-					return;
-				}
-			}
-		}
-	}
+        bool isShooting = ImGui::GetIO().MouseDown[0];
+        uintptr_t userControl = ReadPtr( LocalPlayer + Offsets::Player::m_UserControl );
+        if ( userControl != 0 )
+        {
+                uintptr_t axisDataArray = ReadPtr( userControl + Offsets::UserControlHandler::m_AxisData );
+                if ( axisDataArray != 0 )
+                {
+                        uintptr_t moveAxisData = ReadPtr( axisDataArray + ( N32 ? 0x10 : 0x20 ) );
+                        if ( moveAxisData != 0 )
+                        {
+                                bool isTouched = g_FreeFireMemory.Read<bool>( moveAxisData + Offsets::UserControlHandler::m_IsTouched );
+                                if ( isTouched && !isShooting )
+                                {
+                                        return;
+                                }
+                        }
+                }
+        }
 
-	static float rotationAngle = 0.0f;
-	rotationAngle += g_Globals.Misc.Exploits.LocalPlayer.SpinSpeed * 0.1f;
+        static float rotationAngle = 0.0f;
+        rotationAngle += g_Globals.Misc.Exploits.LocalPlayer.SpinSpeed * 0.1f;
 
-	if ( rotationAngle >= 3.14159265358979323846f * 2.0f )
-		rotationAngle -= 3.14159265358979323846f * 2.0f;
+        if ( rotationAngle >= 3.14159265358979323846f * 2.0f )
+                rotationAngle -= 3.14159265358979323846f * 2.0f;
 
-	uintptr_t rotationWriteOffset = N32 ? 0x10 : 0x20;
+        uintptr_t rotationWriteOffset = N32 ? 0x10 : 0x20;
 
-	TMatrix rootMatrix = g_FreeFireMemory.Read<TMatrix>( matrixList + sizeof( TMatrix ) * index );
-	Quaternion rootQuat( rootMatrix.Rotation.x, rootMatrix.Rotation.y, rootMatrix.Rotation.z, rootMatrix.Rotation.w );
-	Vector3 rootEuler = Quaternion::ToEuler( rootQuat );
-	Quaternion newRootQuat = Quaternion::FromEuler( rootEuler.X, rotationAngle, rootEuler.Z );
+        TMatrix rootMatrix = g_FreeFireMemory.Read<TMatrix>( matrixList + sizeof( TMatrix ) * index );
+        Quaternion rootQuat( rootMatrix.Rotation.x, rootMatrix.Rotation.y, rootMatrix.Rotation.z, rootMatrix.Rotation.w );
+        Vector3 rootEuler = Quaternion::ToEuler( rootQuat );
+        Quaternion newRootQuat = Quaternion::FromEuler( rootEuler.X, rotationAngle, rootEuler.Z );
 
-	newRootQuat = Quaternion::Normalized( newRootQuat );
-	g_FreeFireMemory.Write<Vector4>( matrixList + sizeof( TMatrix ) * index + rotationWriteOffset, { newRootQuat.X, newRootQuat.Y, newRootQuat.Z, newRootQuat.W } );
-	int parentIndex = g_FreeFireMemory.Read<int>( matrixIndices + sizeof( int ) * index );
+        newRootQuat = Quaternion::Normalized( newRootQuat );
+        g_FreeFireMemory.Write<Vector4>( matrixList + sizeof( TMatrix ) * index + rotationWriteOffset, { newRootQuat.X, newRootQuat.Y, newRootQuat.Z, newRootQuat.W } );
+        int parentIndex = g_FreeFireMemory.Read<int>( matrixIndices + sizeof( int ) * index );
 
-	int curIndex = 0;
-	while ( parentIndex >= 0 && curIndex++ < 60 )
-	{
-		TMatrix parentMatrix = g_FreeFireMemory.Read<TMatrix>( matrixList + sizeof( TMatrix ) * parentIndex );
-		Quaternion parentQuat( parentMatrix.Rotation.x, parentMatrix.Rotation.y, parentMatrix.Rotation.z, parentMatrix.Rotation.w );
-		Vector3 parentEuler = Quaternion::ToEuler( parentQuat );
-		Quaternion newParentQuat = Quaternion::FromEuler( parentEuler.X, rotationAngle, parentEuler.Z );
-		newParentQuat = Quaternion::Normalized( newParentQuat );
-		g_FreeFireMemory.Write<Vector4>( matrixList + sizeof( TMatrix ) * parentIndex + rotationWriteOffset, { newParentQuat.X, newParentQuat.Y, newParentQuat.Z, newParentQuat.W } );
-		parentIndex = g_FreeFireMemory.Read<int>( matrixIndices + sizeof( int ) * parentIndex );
-	}
+        int curIndex = 0;
+        while ( parentIndex >= 0 && curIndex++ < 60 )
+        {
+                TMatrix parentMatrix = g_FreeFireMemory.Read<TMatrix>( matrixList + sizeof( TMatrix ) * parentIndex );
+                Quaternion parentQuat( parentMatrix.Rotation.x, parentMatrix.Rotation.y, parentMatrix.Rotation.z, parentMatrix.Rotation.w );
+                Vector3 parentEuler = Quaternion::ToEuler( parentQuat );
+                Quaternion newParentQuat = Quaternion::FromEuler( parentEuler.X, rotationAngle, parentEuler.Z );
+                newParentQuat = Quaternion::Normalized( newParentQuat );
+                g_FreeFireMemory.Write<Vector4>( matrixList + sizeof( TMatrix ) * parentIndex + rotationWriteOffset, { newParentQuat.X, newParentQuat.Y, newParentQuat.Z, newParentQuat.W } );
+                parentIndex = g_FreeFireMemory.Read<int>( matrixIndices + sizeof( int ) * parentIndex );
+        }
 }

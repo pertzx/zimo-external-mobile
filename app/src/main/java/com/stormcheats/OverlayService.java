@@ -6,19 +6,23 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.WindowMetrics;
 import android.view.WindowManager;
 
 public class OverlayService extends Service implements SurfaceHolder.Callback {
@@ -49,10 +53,19 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     private int panelW = 300;
     private int panelH = 500;
 
+    // ultima resolucao real aplicada na janela de render
+    private int lastScreenW = 0;
+    private int lastScreenH = 0;
+
     private final Handler panelTracker = new Handler(Looper.getMainLooper());
     private final Runnable trackPanelRunnable = new Runnable() {
         @Override
         public void run() {
+            // CORRECAO: se a tela girou (retrato -> paisagem no FreeFire),
+            // a janela de render acompanha NA HORA. Sem isso a janela fica
+            // presa no tamanho captado quando o servico subiu e o overlay
+            // aparece cortado na metade da tela.
+            syncScreenSize();
             syncPanelBoundsFromNative();
             panelTracker.postDelayed(this, 16);
         }
@@ -90,6 +103,13 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     }
 
     @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // rotacao do display: reapply tamanho real imediatamente
+        syncScreenSize();
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         panelTracker.removeCallbacks(trackPanelRunnable);
@@ -100,6 +120,76 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
+
+    /**
+     * Retorna o tamanho REAL do display (incluindo a area do notch/cutout e a
+     * barra de status). O MATCH_PARENT em janelas TYPE_APPLICATION_OVERLAY para
+     * ANTES da barra de status / cutout em muitos aparelhos, e era isso que
+     * deixava o ESP deslocado em relacao ao FreeFire (que renderiza na tela
+     * fisica inteira).
+     */
+    private int[] getRealScreenSize() {
+        Point real = new Point(0, 0);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowMetrics metrics = windowManager.getMaximumWindowMetrics();
+                real.x = metrics.getBounds().width();
+                real.y = metrics.getBounds().height();
+            } else {
+                Display disp = windowManager.getDefaultDisplay();
+                if (disp != null) disp.getRealSize(real);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "getRealScreenSize falhou: " + t.getMessage());
+        }
+        if (real.x <= 0 || real.y <= 0) {
+            Display disp = windowManager.getDefaultDisplay();
+            if (disp != null) disp.getSize(real);
+        }
+        return new int[]{ real.x, real.y };
+    }
+
+    /**
+     * CORRECAO DO OVERLAY CORTADO: reavalia o tamanho real da tela e atualiza
+     * a janela de render quando mudou (rotacao, dobraveis, etc). Roda a cada
+     * 16ms pelo tracker, entao a virada para paisagem no jogo aplica em ~1 frame.
+     * Retorna true se o tamanho mudou.
+     */
+    private boolean syncScreenSize() {
+        if (surfaceView == null || surfaceParams == null || windowManager == null) return false;
+
+        int[] real = getRealScreenSize();
+
+        if (real[0] == lastScreenW && real[1] == lastScreenH) return false;
+
+        lastScreenW = real[0];
+        lastScreenH = real[1];
+
+        surfaceParams.width = real[0];
+        surfaceParams.height = real[1];
+        try {
+            windowManager.updateViewLayout(surfaceView, surfaceParams);
+            Log.i(TAG, "Screen size sync: " + real[0] + "x" + real[1]);
+        } catch (Exception e) {
+            Log.w(TAG, "syncScreenSize falhou: " + e.getMessage());
+        }
+        return true;
+    }
+
+    /**
+     * Aplica o modo de cutout que deixa a janela entrar na area do
+     * notch/barra de status. minSdk e 28 (Android P), entao o campo
+     * layoutInDisplayCutoutMode sempre existe no aparelho.
+     */
+    private void applyCutoutMode(WindowManager.LayoutParams params) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        } else {
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+    }
 
     private void createOverlay() {
         windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
@@ -134,6 +224,15 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         surfaceParams.x = 0;
         surfaceParams.y = 0;
 
+        // overlay cobre a area do notch/cutout igual ao jogo
+        applyCutoutMode(surfaceParams);
+        // tamanho inicial = tela fisica inteira
+        int[] real = getRealScreenSize();
+        lastScreenW = real[0];
+        lastScreenH = real[1];
+        surfaceParams.width = real[0];
+        surfaceParams.height = real[1];
+
         windowManager.addView(surfaceView, surfaceParams);
     }
 
@@ -158,6 +257,9 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         touchParams.gravity = Gravity.TOP | Gravity.START;
         touchParams.x = panelX;
         touchParams.y = panelY;
+
+        // se o painel estiver perto do topo, tambem precisa entrar no cutout
+        applyCutoutMode(touchParams);
 
         touchView.setFocusable(true);
         touchView.setFocusableInTouchMode(true);

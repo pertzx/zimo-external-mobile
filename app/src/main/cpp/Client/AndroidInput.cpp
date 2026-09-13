@@ -4,6 +4,7 @@
 // #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <imgui_impl_android.h>
+#include <Interface/FloatingKeys.hpp>
 
 namespace AndroidInput {
     static bool s_MenuKeyPressed = false;
@@ -11,7 +12,13 @@ namespace AndroidInput {
 
     bool IsKeyPressed(int keyCode) {
         if (keyCode == 0x2F) return s_MenuKeyPressed;
-        return false;
+
+        /*
+         * Keybinds no Android: um "key" nunca vem de teclado físico —
+         * ou é 0 (nenhum bind) ou é um BOTÃO FLUTUANTE (vk 0x7000+).
+         * O estado dele vive no FloatingKeys (tap = toggle / segurar).
+         */
+        return FloatingKeys::IsDown(keyCode);
     }
 
     int32_t HandleInputEvent(AInputEvent* event) {

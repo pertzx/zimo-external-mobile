@@ -1,4 +1,3 @@
 ninja: Entering directory `C:\zimo-external-mobile\app\.cxx\Debug\2ka4sv6u\armeabi-v7a'
 [0/2] Re-checking globbed directories...
-[1/2] Building CXX object CMakeFiles/client.dir/Client/Draw/Draw.cpp.o
-[2/2] Linking CXX shared library C:\zimo-external-mobile\app\build\intermediates\cxx\Debug\2ka4sv6u\obj\armeabi-v7a\libclient.so
+ninja: no work to do.

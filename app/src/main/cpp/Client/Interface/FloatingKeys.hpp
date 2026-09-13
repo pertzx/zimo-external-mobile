@@ -1,0 +1,116 @@
+#pragma once
+
+/*
+ * ============================================================================
+ * FloatingKeys.hpp
+ * ============================================================================
+ *
+ * BOTÕES FLUTUANTES de keybind para touch.
+ *
+ * No desktop o keybind espera uma tecla física (GetAsyncKeyState) — no
+ * Android isso nunca dispara (o stub do WindowsCompat.hpp sempre devolve 0)
+ * e não existe teclado no meio do jogo. Solução: cada keybind do painel
+ * pode criar um BOTÃO FLUTUANTE na tela, desenhado por cima do jogo via
+ * ImGui (ForegroundDrawList), com o texto da função ("Aim", "Silent",
+ * "Ghost"...).
+ *
+ * Modos (Globals.General.FloatingKeysHold):
+ *   false = TOQUE SIMPLES : um toque liga, outro toque desliga (toggle)
+ *   true  = SEGURAR       : ligado enquanto o dedo estiver pressionado
+ *
+ * O DESENHO é 100% ImGui (libclient). O TOQUE chega pelo Java: o
+ * OverlayService cria uma pequena janela overlay transparente em cima de
+ * cada botão e repassa ACTION_DOWN/UP para nativeFloatingKeyTouch()
+ * (Client/main.cpp), que chama FloatingKeys::OnTouch() aqui.
+ *
+ * IsDown(vk) é o que o gameplay consulta — vk é o mesmo int do KeyBind
+ * antigo (faixa 0x7000+), então o resto do código nem precisa saber se
+ * o "key" veio de teclado ou de botão de tela.
+ * ============================================================================
+ */
+
+#include <string>
+#include <vector>
+
+namespace FloatingKeys
+{
+    /*
+     * Faixa dos vks virtuais dos botões flutuantes. Um KeyBind cujo valor
+     * cai nessa faixa é um botão de tela (não uma tecla física).
+     */
+    constexpr int kVkBase = 0x7000;
+
+    /*
+     * Cria (ou reaproveita) um botão flutuante com o label dado e devolve
+     * o vk dele. Chamado pelo widget Custom::KeyBind no Android quando o
+     * usuário toca no "None" para ativar.
+     */
+    int Acquire(const char* label);
+
+    /*
+     * Remove o botão (o widget mostra "None" de novo). vk fora da faixa
+     * ou inexistente é ignorado.
+     */
+    void Release(int vk);
+
+    /*
+     * Nome curto do botão ("F1", "F2"...) para mostrar no widget.
+     * vk fora da faixa devolve "None".
+     */
+    const char* VkLabel(int vk);
+
+    /*
+     * Label humano registrado no Acquire ("Aim", "Silent"...).
+     * Devolve nullptr se o vk não existir.
+     */
+    const char* VkTitle(int vk);
+
+    /*
+     * Estado EFETIVO do botão, conforme o modo:
+     *   modo toque    -> alterna no toque, persiste até o próximo toque
+     *   modo segurar  -> true somente enquanto o dedo está na tela
+     * É o que AndroidInput::IsKeyPressed() consulta para vk >= 0x7000.
+     */
+    bool IsDown(int vk);
+
+    /*
+     * true se vk pertence a um botão flutuante existente.
+     */
+    bool Exists(int vk);
+
+    /*
+     * Evento de toque vindo do JNI (janela Java do botão).
+     * down = true no ACTION_DOWN, false no ACTION_UP/CANCEL.
+     */
+    void OnTouch(int vk, bool down);
+
+    /*
+     * Desenha todos os botões na ImGui::GetForegroundDrawList() e
+     * devolve, via array plano, a lista de retângulos para o Java
+     * posicionar as janelas de toque:
+     *     [vk0, x0, y0, w0, h0, vk1, x1, y1, w1, h1, ...]
+     * Coordenadas em pixels da SURFACE (mesma origem do painel).
+     *
+     * Chamado 1x por frame pelo PanelApp::Run() — sempre, com o menu
+     * aberto ou fechado (os botões servem pra usar DURANTE o jogo).
+     */
+    void DrawTick(int screenW, int screenH, int* outBounds, int boundsMax, int& boundsCount);
+
+    /*
+     * Quantidade de botões ativos.
+     */
+    int Count();
+
+    /*
+     * Rects do ÚLTIMO DrawTick (coordenadas da surface), no formato
+     * [vk, x, y, w, h, ...] — é o que o JNI (nativeGetFloatingKeys)
+     * devolve pro Java posicionar as janelas de toque.
+     */
+    constexpr int kMaxKeys = 6;
+    void GetBounds(int* outArr, int maxInts, int& outCount);
+
+    /*
+     * Limpa tudo (restart/shutdown do painel).
+     */
+    void Clear();
+}

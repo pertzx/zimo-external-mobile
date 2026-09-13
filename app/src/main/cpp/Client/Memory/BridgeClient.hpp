@@ -62,6 +62,31 @@ namespace BridgeClient
         uint32_t size
     );
 
+    /*
+     * Leitura em LOTE: N endereços em UM round-trip.
+     *
+     * items  : array com {address, size} de cada leitura.
+     * count  : número de itens.
+     * outBlob: buffer de saída com os dados CONCATENADOS na ordem
+     *          dos itens (item falho vem ZERADO — total sempre
+     *          soma dos sizes).
+     *
+     * Retorna false apenas se o TRANSPORTE falhou (sem daemon).
+     * Leitura de item individual falhada NÃO é erro de transporte:
+     * o item vem zerado no blob.
+     */
+    struct BatchItem
+    {
+        uint64_t address;
+        uint32_t size;
+    };
+
+    bool ReadBatch(
+        const BatchItem* items,
+        uint32_t count,
+        std::vector<uint8_t>& outBlob
+    );
+
     bool WriteMem(
         uint32_t pid,
         uint64_t address,

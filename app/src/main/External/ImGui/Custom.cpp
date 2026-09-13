@@ -6,21 +6,159 @@
 #include <Fonts/Bytes/IconsFontAwesome6.h>
 #include <map>
 #include <Overlay/Overlay.hpp>
+#include <Interface/FloatingKeys.hpp>
+#include <cmath>
+#include <ctime>
+
+// ═══════════════════════════════════════════════════════════════
+// CORRECAO: declaracoes que o bloco de scroll/touch usa
+// (tem que vir ANTES do bloco de scroll que foi colado)
+// ═══════════════════════════════════════════════════════════════
 using namespace ImGui;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Lux - Modern Minimal UI Implementation
-// Dark Theme with Neutral Accent -- #3D3D3D
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Variável global para controle de slider ativo (acessível via extern)
-ImGuiID activeSlider = 0;
-
-// Variável global para controle de color picker ativo (acessível via extern)
+// widgets ativos — usados pelo controle de scroll dos CustomChildrens
+ImGuiID activeSlider     = 0;
+ImGuiID activeCombo      = 0;
 ImGuiID activeColorPicker = 0;
 
-// Variável global para controle de combo aberto (acessível via extern)
-ImGuiID activeCombo = 0;
+// ═════════════════════════════════════════════════════════════════════════════
+// TOUCH SCROLL — arrastar pra rolar os CustomChilds (mobile)
+//
+// O ImGui não tem rolagem por toque: sem isso, um card com muitas opções
+// não rola de jeito nenhum no Android. Aqui, quando o dedo arrasta
+// verticalmente dentro de um child rolável:
+//   - se o toque começou num item "clicável" (checkbox/botão), o clique é
+//     cancelado (ClearActiveID) e o arrasto vira rolagem;
+//   - se começou num slider/combo/color picker (gestos deles), não rouba;
+//   - soltar o dedo com velocidade aplica inércia (fling).
+// ═════════════════════════════════════════════════════════════════════════════
+namespace {
+    struct TouchScrollState {
+        ImGuiID winId = 0;
+        bool decided = false;   // gesto em andamento (dedo pressionado)
+        bool steal = false;     // gesto virou rolagem
+        ImVec2 downPos = ImVec2(0, 0);
+        float lastY = 0.0f;
+        long long lastMs = 0;
+        float vel = 0.0f;       // px/s (suavizada)
+        ImGuiID activeAtDown = 0;
+    };
+    static TouchScrollState g_TS;
+    static std::map<ImGuiID, float> g_ScrollInertia;
+
+    static long long TS_NowMs() {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (long long)ts.tv_sec * 1000ll + ts.tv_nsec / 1000000ll;
+    }
+
+    // Chamar 1x por frame logo após BeginChild() do CustomChild.
+    static void TouchScrollTick(ImGuiWindow* child) {
+        ImGuiContext& g = *GImGui;
+        ImGuiIO& io = GetIO();
+        if (!child) return;
+
+        const bool mouseDown = io.MouseDown[0];
+
+        // ---- Inércia: rola sozinho depois de soltar com velocidade ----
+        auto itIn = g_ScrollInertia.find(child->ID);
+        if (itIn != g_ScrollInertia.end()) {
+            if (!mouseDown && fabsf(itIn->second) > 20.0f) {
+                const float dt = ImClamp(io.DeltaTime, 0.001f, 0.05f);
+                child->Scroll.y -= itIn->second * dt;
+                itIn->second *= expf(-6.0f * dt);   // atrito
+            } else {
+                g_ScrollInertia.erase(itIn);
+            }
+        }
+
+        // ---- Rolável? (conteúdo maior que a área) ----
+        const bool scrollable =
+            child->ScrollbarY ||
+            (child->ContentSize.y > child->Size.y + 2.0f);
+        if (!scrollable) {
+            if (g_TS.winId == child->ID) {
+                g_TS.decided = false;
+                g_TS.steal = false;
+                g_TS.vel = 0.0f;
+            }
+            return;
+        }
+
+        // ---- Hovered = dedo em cima deste child ----
+        if (mouseDown && ImGui::IsWindowHovered()) {
+            if (!g_TS.decided) {
+                g_TS.decided = true;
+                g_TS.steal = false;
+                g_TS.winId = child->ID;
+                g_TS.downPos = io.MousePos;
+                g_TS.lastY = io.MousePos.y;
+                g_TS.lastMs = TS_NowMs();
+                g_TS.vel = 0.0f;
+                g_TS.activeAtDown = g.ActiveId;
+            }
+
+            if (g_TS.winId == child->ID) {
+                const float dyFrame = io.MousePos.y - g_TS.lastY;
+
+                if (!g_TS.steal) {
+                    const float dxTot = io.MousePos.x - g_TS.downPos.x;
+                    const float dyTot = io.MousePos.y - g_TS.downPos.y;
+
+                    if (fabsf(dyTot) > 14.0f && fabsf(dyTot) > fabsf(dxTot) * 1.25f) {
+                        // Não rouba o gesto de sliders/combos/color pickers
+                        const bool blocked =
+                            g_TS.activeAtDown != 0 && (
+                                g_TS.activeAtDown == activeSlider ||
+                                g_TS.activeAtDown == activeCombo ||
+                                g_TS.activeAtDown == activeColorPicker);
+
+                        if (!blocked) {
+                            g_TS.steal = true;
+                            if (g.ActiveId != 0)
+                                ClearActiveID();   // cancela o clique que ia disparar
+                        }
+                    }
+                }
+
+                if (g_TS.steal) {
+                    child->Scroll.y -= dyFrame;
+
+                    const long long now = TS_NowMs();
+                    const float dt = (float)(now - g_TS.lastMs) / 1000.0f;
+                    if (dt > 0.001f)
+                        g_TS.vel = g_TS.vel * 0.65f + (-dyFrame / dt) * 0.35f;
+                    g_TS.lastMs = now;
+                }
+
+                g_TS.lastY = io.MousePos.y;
+            }
+        } else {
+            // Dedo soltou (ou saiu do child)
+            if (g_TS.steal && g_TS.winId == child->ID && g_TS.vel != 0.0f)
+                g_ScrollInertia[child->ID] = g_TS.vel;
+
+            g_TS.decided = false;
+            g_TS.steal = false;
+            g_TS.vel = 0.0f;
+        }
+    }
+}
+// using namespace ImGui;
+
+// // ═══════════════════════════════════════════════════════════════════════════════
+// // Lux - Modern Minimal UI Implementation
+// // Dark Theme with Neutral Accent -- #3D3D3D
+// // ═══════════════════════════════════════════════════════════════════════════════
+
+// // Variável global para controle de slider ativo (acessível via extern)
+// ImGuiID activeSlider = 0;
+
+// // Variável global para controle de color picker ativo (acessível via extern)
+// ImGuiID activeColorPicker = 0;
+
+// // Variável global para controle de combo aberto (acessível via extern)
+// ImGuiID activeCombo = 0;
 
 // Variável global para área do popup do combo (acessível via extern)
 ImRect activeComboPopupRect = ImRect(0, 0, 0, 0);
@@ -519,6 +657,10 @@ namespace Custom {
         
         // Permitir scroll vertical - usar AlwaysVerticalScrollbar para garantir área de scroll
         bool ret = BeginChild(childId, actualSize - ImVec2(0, 36), ImGuiChildFlags_None, ImGuiWindowFlags_None);
+
+        // TOUCH SCROLL: arrastar pra rolar dentro do card (mobile)
+        TouchScrollTick(GetCurrentWindow());
+
         SetCursorPos(ImVec2(14, 12));
         BeginGroup();
         
@@ -1008,7 +1150,13 @@ const char* GetKeyName(int vkCode) {
 #ifdef _WIN32
 const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
 #else
-const char* keyText = it->listening ? "..." : "Key";
+/*
+ * ANDROID: não existe teclado físico. O KeyBind aqui é um ATALHO pra
+ * criar/remover o BOTÃO FLUTUANTE da função (FloatingKeys). O box mostra
+ * o nome do botão ("F1", "F2"...) ou "None". Tocar de novo no box com um
+ * botão já criado remove ele da tela.
+ */
+const char* keyText = (*Key != 0) ? FloatingKeys::VkLabel(*Key) : "None";
 #endif
         ImGui::PushFont(Fonts::InterMedium);
         ImVec2 keySize = CalcTextSize(keyText);
@@ -1036,6 +1184,7 @@ const char* keyText = it->listening ? "..." : "Key";
         
         bool pressed = hovered && ImGui::IsMouseClicked(0) && !IsClickBlocked();
 
+#ifdef _WIN32
         // Sync com estado global
         if (activeKeyBind != 0 && activeKeyBind != id) {
             it->listening = false;
@@ -1051,6 +1200,21 @@ const char* keyText = it->listening ? "..." : "Key";
             it->mouseWasReleased = false; // Reset flag
             activeKeyBind = id;
         }
+#else
+        /*
+         * ANDROID — criar/remover o botão flutuante:
+         *   box "None" + toque = cria um botão com o label da função
+         *   box "F#"  + toque = remove o botão da tela
+         */
+        if (pressed) {
+            if (*Key == 0) {
+                *Key = FloatingKeys::Acquire(label);
+            } else {
+                FloatingKeys::Release(*Key);
+                *Key = 0;
+            }
+        }
+#endif
 
         it->hover = it->hover + (((hovered ? 1.0f : 0.0f) - it->hover) * dt * 15.0f);
         it->active = it->active + (((it->listening ? 1.0f : 0.0f) - it->active) * dt * 12.0f);
@@ -1085,9 +1249,9 @@ const char* keyText = it->listening ? "..." : "Key";
                 }
             }
 #else
-            // Android: não captura teclas físicas via GetAsyncKeyState
-            // Se precisar de keybind no Android, implemente via AndroidInput.cpp
-            (void)Key;
+            // Android: o keybind já virou botão flutuante (criado no bloco
+            // de cima) — não há teclado físico pra capturar aqui.
+            it->listening = false;
 #endif
         }
 

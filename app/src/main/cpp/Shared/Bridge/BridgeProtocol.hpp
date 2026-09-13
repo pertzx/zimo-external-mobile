@@ -78,6 +78,23 @@ enum BridgeCmd : uint32_t
      * Encerra o daemon de forma limpa (usado pelo Java no stop).
      */
     BRIDGE_CMD_SHUTDOWN = 7,
+
+    /*
+     * LEITURA EM LOTE — o coração da velocidade do ESP.
+     *
+     * Payload do pedido: N itens de 12 bytes, cada um:
+     *     uint64_t address;
+     *     uint32_t size;
+     *
+     * Payload da resposta: os dados lidos CONCATENADOS na mesma ordem
+     * (N leituras em UM único round-trip do socket). Item com falha de
+     * leitura vem ZERADO no payload — o código chamante trata zero como
+     * "leitura falhou", igual ao comportamento do READ individual.
+     *
+     * Status: BRIDGE_OK (tudo lido) ou BRIDGE_ERR_PARTIAL (alguns itens
+     * falharam — o payload ainda assim contém os bytes de todos).
+     */
+    BRIDGE_CMD_READ_BATCH = 8,
 };
 
 enum BridgeStatus : uint32_t

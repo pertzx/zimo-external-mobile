@@ -3,6 +3,7 @@
 #include <android/native_window_jni.h>
 #include <android/input.h>
 #include "PanelApp.hpp"
+#include "Interface/FloatingKeys.hpp"
 #include <imgui.h>
 #include <android/log.h>
 
@@ -91,6 +92,43 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
         jintArray arr = env->NewIntArray(4);
         env->SetIntArrayRegion(arr, 0, 4, values);
         return arr;
+    }
+
+    // ============================================================
+    //  BOTÕES FLUTUANTES de keybind — ponte Java <-> C++
+    //
+    //  nativeGetFloatingKeys(): devolve array plano com o rect de
+    //  cada botão EM COORDENADAS DA SURFACE:
+    //      [vk0, x0, y0, w0, h0, vk1, x1, y1, w1, h1, ...]
+    //  O OverlayService usa isso pra posicionar uma pequena janela
+    //  de toque sobre cada botão (os valores são preenchidos pelo
+    //  FloatingKeys::DrawTick a cada frame do painel).
+    //
+    //  nativeFloatingKeyTouch(): o Java repassa ACTION_DOWN/UP de
+    //  cada janela de toque; o FloatingKeys decide se é toggle
+    //  (modo clique) ou hold (modo segurar).
+    // ============================================================
+    JNIEXPORT jintArray JNICALL
+    Java_com_stormcheats_OverlayService_nativeGetFloatingKeys(JNIEnv* env, jobject thiz) {
+        /*
+         * Os rects foram preenchidos pelo FloatingKeys::DrawTick no último
+         * frame (PanelApp::Run chama a cada loop). Aqui só copiamos pro Java.
+         */
+        int bounds[FloatingKeys::kMaxKeys * 5] = { 0 };
+        int count = 0;
+
+        FloatingKeys::GetBounds(bounds, (int)(sizeof(bounds) / sizeof(int)), count);
+
+        jintArray arr = env->NewIntArray(count);
+        if (count > 0)
+            env->SetIntArrayRegion(arr, 0, count, bounds);
+        return arr;
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeFloatingKeyTouch(JNIEnv* env, jobject thiz,
+        jint vk, jboolean down) {
+        FloatingKeys::OnTouch((int)vk, down == JNI_TRUE);
     }
 
 }

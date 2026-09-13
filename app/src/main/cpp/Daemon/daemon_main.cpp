@@ -1034,6 +1034,92 @@ namespace
                 break;
             }
 
+            case BRIDGE_CMD_READ_BATCH:
+            {
+                /*
+                 * Payload in : N x 12 bytes { uint64 addr; uint32 size; }
+                 * Payload out: dados concatenados (item falho = zeros).
+                 * Uma unica viagem de socket para N leituras — e isso que
+                 * faz o ESP atualizar rapido no Android.
+                 */
+                if (req.PayloadSize == 0 ||
+                    req.PayloadSize > BRIDGE_MAX_PAYLOAD ||
+                    (req.PayloadSize % 12) != 0)
+                {
+                    resp.Status = BRIDGE_ERR_INVALID;
+                    g_TotalErrors++;
+                    break;
+                }
+
+                const size_t itemCount = req.PayloadSize / 12;
+                const uint8_t* in = payloadIn.data();
+
+                /* 1a passada: soma os tamanhos (limita a 1 MiB). */
+                size_t totalBytes = 0;
+
+                for (size_t i = 0; i < itemCount; i++)
+                {
+                    uint32_t sz;
+                    memcpy(&sz, in + i * 12 + 8, sizeof(sz));
+                    totalBytes += sz;
+                }
+
+                if (totalBytes > BRIDGE_MAX_PAYLOAD)
+                {
+                    resp.Status = BRIDGE_ERR_TOOBIG;
+                    g_TotalErrors++;
+                    break;
+                }
+
+                payloadOut.assign(totalBytes, 0);
+
+                size_t failed = 0;
+                size_t offset = 0;
+
+                for (size_t i = 0; i < itemCount; i++)
+                {
+                    uint64_t addr;
+                    uint32_t sz;
+
+                    memcpy(&addr, in + i * 12, sizeof(addr));
+                    memcpy(&sz, in + i * 12 + 8, sizeof(sz));
+
+                    if (addr == 0 || sz == 0 || offset + sz > totalBytes)
+                    {
+                        failed++;
+                        offset += sz;
+                        continue;
+                    }
+
+                    if (!BridgeReadMem(
+                            static_cast<pid_t>(req.Pid),
+                            addr,
+                            payloadOut.data() + offset,
+                            sz))
+                    {
+                        /* Item ja vem zerado no payload (assign inicial). */
+                        failed++;
+                    }
+
+                    offset += sz;
+                }
+
+                resp.PayloadSize = static_cast<uint32_t>(totalBytes);
+                resp.Status = (failed == 0) ? BRIDGE_OK : BRIDGE_ERR_PARTIAL;
+
+                g_TotalReads += (uint64_t)itemCount;
+
+                if (failed != 0)
+                {
+                    LOGE(
+                        "[READBATCH] pid=%u itens=%zu falhas=%zu total=%zu",
+                        req.Pid, itemCount, failed, totalBytes
+                    );
+                }
+
+                break;
+            }
+
             case BRIDGE_CMD_FIND_PID:
             {
                 std::vector<std::string> names;

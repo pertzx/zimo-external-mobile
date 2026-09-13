@@ -14,6 +14,7 @@ set(OLD_GLOB
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Draw/Weapon/NameGun.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Fonts/Fonts.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/IPC/IPCClient.cpp"
+  "C:/zimo-external-mobile/app/src/main/cpp/Client/Interface/FloatingKeys.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Interface/Interface.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Math/Math.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Math/Quaternion/Quaternion.cpp"

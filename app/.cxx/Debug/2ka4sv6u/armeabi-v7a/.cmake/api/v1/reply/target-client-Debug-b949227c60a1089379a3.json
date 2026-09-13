@@ -211,7 +211,8 @@
 				32,
 				33,
 				34,
-				35
+				35,
+				36
 			],
 			"sysroot" : 
 			{
@@ -312,7 +313,8 @@
 				32,
 				33,
 				34,
-				35
+				35,
+				36
 			]
 		}
 	],
@@ -370,6 +372,12 @@
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
 			"path" : "Client/IPC/IPCClient.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "Client/Interface/FloatingKeys.cpp",
 			"sourceGroupIndex" : 0
 		},
 		{

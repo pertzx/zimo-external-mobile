@@ -1176,6 +1176,40 @@ bool Memory::Read(
     return false;
 }
 
+bool Memory::ReadBatch(
+    const BatchItem* items,
+    size_t count,
+    std::vector<uint8_t>& outBlob
+)
+{
+    outBlob.clear();
+
+    if (!items || count == 0 || s_TargetPid <= 0)
+        return false;
+
+    /*
+     * Converte os itens para o formato da ponte (uint64 addr) e faz UM
+     * pedido só. A ponte devolve os dados concatenados; item com falha
+     * vem zerado, que é exatamente o que os leitores da cadeia esperam
+     * (ponteiro 0 = descarta a entidade, igual ao READ individual).
+     */
+    std::vector<BridgeClient::BatchItem> bridgeItems(count);
+
+    for (size_t i = 0; i < count; i++)
+    {
+        bridgeItems[i].address =
+            static_cast<uint64_t>(items[i].address);
+
+        bridgeItems[i].size = items[i].size;
+    }
+
+    return BridgeClient::ReadBatch(
+        bridgeItems.data(),
+        static_cast<uint32_t>(count),
+        outBlob
+    );
+}
+
 bool Memory::Write(
     uintptr_t address,
     const void* value,

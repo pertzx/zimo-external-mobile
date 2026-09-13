@@ -127,6 +127,14 @@ namespace Cheat {
             bool EnableFuncs = false;
 
             /*
+             * Modo dos BOTÕES FLUTUANTES de keybind (mobile):
+             *   false = TOQUE SIMPLES : um toque liga, outro desliga
+             *   true  = SEGURAR       : ligado só enquanto o dedo está no botão
+             * Escolhido na aba Config.
+             */
+            bool FloatingKeysHold = false;
+
+            /*
              * ============================================================
              * GameProfile — O TIPO DO JOGO, escolhido na aba Settings.
              * E a UNICA configuracao de jogo que existe agora. Essa escolha

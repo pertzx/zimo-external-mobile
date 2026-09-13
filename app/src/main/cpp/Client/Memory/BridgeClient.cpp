@@ -536,6 +536,61 @@ bool ReadMem(
     return true;
 }
 
+bool ReadBatch(
+    const BatchItem* items,
+    uint32_t count,
+    std::vector<uint8_t>& outBlob
+)
+{
+    outBlob.clear();
+
+    if (!items || count == 0)
+        return false;
+
+    /*
+     * Monta o payload: N x 12 bytes (endereco + tamanho), packed.
+     * O protocolo do daemon espera exatamente esse layout.
+     */
+    std::vector<uint8_t> payload(count * 12);
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+        uint8_t* p = payload.data() + (size_t)i * 12;
+
+        uint64_t addr = items[i].address;
+        uint32_t sz = items[i].size;
+
+        memcpy(p, &addr, sizeof(addr));
+        memcpy(p + 8, &sz, sizeof(sz));
+    }
+
+    BridgeRequest req{};
+
+    req.Cmd = BRIDGE_CMD_READ_BATCH;
+    req.PayloadSize = static_cast<uint32_t>(payload.size());
+
+    BridgeResponse resp{};
+    std::vector<uint8_t> respPayload;
+
+    if (!Request(
+            req,
+            payload.data(),
+            static_cast<uint32_t>(payload.size()),
+            resp,
+            respPayload
+        ))
+    {
+        return false;
+    }
+
+    if (resp.Status != BRIDGE_OK && resp.Status != BRIDGE_ERR_PARTIAL)
+        return false;
+
+    outBlob = std::move(respPayload);
+
+    return true;
+}
+
 bool WriteMem(
     uint32_t pid,
     uint64_t address,

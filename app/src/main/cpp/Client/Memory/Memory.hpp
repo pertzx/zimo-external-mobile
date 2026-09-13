@@ -22,6 +22,24 @@ public:
     static bool Write(uintptr_t address, const void* value, size_t size);
 
     /*
+     * Leitura em LOTE via ponte: N endereços em UM único round-trip do
+     * socket. outBlob recebe os dados concatenados na ordem dos itens;
+     * item com falha de leitura vem ZERADO. Retorna false só se a ponte
+     * inteira estiver indisponível (nesse caso outBlob fica vazio).
+     */
+    struct BatchItem
+    {
+        uintptr_t address;
+        uint32_t size;
+    };
+
+    static bool ReadBatch(
+        const BatchItem* items,
+        size_t count,
+        std::vector<uint8_t>& outBlob
+    );
+
+    /*
      * Log verbose de cada operação READ/WRITE (diagnóstico da ponte).
      * Off por padrão; ligue para ver no logcat (tag StormBridge) cada
      * acesso feito quando você ativa uma função no painel.

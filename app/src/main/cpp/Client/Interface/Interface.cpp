@@ -10,6 +10,9 @@
 #include "../AndroidInput.hpp"
 #include "../AndroidOverlay.hpp"
 #include <Memory/Memory.hpp>
+#include <Offsets/Offsets.hpp>
+#include <PanelApp.hpp>
+#include <Interface/FloatingKeys.hpp>
 #include <cmath>
 #include <XorStr.hpp>
 
@@ -395,6 +398,81 @@ void Interface::RenderGui()
                         g_Globals.General.ShutDown = true;
                         return;
                 }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════════
+        // FAB DO MENU — botão flutuante que reabre o painel minimizado
+        //
+        // O painel minimiza pelo botão "–" no header (ou tecla volume).
+        // Minimizado, este FAB fica na tela (com o logo), arrastável, e um
+        // toque simples reabre o painel. A área de TOQUE é o próprio
+        // touchWindow do painel: o Java recebe os bounds do FAB via
+        // PanelApp::SetPanelBounds abaixo e posiciona a janela em cima dele.
+        // ═════════════════════════════════════════════════════════════════════════
+        static ImVec2 s_FabPos = ImVec2(-1, -1);
+        static bool s_FabDragging = false;
+        static bool s_FabWasDrag = false;
+        static ImVec2 s_FabGrab(0, 0);
+        static ImVec2 s_FabClickPos(0, 0);
+        const float kFabSize = 58.0f;
+
+        if (s_FabPos.x < 0)
+                s_FabPos = ImVec2(18.0f, io.DisplaySize.y * 0.45f);
+
+        if (!bIsMenuOpen && !g_WantShutdown)
+        {
+                ImVec2 fabMin = s_FabPos;
+                ImVec2 fabMax = s_FabPos + ImVec2(kFabSize, kFabSize);
+                const bool fabHover =
+                        io.MousePos.x >= fabMin.x && io.MousePos.x <= fabMax.x &&
+                        io.MousePos.y >= fabMin.y && io.MousePos.y <= fabMax.y;
+
+                if (fabHover && ImGui::IsMouseClicked(0))
+                {
+                        s_FabDragging = true;
+                        s_FabWasDrag = false;
+                        s_FabGrab = io.MousePos - s_FabPos;
+                        s_FabClickPos = io.MousePos;
+                }
+
+                if (s_FabDragging && ImGui::IsMouseDown(0))
+                {
+                        float dxTot = io.MousePos.x - s_FabClickPos.x;
+                        float dyTot = io.MousePos.y - s_FabClickPos.y;
+                        if (sqrtf(dxTot * dxTot + dyTot * dyTot) > 14.0f)
+                                s_FabWasDrag = true;
+
+                        s_FabPos = io.MousePos - s_FabGrab;
+                        s_FabPos.x = ImClamp(s_FabPos.x, 0.0f, io.DisplaySize.x - kFabSize);
+                        s_FabPos.y = ImClamp(s_FabPos.y, 0.0f, io.DisplaySize.y - kFabSize);
+                }
+                else if (s_FabDragging && !ImGui::IsMouseDown(0))
+                {
+                        s_FabDragging = false;
+                        if (!s_FabWasDrag)
+                                bIsMenuOpen = true;   // toque simples = reabrir
+                }
+
+                ImDrawList* fdl = ImGui::GetForegroundDrawList();
+                ImVec2 fc((fabMin.x + fabMax.x) * 0.5f, (fabMin.y + fabMax.y) * 0.5f);
+
+                fdl->AddCircleFilled(fc + ImVec2(0, 3), kFabSize * 0.5f, IM_COL32(0, 0, 0, 80), 48);
+                fdl->AddCircleFilled(fc, kFabSize * 0.5f, IM_COL32(14, 14, 14, 235), 48);
+                fdl->AddCircle(fc, kFabSize * 0.5f, IM_COL32(200, 0, 0, 210), 48, 2.0f);
+
+                if (Fonts::LogoTexture)
+                        fdl->AddImage(
+                                (ImTextureID)(intptr_t)Fonts::LogoTexture,
+                                fabMin + ImVec2(11, 11), fabMax - ImVec2(11, 11),
+                                ImVec2(0, 0), ImVec2(1, 1),
+                                IM_COL32(255, 255, 255, 235));
+
+                // O touchWindow Java passa a seguir o FAB enquanto minimizado
+                PanelApp::SetPanelBounds(s_FabPos.x, s_FabPos.y, kFabSize, kFabSize);
+
+                // Painel fechado: não renderiza a janela principal
+                if (!bIsMenuOpen)
+                        return;
         }
 
         float targetScale = bIsMenuOpen ? 1.0f : 0.95f;
@@ -981,6 +1059,39 @@ lastFrameHoveredId = gc.HoveredId;
                                 ImGui::PopFont();
                         }
 
+                        // ═════════════════════════════════════════════════════════
+                        // BOTÃO MINIMIZAR — círculo "–" à esquerda do avatar.
+                        // Fecha o painel e deixa só o FAB flutuante na tela;
+                        // o ESP continua rodando normalmente minimizado.
+                        // ═════════════════════════════════════════════════════════
+                        {
+                                const float btnSize = 30.0f;
+                                ImVec2 btnMin = ImVec2(
+                                        Pos.x + Size.x - 18.0f - 36.0f - 10.0f - btnSize,
+                                        Pos.y + (headerHeight - btnSize) * 0.5f);
+                                ImVec2 btnMax = btnMin + ImVec2(btnSize, btnSize);
+                                ImVec2 btnC((btnMin.x + btnMax.x) * 0.5f, (btnMin.y + btnMax.y) * 0.5f);
+
+                                const bool btnHover =
+                                        io.MousePos.x >= btnMin.x && io.MousePos.x <= btnMax.x &&
+                                        io.MousePos.y >= btnMin.y && io.MousePos.y <= btnMax.y;
+
+                                DrawList->AddCircleFilled(btnC, btnSize * 0.5f,
+                                        btnHover ? IM_COL32(44, 44, 50, 255) : IM_COL32(26, 26, 30, 240), 28);
+                                DrawList->AddCircle(btnC, btnSize * 0.5f,
+                                        btnHover ? IM_COL32(225, 225, 230, 230) : IM_COL32(110, 110, 118, 170), 28, 1.4f);
+                                DrawList->AddLine(
+                                        ImVec2(btnC.x - 7.0f, btnC.y),
+                                        ImVec2(btnC.x + 7.0f, btnC.y),
+                                        IM_COL32(235, 235, 240, 245), 2.2f);
+
+                                if (btnHover && ImGui::IsMouseClicked(0))
+                                {
+                                        bIsMenuOpen = false;
+                                        NotifyManager::Send(XorStr("Painel minimizado — toque no FAB pra reabrir"), 2500);
+                                }
+                        }
+
                         DrawDock(DrawList, Pos, Size, CurrentTab, g_ContentAlpha);
 
                         float contentTop = headerHeight + 10;
@@ -1235,6 +1346,19 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         ImGui::Dummy(ImVec2(0, 8));
 
+                                                        /*
+                                                         * MODO DOS BOTÕES FLUTUANTES (mobile):
+                                                         * Clique alterna = um toque liga, outro desliga.
+                                                         * Segurar ativa = função ligada só enquanto o dedo
+                                                         * está no botão.
+                                                         */
+                                                        static int fkMode = 0;
+                                                        Custom::Combo(XorStr("Botões Flutuantes"), &fkMode,
+                                                                XorStr("Clique alterna\0Segurar ativa\0"));
+                                                        g_Globals.General.FloatingKeysHold = (fkMode != 0);
+
+                                                        ImGui::Dummy(ImVec2(0, 8));
+
                                                                                                                 /*
                                                          * TIPO DO JOGO — a unica escolha que existe.
                                                          * Define o perfil de offsets aplicado (FFTHV7A75 /
@@ -1293,6 +1417,60 @@ lastFrameHoveredId = gc.HoveredId;
                                                         {
                                                                 std::thread([]{ g_FreeFireMemory.Restart(); }).detach();
                                                                 NotifyManager::Send(XorStr("Restarted"), 4000);
+                                                        }
+
+                                                        ImGui::Dummy(ImVec2(0, 3));
+
+                                                        /*
+                                                         * TESTE DE ESCRITA — prova de ponta a ponta que a
+                                                         * ponte WRITE funciona: lê um float real do jogo
+                                                         * (GameVar), escreve O MESMO valor de volta e relê.
+                                                         * Não altera nada no jogo (write-back idêntico) e
+                                                         * mostra o resultado como notificação. Se este teste
+                                                         * passa mas algum exploit não funciona, o problema
+                                                         * é offset/exploit — não a ponte.
+                                                         */
+                                                        if (Custom::Button(XorStr("Testar Escrita (WRITE)"), ImVec2(ImGui::GetWindowSize().x - 28, 36)))
+                                                        {
+                                                                std::thread([]{
+                                                                        if (!Memory::IsInitialized())
+                                                                        {
+                                                                                NotifyManager::Send(XorStr("Teste: memoria nao inicializada (aplique o Game Type)"), 5000);
+                                                                                return;
+                                                                        }
+
+                                                                        uintptr_t GameVar_TI = (Offsets::GameVarDef::GameVarDef_TypeInfo != 0)
+                                                                                ? g_FreeFireMemory.Read<uintptr_t>(Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo) : 0;
+                                                                        uintptr_t gv = (GameVar_TI != 0)
+                                                                                ? g_FreeFireMemory.Read<uintptr_t>(GameVar_TI + Offsets::AccessClass) : 0;
+
+                                                                        if (gv == 0)
+                                                                        {
+                                                                                NotifyManager::Send(XorStr("Teste: entre numa partida (GameVar = 0)"), 5000);
+                                                                                return;
+                                                                        }
+
+                                                                        const uintptr_t testAddr = gv + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold;
+
+                                                                        float before = 0.0f;
+                                                                        if (!g_FreeFireMemory.Read<float>(testAddr, before))
+                                                                        {
+                                                                                NotifyManager::Send(XorStr("Teste: READ do valor falhou"), 5000);
+                                                                                return;
+                                                                        }
+
+                                                                        if (!g_FreeFireMemory.Write<float>(testAddr, before))
+                                                                        {
+                                                                                NotifyManager::Send(XorStr("Teste: WRITE FALHOU — veja logcat StormBridge"), 5000);
+                                                                                return;
+                                                                        }
+
+                                                                        float after = 0.0f;
+                                                                        if (g_FreeFireMemory.Read<float>(testAddr, after) && after == before)
+                                                                                NotifyManager::Send(XorStr("Teste: WRITE OK — ponte gravando!"), 5000);
+                                                                        else
+                                                                                NotifyManager::Send(XorStr("Teste: write aceito, mas releitura difere"), 5000);
+                                                                }).detach();
                                                         }
                                                 }
                                                 Custom::EndCustomChild();

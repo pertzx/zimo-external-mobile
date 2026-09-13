@@ -2,6 +2,7 @@
 #include "AndroidOverlay.hpp"
 #include "AndroidInput.hpp"
 #include "Interface/Interface.hpp"
+#include "Interface/FloatingKeys.hpp"
 #include "Draw/Draw.hpp"
 
 #include <imgui_internal.h>
@@ -12,8 +13,13 @@
 #include <thread>
 #include <Notify/Notify.hpp>
 
+#ifndef LOGI
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormPanel", __VA_ARGS__)
+#endif
+
+#ifndef LOGE
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "StormPanel", __VA_ARGS__)
+#endif
 
 static bool g_Running = true;
 // static Interface* g_Interface = nullptr;
@@ -97,6 +103,20 @@ void Run(ANativeWindow* window) {
                 g_Globals.General.V31
             );
 
+            /*
+             * BOTÕES FLUTUANTES de keybind — desenhados SEMPRE (menu aberto
+             * ou fechado), porque existem pra usar durante o jogo. Aqui
+             * também geramos a lista de retângulos que o Java consulta via
+             * nativeGetFloatingKeys() pra posicionar as janelas de toque.
+             */
+            {
+                int fkBounds[6 * 5];
+                int fkCount = 0;
+                FloatingKeys::DrawTick(
+                    g_SurfaceWidth, g_SurfaceHeight,
+                    fkBounds, (int)(sizeof(fkBounds) / sizeof(int)), fkCount);
+            }
+
             // Render menu ImGui
             g_Interface->RenderGui();
             NotifyManager::Render();
@@ -105,6 +125,10 @@ void Run(ANativeWindow* window) {
             // Se o Interface::RenderGui() já chamou PanelApp::SetPanelBounds(),
             // esses valores já estão corretos. Caso contrário, este bloco
             // pega a primeira janela ImGui visível (que costuma ser o painel).
+            // SÓ roda com o menu ABERTO: minimizado, o SetPanelBounds já
+            // apontou os bounds do FAB e não pode ser sobrescrito (a janela
+            // de toque Java precisa ficar em cima do FAB).
+            if (g_Interface && g_Interface->GetMenuOpen())
             {
                 ImGuiContext* ctx = ImGui::GetCurrentContext();
                 if (ctx) {
