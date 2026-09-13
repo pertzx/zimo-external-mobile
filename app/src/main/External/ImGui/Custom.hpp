@@ -116,7 +116,11 @@ namespace Custom {
     // ─── Input Controls ───
     bool Checkbox(const char* label, bool* v, float width = 0.0f);
     bool ToggleSwitch(const char* label, bool* v);
-    bool KeyBind(const char* label, int* Key, bool IsBlockMouse = false);
+    /*
+     * ANDROID: FeatureFlag (opcional) liga o botão flutuante ao toggle
+     * da função — sincronização bidirecional com o checkbox do painel.
+     */
+    bool KeyBind(const char* label, int* Key, bool IsBlockMouse = false, bool* FeatureFlag = nullptr);
     
     // ─── Sliders ───
     bool SliderScalar(const char* label, ImGuiDataType data_type, void* p_data, const void* p_min, const void* p_max, const char* format = NULL, ImGuiSliderFlags flags = 0);

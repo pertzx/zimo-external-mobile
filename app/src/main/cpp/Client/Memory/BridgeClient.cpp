@@ -54,6 +54,26 @@ namespace
     static std::atomic<uint32_t> g_ActivePid{ 0 };
 
     /*
+     * Traduz o status da ponte pra texto — usado nos logs de erro de
+     * WRITE (antes o write podia falhar 100% SILENCIOSO, sem uma linha
+     * sequer no logcat, e ficava impossível diagnosticar de fora).
+     */
+    const char* DecodeStatus(uint32_t status)
+    {
+        switch (status)
+        {
+            case BRIDGE_OK:            return "OK";
+            case BRIDGE_ERR_GENERIC:   return "GENERIC";
+            case BRIDGE_ERR_INVALID:   return "INVALID";
+            case BRIDGE_ERR_NOTFOUND:  return "NOTFOUND";
+            case BRIDGE_ERR_PERM:      return "PERM";
+            case BRIDGE_ERR_PARTIAL:   return "PARTIAL";
+            case BRIDGE_ERR_TOOBIG:    return "TOOBIG";
+            default:                   return "DESCONHECIDO";
+        }
+    }
+
+    /*
      * Depois de uma falha de conexão, não martela o socket a cada
      * operação: espera este intervalo antes de tentar de novo. Durante
      * a espera, os pedidos falham na hora (caem no fallback local).
@@ -432,6 +452,17 @@ bool Request(
     req.Seq =
         ++g_Seq;
 
+    /*
+     * BLINDAGEM DO WRITE: o header PRECISA declarar exatamente quantos
+     * bytes de payload vêm depois dele. Forçar aqui torna a coerência
+     * ESTRUTURAL — nenhum comando consegue mais enviar header com
+     * PayloadSize=0 e bytes órfãos no stream (era isso que deixava o
+     * canal de write morto: o daemon lia 0 bytes, respondia INVALID
+     * silencioso e o stream dessincronizava).
+     */
+    req.PayloadSize =
+        (payloadIn && payloadInSize > 0) ? payloadInSize : 0;
+
     for (int attempt = 0; attempt < 2; attempt++)
     {
         if (g_Socket < 0)
@@ -646,22 +677,36 @@ bool WriteMem(
     req.Address = address;
     req.Size = size;
 
+    /*
+     * FIX DO WRITE (canal morto): o header precisa declarar o tamanho
+     * do payload. Antes req.PayloadSize ficava 0, então o daemon lia
+     * ZERO bytes -> payloadIn.size() (0) != req.Size ->
+     * BRIDGE_ERR_INVALID SILLENCIOSO (sem log nenhum), e os bytes do
+     * valor ficavam órfãos no stream dessincronizando a conexão.
+     * Era isso que deixava o log do daemon sem NENHUM write e todos
+     * os exploits que escrevem sem funcionar.
+     */
+    req.PayloadSize = size;
+
     BridgeResponse resp{};
     std::vector<uint8_t> payload;
 
-    bool ok =
+    const bool transportOk =
         Request(
             req,
             static_cast<const uint8_t*>(buffer),
             size,
             resp,
             payload
-        ) &&
+        );
+
+    const bool ok =
+        transportOk &&
         resp.Status == BRIDGE_OK;
 
     g_StatsWrites++;
 
-    if (g_OpLogging.load() && ok)
+    if (ok && g_OpLogging.load())
     {
         LOGI(
             "[WRITE] pid=%u addr=0x%llX size=%u OK",
@@ -669,6 +714,48 @@ bool WriteMem(
             (unsigned long long)address,
             size
         );
+    }
+
+    /*
+     * DIAGNÓSTICO DO WRITE (nunca mais falha silenciosa): se a escrita
+     * não foi aceita, loga UMA vez por segundo com o motivo decodificado.
+     * - transporte falhou  -> daemon morto/socket caiu (veja reconexões)
+     * - status INVALID     -> header/payload dessincronizado (não deve
+     *                         acontecer: Request() força PayloadSize)
+     * - status PERM        -> SELinux/ptrace bloqueando o daemon
+     * - status GENERIC     -> process_vm_writev + /proc/pid/mem falharam
+     */
+    if (!ok)
+    {
+        static long long s_LastWriteFailLogMs = 0;
+
+        const long long nowMs = NowMs();
+
+        if (nowMs - s_LastWriteFailLogMs > 1000)
+        {
+            s_LastWriteFailLogMs = nowMs;
+
+            if (transportOk)
+            {
+                LOGE(
+                    "[WRITE FALHOU] pid=%u addr=0x%llX size=%u status=%s (ponte respondeu erro)",
+                    pid,
+                    (unsigned long long)address,
+                    size,
+                    DecodeStatus(resp.Status)
+                );
+            }
+            else
+            {
+                LOGE(
+                    "[WRITE FALHOU] pid=%u addr=0x%llX size=%u transporte indisponivel (daemon morto? reconexoes=%llu)",
+                    pid,
+                    (unsigned long long)address,
+                    size,
+                    (unsigned long long)g_StatsReconnects.load()
+                );
+            }
+        }
     }
 
     return ok;

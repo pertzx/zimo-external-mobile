@@ -121,6 +121,26 @@ namespace Cheat {
         {
             int MenuKey = 0;
             int ThreadDelay = 240;
+
+            /*
+             * ============================================================
+             * STEALTH DE LEITURA (anti-detecção) — o volume de reads era
+             * o que fazia o FreeFire detectar em ~5 minutos.
+             *
+             *   ReadIntervalMs : intervalo entre varreduras completas do
+             *                    ESP na thread de leitura. Antes = 1ms
+             *                    (~1000 varreduras/seg — metrônomo
+             *                    perfeito). Padrão agora = 60ms (~16 Hz,
+             *                    ESP continua fluida, volume cai ~60x).
+             *   StealthRead    : jitter aleatório de ±20% no intervalo,
+             *                    pra quebrar a cadência periódica
+             *                    (assinatura de automação).
+             * Ajustáveis na aba Config.
+             * ============================================================
+             */
+            int ReadIntervalMs = 60;
+            bool StealthRead = true;
+
             bool CaptureBypass = true;
             bool WebRemote = false;
             bool ShutDown = false;

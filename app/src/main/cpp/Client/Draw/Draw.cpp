@@ -1374,7 +1374,30 @@ void Data::ReadLoop( )
                         DiagLog( "[diag] ReadLoop exception (unknown)" );
                 }
 
-                std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+                /*
+                 * STEALTH DE LEITURA — antes: 1ms (≈1000 varreduras/segundo,
+                 * cada uma com ~20-25 round-trips de batch = volume gigante
+                 * em cadência de metrônomo perfeito; era ISSO que o
+                 * anti-cheat detectava em ~5 minutos). Agora: intervalo
+                 * configurável (padrão 60ms ≈ 16Hz — ESP continua fluida)
+                 * com jitter aleatório de ±20% quando StealthRead ligado,
+                 * pra não formar padrão periódico.
+                 */
+                {
+                        int readInterval = g_Globals.General.ReadIntervalMs;
+                        if ( readInterval < 15 ) readInterval = 15;
+                        if ( readInterval > 1000 ) readInterval = 1000;
+
+                        if ( g_Globals.General.StealthRead )
+                        {
+                                static unsigned int s_JitterSeed = 12345u;
+                                s_JitterSeed = s_JitterSeed * 1664525u + 1013904223u;
+                                const int jitterPct = ( int )( ( s_JitterSeed >> 16 ) % 41u ) - 20;   // -20..+20
+                                readInterval = readInterval * ( 100 + jitterPct ) / 100;
+                        }
+
+                        std::this_thread::sleep_for( std::chrono::milliseconds( readInterval ) );
+                }
         }
 }
 
@@ -2209,7 +2232,14 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                         while ( isHolding && lockedMatrixAddr )
                                         {
                                                 g_FreeFireMemory.Write<Vector3>( lockedMatrixAddr + posWriteOffset, lockedRootPos );
-                                                std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
+                                                /*
+                                                 * STEALTH DE ESCRITA: 1 microssegundo = até
+                                                 * ~1 MILHÃO de writes/segundo agora que a
+                                                 * ponte de write funciona — detecção
+                                                 * instantânea. 2ms (500/s) segura o magnet
+                                                 * com volume ~2000x menor.
+                                                 */
+                                                std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
                                         }
                                 } );
                                 magnetThread.detach( );
@@ -2478,7 +2508,8 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                                                         auto playerLook = AimBot::GetRotationToLocation( Head, 0.0f, LocalCamera );
                                                         g_FreeFireMemory.Write( localPlayer + Offsets::Player::m_AimRotation, playerLook );
-                                                        std::this_thread::sleep_for( std::chrono::microseconds( 1 ) );
+                                                        /* STEALTH DE ESCRITA: 1µs virou 2ms (ver magnet) */
+                                                        std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
                                                 }
 
                                                 if ( aimAssistModified )
@@ -2501,6 +2532,29 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
         // ==================== Weapon Exploits ====================
 
+        /*
+         * THROTTLE + STEALTH: este bloco lê e escreve na memória do jogo.
+         * Rodando TODO frame (até 240 fps) gerava centenas de operações
+         * por segundo em cadência de metrônomo — assinatura fácil de
+         * detectar. Agora roda a cada 50ms (20 Hz), mais que suficiente
+         * para NoRecoil/MedKit/Precision/FireDelay/etc.
+         * O SpinBot ficou FORA do throttle (efeito visual contínuo).
+         */
+        static LONGLONG s_LastExploitTick = 0;
+        const LONGLONG nowExploitTick = GetTickCount64( );
+        const bool exploitTick = ( nowExploitTick - s_LastExploitTick ) >= 50;
+        if ( exploitTick )
+                s_LastExploitTick = nowExploitTick;
+
+        // --- SpinBot (por frame, fora do throttle) ---
+        if ( g_Globals.Misc.Exploits.LocalPlayer.SpinBot && !IsObserving )
+        {
+                SpinBot( localPlayer, N32 );
+        }
+
+        if ( exploitTick )
+        {
+
         uintptr_t m_InventoryManager = ReadPtr( localPlayer + Offsets::Player::m_InventoryManager );
         uintptr_t m_itemOnHand = ReadPtr( m_InventoryManager + Offsets::InventoryManager::m_itemOnHand );
         uintptr_t m_WeaponData = ReadPtr( m_itemOnHand + Offsets::Weapon::m_WeaponData );
@@ -2522,12 +2576,6 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                         g_FreeFireMemory.Write<float>( FireComponent + Offsets::Weapon::tangentTheta, newRecoil );
                         }
                 }
-        }
-
-        // --- SpinBot ---
-        if ( g_Globals.Misc.Exploits.LocalPlayer.SpinBot && !IsObserving )
-        {
-                SpinBot( localPlayer, N32 );
         }
 
         // --- SocoLonge ---
@@ -2655,6 +2703,9 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         s_awmOriginals.clear( );
                 }
         }
+
+        } // if ( exploitTick )
+
         }
         catch ( const std::exception& ex )
         {

@@ -10,6 +10,7 @@
 #include "../AndroidInput.hpp"
 #include "../AndroidOverlay.hpp"
 #include <Memory/Memory.hpp>
+#include <Memory/BridgeClient.hpp>
 #include <Offsets/Offsets.hpp>
 #include <PanelApp.hpp>
 #include <Interface/FloatingKeys.hpp>
@@ -177,9 +178,9 @@ void Interface::UpdateStyle()
 
 void DrawDock(ImDrawList* dl, ImVec2 windowPos, ImVec2 windowSize, int& currentTab, float alpha)
 {
-        const float dockHeight = 56.0f;
+        const float dockHeight = 62.0f;
         const float dockPadding = 12.0f;
-        const float itemSize = 44.0f;
+        const float itemSize = 50.0f;    // ícones maiores (era 44)
         const float itemSpacing = 14.0f;
         const int numItems = 5;
 
@@ -372,6 +373,13 @@ static float g_ShutdownScale = 1.0f;
 static float g_ShutdownAlpha = 1.0f;
 static float g_ShutdownRotation = 0.0f;
 
+/*
+ * Animação de MINIMIZAR — replica exatamente o Unload:
+ * encolhe (1.0 -> 0.7), sobe 30px e some com easeOut quadrático.
+ */
+static bool g_Minimizing = false;
+static float g_MinimizeProgress = 0.0f;
+
 void Interface::RenderGui()
 {
         ImGuiIO& io = ImGui::GetIO();
@@ -414,12 +422,18 @@ void Interface::RenderGui()
         static bool s_FabWasDrag = false;
         static ImVec2 s_FabGrab(0, 0);
         static ImVec2 s_FabClickPos(0, 0);
-        const float kFabSize = 58.0f;
+        const float kFabSize = 72.0f;    // ícone maior (era 58)
 
         if (s_FabPos.x < 0)
                 s_FabPos = ImVec2(18.0f, io.DisplaySize.y * 0.45f);
 
-        if (!bIsMenuOpen && !g_WantShutdown)
+        /*
+         * O FAB só aparece DEPOIS que a animação de minimizar termina —
+         * durante a animação o painel ainda está desenhando (Unload).
+         */
+        const bool fabVisible = !bIsMenuOpen && !g_WantShutdown && !g_Minimizing;
+
+        if (fabVisible)
         {
                 ImVec2 fabMin = s_FabPos;
                 ImVec2 fabMax = s_FabPos + ImVec2(kFabSize, kFabSize);
@@ -450,7 +464,26 @@ void Interface::RenderGui()
                 {
                         s_FabDragging = false;
                         if (!s_FabWasDrag)
+                        {
                                 bIsMenuOpen = true;   // toque simples = reabrir
+
+                                /*
+                                 * VOLTA PRA POSIÇÃO INICIAL: o painel volta
+                                 * pro centro (igual à primeira abertura) e o
+                                 * ícone (FAB) também volta ao canto inicial.
+                                 */
+                                {
+                                        const float maxW = io.DisplaySize.x * 0.95f;
+                                        const float maxH = io.DisplaySize.y * 0.85f;
+                                        const ImVec2 ws(ImMin(700.0f, maxW), ImMin(460.0f, maxH));
+
+                                        g_WindowPos = ImVec2(
+                                                (io.DisplaySize.x - ws.x) * 0.5f,
+                                                (io.DisplaySize.y - ws.y) * 0.5f);
+                                }
+
+                                s_FabPos = ImVec2(18.0f, io.DisplaySize.y * 0.45f);
+                        }
                 }
 
                 ImDrawList* fdl = ImGui::GetForegroundDrawList();
@@ -475,15 +508,33 @@ void Interface::RenderGui()
                         return;
         }
 
-        float targetScale = bIsMenuOpen ? 1.0f : 0.95f;
-        float targetAlpha = bIsMenuOpen ? 1.0f : 0.0f;
+        /*
+         * ANIMAÇÃO DE MINIMIZAR = MESMA DO UNLOAD:
+         * mesma curva easeOut do g_WantShutdown (progress += dt*3.5,
+         * escala 1.0 -> 0.7, alpha 1.0 -> 0.0, sobe 30px).
+         */
+        if (g_Minimizing)
+        {
+                g_MinimizeProgress += dt * 3.5f;
+                float t = g_MinimizeProgress;
+                float easeOut = 1.0f - (1.0f - t) * (1.0f - t);
 
-        float scaleSpeed = bIsMenuOpen ? 12.0f : 25.0f;
-        float alphaSpeed = bIsMenuOpen ? 10.0f : 30.0f;
+                g_WindowScale = 1.0f - easeOut * 0.3f;
+                g_WindowAlpha = 1.0f - easeOut;
+                g_ContentAlpha = g_WindowAlpha;
 
-        g_WindowScale = smoothLerp(g_WindowScale, targetScale, scaleSpeed, dt);
-        g_WindowAlpha = smoothLerp(g_WindowAlpha, targetAlpha, alphaSpeed, dt);
-        g_ContentAlpha = smoothLerp(g_ContentAlpha, targetAlpha, alphaSpeed, dt);
+                if (g_MinimizeProgress >= 1.0f)
+                {
+                        g_MinimizeProgress = 0.0f;
+                        g_Minimizing = false;
+                }
+        }
+        else if (bIsMenuOpen)
+        {
+                g_WindowScale = smoothLerp(g_WindowScale, 1.0f, 12.0f, dt);
+                g_WindowAlpha = smoothLerp(g_WindowAlpha, 1.0f, 10.0f, dt);
+                g_ContentAlpha = smoothLerp(g_ContentAlpha, 1.0f, 10.0f, dt);
+        }
 
         if (g_WantShutdown)
         {
@@ -492,7 +543,7 @@ void Interface::RenderGui()
                 g_ContentAlpha *= g_ShutdownAlpha;
         }
 
-        if (g_WindowAlpha < 0.01f && !g_WantShutdown) return;
+        if (g_WindowAlpha < 0.01f && !g_WantShutdown && !g_Minimizing) return;
 
         static float AnimaTab = 0.0f;
         static float AnimaTabVelocity = 0.0f;
@@ -579,6 +630,11 @@ void Interface::RenderGui()
         {
                 float moveUp = g_ShutdownProgress * 30.0f;
                 scaledPos.y -= moveUp;
+        }
+        else if (g_Minimizing)
+        {
+                // Mesmo movimento do Unload: sobe enquanto some.
+                scaledPos.y -= g_MinimizeProgress * 30.0f;
         }
 
         ImGui::SetNextWindowPos(scaledPos);
@@ -1065,7 +1121,7 @@ lastFrameHoveredId = gc.HoveredId;
                         // o ESP continua rodando normalmente minimizado.
                         // ═════════════════════════════════════════════════════════
                         {
-                                const float btnSize = 30.0f;
+                                const float btnSize = 36.0f;    // ícone maior (era 30)
                                 ImVec2 btnMin = ImVec2(
                                         Pos.x + Size.x - 18.0f - 36.0f - 10.0f - btnSize,
                                         Pos.y + (headerHeight - btnSize) * 0.5f);
@@ -1081,13 +1137,15 @@ lastFrameHoveredId = gc.HoveredId;
                                 DrawList->AddCircle(btnC, btnSize * 0.5f,
                                         btnHover ? IM_COL32(225, 225, 230, 230) : IM_COL32(110, 110, 118, 170), 28, 1.4f);
                                 DrawList->AddLine(
-                                        ImVec2(btnC.x - 7.0f, btnC.y),
-                                        ImVec2(btnC.x + 7.0f, btnC.y),
-                                        IM_COL32(235, 235, 240, 245), 2.2f);
+                                        ImVec2(btnC.x - 8.5f, btnC.y),
+                                        ImVec2(btnC.x + 8.5f, btnC.y),
+                                        IM_COL32(235, 235, 240, 245), 2.4f);
 
                                 if (btnHover && ImGui::IsMouseClicked(0))
                                 {
                                         bIsMenuOpen = false;
+                                        g_Minimizing = true;          // mesma animação do Unload
+                                        g_MinimizeProgress = 0.0f;
                                         NotifyManager::Send(XorStr("Painel minimizado — toque no FAB pra reabrir"), 2500);
                                 }
                         }
@@ -1116,12 +1174,16 @@ lastFrameHoveredId = gc.HoveredId;
                                                 Custom::CustomChild(XorStr("General"), ImVec2(cardWidth, cardHeight));
                                                 {
                                                         Custom::Checkbox(XorStr("Aimbot"), &g_Globals.AimBot.Enabled);
-                                                        Custom::KeyBind(XorStr("AimKey"), &g_Globals.AimBot.KeyBind);
-                                                        if (!g_Globals.General.V31)
-                                                        {
-                                                                Custom::Checkbox(XorStr("Pull Player"), &g_Globals.AimBot.aimmagnect);
-                                                                Custom::KeyBind(XorStr("PullKey"), &g_Globals.AimBot.MagKey);
-                                                        }
+                                                        Custom::KeyBind(XorStr("AimKey"), &g_Globals.AimBot.KeyBind, false, &g_Globals.AimBot.Enabled);
+
+                                                        /*
+                                                         * MÁXIMO DE FUNÇÕES SEMPRE: "Pull Player" antes
+                                                         * só aparecia com !V31 — mas o Memory::Initialize
+                                                         * FORÇA V31=true no perfil 32-bit, então nunca
+                                                         * aparecia. Agora aparece sempre.
+                                                         */
+                                                        Custom::Checkbox(XorStr("Pull Player"), &g_Globals.AimBot.aimmagnect);
+                                                        Custom::KeyBind(XorStr("PullKey"), &g_Globals.AimBot.MagKey, false, &g_Globals.AimBot.aimmagnect);
                                                         Custom::Checkbox(XorStr("Aimbot 2x"), &g_Globals.Misc.Exploits.LocalPlayer.AimLock2x);
                                                         Custom::Checkbox(XorStr("Aimbot Sniper"), &g_Globals.Misc.Exploits.LocalPlayer.AimbotAwm);
                                                         Custom::Checkbox(XorStr("No Recoil"), &g_Globals.Misc.Exploits.LocalPlayer.NoRecoil);
@@ -1186,7 +1248,7 @@ lastFrameHoveredId = gc.HoveredId;
                                                 Custom::CustomChild(XorStr("Silent Aim"), ImVec2(cardWidth, cardHeight));
                                                 {
                                                         Custom::Checkbox(XorStr("Enable Silent"), &g_Globals.Silent.Enabled);
-                                                        Custom::KeyBind(XorStr("SilentKey"), &g_Globals.Silent.KeyBind);
+                                                        Custom::KeyBind(XorStr("SilentKey"), &g_Globals.Silent.KeyBind, false, &g_Globals.Silent.Enabled);
 
                                                 }
                                                 Custom::EndCustomChild();
@@ -1233,16 +1295,18 @@ lastFrameHoveredId = gc.HoveredId;
                                                         {
                                                                 Custom::Combo(XorStr("Level"), &g_Globals.Misc.Exploits.LocalPlayer.AtributarArmaLevel, XorStr("Lv 1\0Lv 2\0Lv 3\0Lv 4\0"));
                                                         }
-                                                        if (!g_Globals.General.V31)
+                                                        /*
+                                                         * MÁXIMO DE FUNÇÕES SEMPRE: Spin Bot aparecia
+                                                         * só com !V31 (que nunca acontecia de verdade).
+                                                         * Agora sempre visível, em qualquer Game Type.
+                                                         */
+                                                        Custom::Checkbox(XorStr("Spin Bot"), &g_Globals.Misc.Exploits.LocalPlayer.SpinBot);
+                                                        if (g_Globals.Misc.Exploits.LocalPlayer.SpinBot)
                                                         {
-                                                                Custom::Checkbox(XorStr("Spin Bot"), &g_Globals.Misc.Exploits.LocalPlayer.SpinBot);
-                                                                if (g_Globals.Misc.Exploits.LocalPlayer.SpinBot)
-                                                                {
-                                                                        Custom::SliderFloat(XorStr("Spin Speed"), &g_Globals.Misc.Exploits.LocalPlayer.SpinSpeed, 1.0f, 5.0f, "%.1f");
-                                                                }
+                                                                Custom::SliderFloat(XorStr("Spin Speed"), &g_Globals.Misc.Exploits.LocalPlayer.SpinSpeed, 1.0f, 5.0f, "%.1f");
                                                         }
                                                         Custom::Checkbox(XorStr("Ghost"), &g_Globals.AimBot.ghost);
-                                                        Custom::KeyBind(XorStr("GhostKey"), &g_Globals.AimBot.ghostkey);
+                                                        Custom::KeyBind(XorStr("GhostKey"), &g_Globals.AimBot.ghostkey, false, &g_Globals.AimBot.ghost);
                                                 }
                                                 Custom::EndCustomChild();
 
@@ -1343,6 +1407,18 @@ lastFrameHoveredId = gc.HoveredId;
                                                 {
                                                         Custom::Checkbox(XorStr("Stream Mode"), &g_Globals.General.CaptureBypass);
                                                         Custom::SliderInt(XorStr("Frame Rate"), &g_Globals.General.ThreadDelay, 30, 240, "%dFPS");
+
+                                                        ImGui::Dummy(ImVec2(0, 8));
+
+                                                        /*
+                                                         * STEALTH DE LEITURA — o volume de reads era o
+                                                         * que fazia o jogo detectar (~5 minutos).
+                                                         * Intervalo entre varreduras do ESP (padrão
+                                                         * 60ms ≈ 16Hz) + jitter aleatório pra quebrar
+                                                         * a cadência. Valor maior = mais discreto.
+                                                         */
+                                                        Custom::SliderInt(XorStr("Read Interval"), &g_Globals.General.ReadIntervalMs, 15, 300, "%d ms");
+                                                        Custom::Checkbox(XorStr("Stealth (jitter)"), &g_Globals.General.StealthRead);
 
                                                         ImGui::Dummy(ImVec2(0, 8));
 
@@ -1459,9 +1535,26 @@ lastFrameHoveredId = gc.HoveredId;
                                                                                 return;
                                                                         }
 
+                                                                        const BridgeClient::Stats st0 = BridgeClient::GetStats();
+
                                                                         if (!g_FreeFireMemory.Write<float>(testAddr, before))
                                                                         {
-                                                                                NotifyManager::Send(XorStr("Teste: WRITE FALHOU — veja logcat StormBridge"), 5000);
+                                                                                /*
+                                                                                 * Mostra os CONTADORES da ponte na notificação:
+                                                                                 * w subiu?  -> a ponte aceitou algum write, o
+                                                                                 *               motivo da falha está no logcat
+                                                                                 *               (tag StormBridge, status decodificado).
+                                                                                 * w = 0     -> NENHUM write chegou ao daemon —
+                                                                                 *               neste APK o BridgeClient.cpp
+                                                                                 *               corrigido não entrou na build.
+                                                                                 */
+                                                                                const BridgeClient::Stats st = BridgeClient::GetStats();
+                                                                                NotifyManager::Send(
+                                                                                        std::string(XorStr("Teste: WRITE FALHOU | ponte w=")) +
+                                                                                        std::to_string(st.Writes - st0.Writes) +
+                                                                                        " r=" + std::to_string(st.Reads) +
+                                                                                        " erros=" + std::to_string(st.Errors) +
+                                                                                        std::string(XorStr(" (logcat StormBridge)")), 6000);
                                                                                 return;
                                                                         }
 
@@ -1517,6 +1610,27 @@ void Interface::HandleMenuKey()
         {
             MenuKeyDown = true;
             bIsMenuOpen = !bIsMenuOpen;
+
+            /*
+             * Mesma regra do FAB: fechar = animação do Unload;
+             * abrir = painel de volta à posição inicial.
+             */
+            if (!bIsMenuOpen)
+            {
+                g_Minimizing = true;
+                g_MinimizeProgress = 0.0f;
+            }
+            else
+            {
+                ImGuiIO& io = ImGui::GetIO();
+                const float maxW = io.DisplaySize.x * 0.95f;
+                const float maxH = io.DisplaySize.y * 0.85f;
+                const ImVec2 ws(ImMin(700.0f, maxW), ImMin(460.0f, maxH));
+
+                g_WindowPos = ImVec2(
+                        (io.DisplaySize.x - ws.x) * 0.5f,
+                        (io.DisplaySize.y - ws.y) * 0.5f);
+            }
         }
     }
     else

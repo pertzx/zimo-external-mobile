@@ -14,6 +14,24 @@
  * ImGui (ForegroundDrawList), com o texto da função ("Aim", "Silent",
  * "Ghost"...).
  *
+ * ══════════════════════════════════════════════════════════════════════
+ * UM BOTÃO FIXO POR FUNÇÃO (nada de F1/F2/F3):
+ *
+ *   - Acquire("AimKey") reaproveita o botão já existente da mesma
+ *     função (mesmo título) — spawnar/despawnar repetidamente NÃO
+ *     acumula botões nem incrementa numeração.
+ *   - O box do keybind no painel mostra "Show" / "Hide" (em vez de
+ *     "None"/"F#").
+ *
+ * SINCRONIZAÇÃO BIDIRECIONAL COM O PAINEL (Bind + SyncFromPanel):
+ *
+ *   - Tocar no botão flutuante alterna o bool da função (o checkbox
+ *     do painel muda na hora — dá pra ver que a função está ativa).
+ *   - Tocar no checkbox do painel atualiza o estado do botão no
+ *     próximo frame (o botão acende/apaga junto).
+ *   - No modo "segurar" (FloatingKeysHold) o botão continua
+ *     momentâneo, sem toggle.
+ *
  * Modos (Globals.General.FloatingKeysHold):
  *   false = TOQUE SIMPLES : um toque liga, outro toque desliga (toggle)
  *   true  = SEGURAR       : ligado enquanto o dedo estiver pressionado
@@ -46,21 +64,25 @@ namespace FloatingKeys
     constexpr int kVkBase = 0x7000;
 
     /*
-     * Cria (ou reaproveita) um botão flutuante com o label dado e devolve
-     * o vk dele. Chamado pelo widget Custom::KeyBind no Android quando o
-     * usuário toca no "None" para ativar.
+     * Cria (ou REAPROVEITA — um botão fixo por função) um botão flutuante
+     * com o label dado e devolve o vk dele.
+     *   - Se já existe botão com o mesmo título: devolve o vk dele (nada
+     *     de duplicar nem de numeração acumulando).
+     *   - Se o pool estiver cheio (kMaxKeys): devolve 0.
+     * Chamado pelo widget Custom::KeyBind no Android quando o usuário
+     * toca no "Show" para spawnar o botão da função.
      */
     int Acquire(const char* label);
 
     /*
-     * Remove o botão (o widget mostra "None" de novo). vk fora da faixa
+     * Remove o botão (o widget volta a mostrar "Show"). vk fora da faixa
      * ou inexistente é ignorado.
      */
     void Release(int vk);
 
     /*
-     * Nome curto do botão ("F1", "F2"...) para mostrar no widget.
-     * vk fora da faixa devolve "None".
+     * Nome do botão — o título da função ("Aim", "Silent"...).
+     * vk fora da faixa devolve "None". (Legado: antes mostrava "F1".)
      */
     const char* VkLabel(int vk);
 
@@ -71,8 +93,26 @@ namespace FloatingKeys
     const char* VkTitle(int vk);
 
     /*
+     * SINCRONIZAÇÃO COM O PAINEL: liga o botão (vk) ao bool do toggle
+     * da função (o mesmo bool do checkbox no painel). Depois disso:
+     *   - tocar no botão flutuante alterna o bool (checkbox acompanha)
+     *   - tocar no checkbox atualiza o botão (via SyncFromPanel)
+     * Chame toda frame que o KeyBind for desenhado, ou logo após o
+     * Acquire. vk inválido/inexistente é ignorado.
+     */
+    void Bind(int vk, bool* flag);
+
+    /*
+     * Puxa o estado dos bools ligados via Bind() para o estado visual
+     * dos botões (direção painel -> botão). Chamado automaticamente
+     * 1x por frame dentro do DrawTick. No modo "segurar" é no-op.
+     */
+    void SyncFromPanel();
+
+    /*
      * Estado EFETIVO do botão, conforme o modo:
      *   modo toque    -> alterna no toque, persiste até o próximo toque
+     *                    (e fica espelhado no bool da função via Bind)
      *   modo segurar  -> true somente enquanto o dedo está na tela
      * É o que AndroidInput::IsKeyPressed() consulta para vk >= 0x7000.
      */
@@ -92,7 +132,8 @@ namespace FloatingKeys
     /*
      * O toque VIROU ARRASTO (dedo deslizou além do slop). Cancela o efeito
      * do toque: solta o dedo lógico e desfaz o toggle caso o modo seja
-     * toque-simples (o DOWN tinha ligado/desligado o botão).
+     * toque-simples (o DOWN tinha ligado/desligado o botão) — inclusive
+     * no bool da função.
      */
     void DragCancel(int vk);
 

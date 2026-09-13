@@ -151,6 +151,8 @@ namespace Cheat {
             wBool(ofs, "CaptureBypass", g_Globals.General.CaptureBypass);
             wBool(ofs, "WebRemote", g_Globals.General.WebRemote);
             wInt(ofs, "GameProfile", g_Globals.General.GameProfile);   // << NOVA
+            wInt(ofs, "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
+            wBool(ofs, "StealthRead", g_Globals.General.StealthRead);
             ofs << "\n";
 
                 return true;
@@ -284,6 +286,8 @@ namespace Cheat {
             gBool("General", "CaptureBypass", g_Globals.General.CaptureBypass);
             gBool("General", "WebRemote", g_Globals.General.WebRemote);
             gInt("General", "GameProfile", g_Globals.General.GameProfile);   // << NOVA
+            gInt("General", "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
+            gBool("General", "StealthRead", g_Globals.General.StealthRead);
 
 
             return true;

@@ -72,76 +72,112 @@ namespace {
             }
         }
 
-        // ---- Rolável? (conteúdo maior que a área) ----
-        const bool scrollable =
-            child->ScrollbarY ||
-            (child->ContentSize.y > child->Size.y + 2.0f);
-        if (!scrollable) {
-            if (g_TS.winId == child->ID) {
-                g_TS.decided = false;
-                g_TS.steal = false;
-                g_TS.vel = 0.0f;
-            }
-            return;
-        }
-
-        // ---- Hovered = dedo em cima deste child ----
-        if (mouseDown && ImGui::IsWindowHovered()) {
-            if (!g_TS.decided) {
-                g_TS.decided = true;
-                g_TS.steal = false;
-                g_TS.winId = child->ID;
-                g_TS.downPos = io.MousePos;
-                g_TS.lastY = io.MousePos.y;
-                g_TS.lastMs = TS_NowMs();
-                g_TS.vel = 0.0f;
-                g_TS.activeAtDown = g.ActiveId;
-            }
-
-            if (g_TS.winId == child->ID) {
-                const float dyFrame = io.MousePos.y - g_TS.lastY;
-
-                if (!g_TS.steal) {
-                    const float dxTot = io.MousePos.x - g_TS.downPos.x;
-                    const float dyTot = io.MousePos.y - g_TS.downPos.y;
-
-                    if (fabsf(dyTot) > 14.0f && fabsf(dyTot) > fabsf(dxTot) * 1.25f) {
-                        // Não rouba o gesto de sliders/combos/color pickers
-                        const bool blocked =
-                            g_TS.activeAtDown != 0 && (
-                                g_TS.activeAtDown == activeSlider ||
-                                g_TS.activeAtDown == activeCombo ||
-                                g_TS.activeAtDown == activeColorPicker);
-
-                        if (!blocked) {
-                            g_TS.steal = true;
-                            if (g.ActiveId != 0)
-                                ClearActiveID();   // cancela o clique que ia disparar
-                        }
-                    }
-                }
-
-                if (g_TS.steal) {
-                    child->Scroll.y -= dyFrame;
-
-                    const long long now = TS_NowMs();
-                    const float dt = (float)(now - g_TS.lastMs) / 1000.0f;
-                    if (dt > 0.001f)
-                        g_TS.vel = g_TS.vel * 0.65f + (-dyFrame / dt) * 0.35f;
-                    g_TS.lastMs = now;
-                }
-
-                g_TS.lastY = io.MousePos.y;
-            }
-        } else {
-            // Dedo soltou (ou saiu do child)
-            if (g_TS.steal && g_TS.winId == child->ID && g_TS.vel != 0.0f)
-                g_ScrollInertia[child->ID] = g_TS.vel;
+        /*
+         * ── FIM DO GESTO (dedo levantou) ─────────────────────────────
+         * Roda em QUALQUER card (o primeiro a tickar finaliza; é
+         * idempotente). Fica ANTES do teste de "scrollable" de propósito:
+         * assim nenhum estado de gesto fica preso se o card dono sumir
+         * ou deixar de ser rolável no meio do arrasto.
+         */
+        if (!mouseDown) {
+            if (g_TS.decided && g_TS.steal && g_TS.winId != 0 && g_TS.vel != 0.0f)
+                g_ScrollInertia[g_TS.winId] = g_TS.vel;
 
             g_TS.decided = false;
             g_TS.steal = false;
             g_TS.vel = 0.0f;
+            g_TS.winId = 0;
+            return;
         }
+
+        // ---- Rolável? (conteúdo maior que a área) ----
+        const bool scrollable =
+            child->ScrollbarY ||
+            (child->ContentSize.y > child->Size.y + 2.0f);
+        if (!scrollable)
+            return;
+
+        /*
+         * ── JANELA "ESTRANGEIRA" ─────────────────────────────────────
+         * FIX DO SCROLL SÓ NA ABA CONFIG: a maior parte das abas tem
+         * DOIS cards lado a lado e a Config tem UM. O else final da
+         * versão antiga RESETAVA decided/steal em toda janela que não
+         * estava sob o dedo — com dois cards, o segundo card apagava o
+         * gesto do primeiro TODO FRAME, o downPos era recapturado na
+         * posição atual do dedo e o limiar de 10px NUNCA acumulava.
+         * Resultado: nenhuma aba de 2 cards rolava (só a Config).
+         *
+         * Regra nova: card que NÃO está sob o dedo e NÃO é o dono do
+         * gesto simplesmente NÃO MEXE no estado global.
+         */
+        const bool hovered = ImGui::IsWindowHovered();
+        if (!hovered && g_TS.winId != child->ID)
+            return;
+
+        // ---- Decide o dono do gesto ----
+        if (!g_TS.decided) {
+            g_TS.decided = true;
+            g_TS.steal = false;
+            g_TS.winId = child->ID;
+            g_TS.downPos = io.MousePos;
+            g_TS.lastY = io.MousePos.y;
+            g_TS.lastMs = TS_NowMs();
+            g_TS.vel = 0.0f;
+            g_TS.activeAtDown = g.ActiveId;
+        }
+
+        // Gesto já tem dono e não é este card (dedo entrou nele no meio
+        // de um gesto ainda não roubado): não decide de novo.
+        if (g_TS.winId != child->ID)
+            return;
+
+        const float dyFrame = io.MousePos.y - g_TS.lastY;
+
+        if (!g_TS.steal) {
+            const float dxTot = io.MousePos.x - g_TS.downPos.x;
+            const float dyTot = io.MousePos.y - g_TS.downPos.y;
+
+            if (fabsf(dyTot) > 10.0f && fabsf(dyTot) > fabsf(dxTot) * 1.15f) {
+                // Slider/combo/colorpicker começaram o toque: em arrasto
+                // horizontal/neutro o gesto DELES continua. Mas um arrasto
+                // CLARAMENTE VERTICAL (>2:1 e >14px) vira rolagem — é o
+                // caso de rolar a lista com o dedo que pousou num slider.
+                const bool onGestureWidget =
+                    g_TS.activeAtDown != 0 && (
+                        g_TS.activeAtDown == activeSlider ||
+                        g_TS.activeAtDown == activeCombo ||
+                        g_TS.activeAtDown == activeColorPicker);
+
+                const bool clearlyVertical =
+                    fabsf(dyTot) > fabsf(dxTot) * 2.0f && fabsf(dyTot) > 14.0f;
+
+                if (!onGestureWidget || clearlyVertical) {
+                    g_TS.steal = true;
+                    if (g.ActiveId != 0)
+                        ClearActiveID();   // cancela o clique que ia disparar
+                }
+            }
+        }
+
+        if (g_TS.steal) {
+            // Mantém o widget da origem cancelado o gesto todo
+            // (evita o checkbox/slider "acordar" no meio do scroll).
+            // Vale também quando o dedo JÁ SAIU deste card: como o dono
+            // continua sendo este child, a rolagem segue até o dedo
+            // subir — não trava mais ao sair da área.
+            if (g.ActiveId != 0 && g.ActiveId == g_TS.activeAtDown)
+                ClearActiveID();
+
+            child->Scroll.y -= dyFrame;
+
+            const long long now = TS_NowMs();
+            const float dt = (float)(now - g_TS.lastMs) / 1000.0f;
+            if (dt > 0.001f)
+                g_TS.vel = g_TS.vel * 0.65f + (-dyFrame / dt) * 0.35f;
+            g_TS.lastMs = now;
+        }
+
+        g_TS.lastY = io.MousePos.y;
     }
 }
 // using namespace ImGui;
@@ -1098,7 +1134,7 @@ const char* GetKeyName(int vkCode) {
 }
 #endif
 
-    bool KeyBind(const char* label, int* Key, bool IsBlockMouse) {
+    bool KeyBind(const char* label, int* Key, bool IsBlockMouse, bool* FeatureFlag) {
         struct KeyBindAnim {
             ImGuiID id;
             float hover;
@@ -1152,11 +1188,13 @@ const char* keyText = it->listening ? "..." : GetKeyNameFromSystem(*Key);
 #else
 /*
  * ANDROID: não existe teclado físico. O KeyBind aqui é um ATALHO pra
- * criar/remover o BOTÃO FLUTUANTE da função (FloatingKeys). O box mostra
- * o nome do botão ("F1", "F2"...) ou "None". Tocar de novo no box com um
- * botão já criado remove ele da tela.
+ * spawnar/remover o BOTÃO FLUTUANTE da função (FloatingKeys). O box
+ * mostra "Show" (spawnar) ou "Hide" (remover) — sem numeração F1/F2/F3.
+ * O botão fica SINCRONIZADO com o toggle da função (FeatureFlag):
+ * tocar no botão liga/desliga a função e o checkbox do painel acompanha
+ * na hora — e mudar o checkbox atualiza o botão também.
  */
-const char* keyText = (*Key != 0) ? FloatingKeys::VkLabel(*Key) : "None";
+const char* keyText = ((*Key != 0) && FloatingKeys::Exists(*Key)) ? "Hide" : "Show";
 #endif
         ImGui::PushFont(Fonts::InterMedium);
         ImVec2 keySize = CalcTextSize(keyText);
@@ -1202,13 +1240,20 @@ const char* keyText = (*Key != 0) ? FloatingKeys::VkLabel(*Key) : "None";
         }
 #else
         /*
-         * ANDROID — criar/remover o botão flutuante:
-         *   box "None" + toque = cria um botão com o label da função
-         *   box "F#"  + toque = remove o botão da tela
+         * ANDROID — spawnar/remover o botão flutuante + manter ele
+         * sincronizado com o toggle da função (bidirecional).
          */
+        if (FeatureFlag && *Key != 0)
+            FloatingKeys::Bind(*Key, FeatureFlag);
+
         if (pressed) {
-            if (*Key == 0) {
-                *Key = FloatingKeys::Acquire(label);
+            if (*Key == 0 || !FloatingKeys::Exists(*Key)) {
+                const int newVk = FloatingKeys::Acquire(label);
+                if (newVk != 0) {
+                    *Key = newVk;
+                    if (FeatureFlag)
+                        FloatingKeys::Bind(*Key, FeatureFlag);
+                }
             } else {
                 FloatingKeys::Release(*Key);
                 *Key = 0;

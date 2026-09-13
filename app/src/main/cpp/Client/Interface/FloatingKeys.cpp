@@ -9,6 +9,7 @@
 #include <cstring>
 #include <mutex>
 #include <cstdio>
+#include <string>
 
 /*
  * ============================================================================
@@ -16,13 +17,26 @@
  * ============================================================================
  * Implementação dos botões flutuantes de keybind (ver o header pra arquitetura).
  *
- * Novidades:
- *   - ARRASTO: cada botão guarda um offset (ox, oy) somado ao layout base.
- *     O Java detecta o arrasto (deslize > slop), chama DragCancel() e passa
- *     os deltas em MoveBy(). O botão fica onde foi solto.
- *   - O toque agora SEMPRE chega pela janelinha Java de cada botão
- *     (OverlayService::syncFloatingKeys), não depende do io.MousePos do
- *     painel — antes os botões fora do painel eram inclicáveis.
+ * MUDANÇAS DESSA VERSÃO:
+ *   - UM BOTÃO FIXO POR FUNÇÃO: Acquire reaproveita o botão de mesmo
+ *     título em vez de criar um novo — acabou a numeração F1, F2, F3, F4
+ *     acumulando a cada spawn/despawn. O vk é reciclado do menor slot
+ *     livre quando o botão é recriado (irrelevante na UI, que não mostra
+ *     número algum: o box do painel mostra "Show"/"Hide" e o botão
+ *     mostra o nome da função).
+ *   - SINCRONIZAÇÃO BIDIRECIONAL com o painel: Bind(vk, bool*) liga o
+ *     botão ao toggle da função. Tocar no botão alterna o bool; o
+ *     SyncFromPanel (1x/frame no DrawTick) espelha o bool no botão.
+ *   - BOTÕES MAIORES: 96x52 (antes 76x40), gap 12, bolinha e texto
+ *     maiores pra facilitar o toque durante o jogo.
+ *
+ * Mantido das versões anteriores:
+ *   - ARRASTO: cada botão guarda um offset (ox, oy) somado ao layout
+ *     base. O Java detecta o arrasto (deslize > slop), chama DragCancel()
+ *     e passa os deltas em MoveBy(). O botão fica onde foi solto.
+ *   - O toque SEMPRE chega pela janelinha Java de cada botão
+ *     (OverlayService::syncFloatingKeys), não depende do io.MousePos
+ *     do painel.
  * ============================================================================
  */
 
@@ -44,20 +58,17 @@ namespace
         bool pendingToggle = false; // toggle aplicado no DOWN (desfeito se virar drag)
         float ox = 0, oy = 0;  // offset do arrasto (relativo ao layout base)
         float x = 0, y = 0, w = 0, h = 0;
+
+        /*
+         * SINCRONIZAÇÃO: ponteiro pro bool do toggle da função no painel
+         * (ex.: &g_Globals.AimBot.Enabled). nullptr = botão solto, sem
+         * ligação com o painel (só estado interno).
+         */
+        bool* bound = nullptr;
     };
 
     static std::mutex g_Mutex;
     static std::vector<FloatingKey> g_Keys;
-    static int g_NextSlot = 0;
-
-    const char* SlotLabel(int slot)
-    {
-        static char buf[8][8];
-        static int rot = 0;
-        rot = (rot + 1) & 7;
-        snprintf(buf[rot], sizeof(buf[rot]), "F%d", slot + 1);
-        return buf[rot];
-    }
 
     FloatingKey* FindLocked(int vk)
     {
@@ -67,24 +78,57 @@ namespace
         return nullptr;
     }
 
+    /*
+     * Preenche o título a partir do label do widget ("AimKey" -> "Aim").
+     */
+    void MakeTitle(const char* label, char (&out)[24])
+    {
+        std::string t = (label && *label) ? label : "?";
+
+        if (t.size() > 3 && t.compare(t.size() - 3, 3, "Key") == 0)
+            t.resize(t.size() - 3);
+
+        memset(out, 0, sizeof(out));
+        strncpy(out, t.c_str(), sizeof(out) - 1);
+    }
+
+    /*
+     * Direção PAINEL -> BOTÃO: espelha o bool da função no estado visual
+     * do botão. Só faz sentido no modo toque (no modo segurar o botão é
+     * momentâneo, controlado pelo dedo).
+     */
+    void SyncFromPanelLocked()
+    {
+        if (g_Globals.General.FloatingKeysHold)
+            return;
+
+        for (auto& k : g_Keys)
+            if (k.bound)
+                k.state = *k.bound ? true : false;
+    }
+
     void LayoutLocked(int screenW, int screenH)
     {
         /*
-         * Coluna compacta no canto DIREITO da tela, começando um pouco
-         * acima do centro. Cada botão soma o offset do arrasto (ox/oy) e
-         * o resultado é preso dentro da tela. Se a tela estiver de cabeça
+         * Coluna no canto DIREITO da tela, começando um pouco acima do
+         * centro. Cada botão soma o offset do arrasto (ox/oy) e o
+         * resultado é preso dentro da tela. Se a tela estiver de cabeça
          * pra baixo ou com tamanho zero (boot), mantém o layout anterior.
          */
         if (screenW <= 0 || screenH <= 0)
             return;
 
-        const float w = 76.0f;
-        const float h = 40.0f;
-        const float gap = 10.0f;
+        /*
+         * BOTÕES MAIORES (pedido do usuário): 96x52, gap 12.
+         * Fácil de acertar durante a partida.
+         */
+        const float w = 96.0f;
+        const float h = 52.0f;
+        const float gap = 12.0f;
         const float margin = 14.0f;
 
         const float baseX = (float)screenW - w - margin;
-        const float baseY = (float)screenH * 0.28f;
+        const float baseY = (float)screenH * 0.24f;
 
         int slot = 0;
 
@@ -116,28 +160,44 @@ int Acquire(const char* label)
 {
     std::lock_guard<std::mutex> lock(g_Mutex);
 
-    FloatingKey k;
-    k.vk = kVkBase + (g_NextSlot++ & 0xFF);
+    char title[24];
+    MakeTitle(label, title);
 
-    if (label && *label)
+    /*
+     * UM BOTÃO POR FUNÇÃO: já existe botão com esse título? Reaproveita —
+     * mesmo vk, sem duplicar, sem numeração acumulando.
+     */
+    for (auto& k : g_Keys)
     {
-        /*
-         * Tira o sufixo "Key" do label do widget ("AimKey" -> "Aim")
-         * pra ficar bonito no botão, e limita a 22 chars.
-         */
-        std::string t = label;
-        if (t.size() > 3 && t.compare(t.size() - 3, 3, "Key") == 0)
-            t.resize(t.size() - 3);
-
-        strncpy(k.title, t.c_str(), sizeof(k.title) - 1);
-    }
-    else
-    {
-        strncpy(k.title, "?", sizeof(k.title) - 1);
+        if (strncmp(k.title, title, sizeof(k.title)) == 0)
+            return k.vk;
     }
 
-    g_Keys.push_back(k);
-    return k.vk;
+    /*
+     * Pool cheio: falha explícita (o widget mantém *Key como estava).
+     */
+    if ((int)g_Keys.size() >= kMaxKeys)
+        return 0;
+
+    /*
+     * Menor slot livre — o vk de um botão removido é reciclado.
+     */
+    for (int slot = 0; slot < 256; slot++)
+    {
+        const int vk = kVkBase + slot;
+
+        if (!FindLocked(vk))
+        {
+            FloatingKey k;
+            k.vk = vk;
+            strncpy(k.title, title, sizeof(k.title) - 1);
+            g_Keys.push_back(k);
+
+            return vk;
+        }
+    }
+
+    return 0;
 }
 
 void Release(int vk)
@@ -165,7 +225,7 @@ const char* VkLabel(int vk)
     std::lock_guard<std::mutex> lock(g_Mutex);
 
     FloatingKey* k = FindLocked(vk);
-    return k ? SlotLabel(k->vk - kVkBase) : "None";
+    return k ? k->title : "None";
 }
 
 const char* VkTitle(int vk)
@@ -174,6 +234,24 @@ const char* VkTitle(int vk)
 
     FloatingKey* k = FindLocked(vk);
     return k ? k->title : nullptr;
+}
+
+void Bind(int vk, bool* flag)
+{
+    if (vk < kVkBase)
+        return;
+
+    std::lock_guard<std::mutex> lock(g_Mutex);
+
+    FloatingKey* k = FindLocked(vk);
+    if (k)
+        k->bound = flag;
+}
+
+void SyncFromPanel()
+{
+    std::lock_guard<std::mutex> lock(g_Mutex);
+    SyncFromPanelLocked();
 }
 
 bool Exists(int vk)
@@ -219,6 +297,13 @@ void OnTouch(int vk, bool down)
         {
             k->state = !k->state;      // modo toque: alterna no press
             k->pendingToggle = true;   // será desfeito se virar arrasto
+
+            /*
+             * SINCRONIZAÇÃO BOTÃO -> PAINEL: o toggle da função acompanha
+             * na hora (o checkbox no painel acende/apaga junto).
+             */
+            if (k->bound)
+                *k->bound = k->state;
         }
     }
     else
@@ -243,6 +328,12 @@ void DragCancel(int vk)
     {
         k->state = !k->state;   // desfaz o toggle do DOWN
         k->pendingToggle = false;
+
+        /*
+         * Desfaz também no painel — o bool volta ao valor anterior.
+         */
+        if (k->bound)
+            *k->bound = k->state;
     }
 
     k->dragging = true;
@@ -277,6 +368,12 @@ void DrawTick(int screenW, int screenH, int* outBounds, int boundsMax, int& boun
     if (g_Keys.empty())
         return;
 
+    /*
+     * SINCRONIZAÇÃO PAINEL -> BOTÃO (1x por frame): se o usuário mudou o
+     * toggle no painel, o botão acende/apaga junto.
+     */
+    SyncFromPanelLocked();
+
     LayoutLocked(screenW, screenH);
 
     ImDrawList* dl = ImGui::GetForegroundDrawList();
@@ -296,31 +393,31 @@ void DrawTick(int screenW, int screenH, int* outBounds, int boundsMax, int& boun
         ImVec2 mx(k.x + k.w, k.y + k.h);
 
         // Sombra + corpo
-        dl->AddRectFilled(mn + ImVec2(0, 3), mx + ImVec2(0, 3), IM_COL32(0, 0, 0, 70), 12.0f);
+        dl->AddRectFilled(mn + ImVec2(0, 3), mx + ImVec2(0, 3), IM_COL32(0, 0, 0, 70), 14.0f);
         dl->AddRectFilled(mn, mx,
             active ? IM_COL32(46, 10, 10, 235)
                    : (pressed ? IM_COL32(30, 30, 30, 220) : IM_COL32(16, 16, 16, 200)),
-            12.0f);
+            14.0f);
 
         // Borda: acesa em vermelho quando ativo
         dl->AddRect(mn, mx,
             active ? IM_COL32(200, 0, 0, 255)
                    : IM_COL32(90, 90, 95, 180),
-            12.0f, 0, pressed ? 2.5f : 1.5f);
+            14.0f, 0, pressed ? 2.5f : 1.5f);
 
-        // Bolinha de estado
-        ImVec2 dot(k.x + 14.0f, k.y + k.h * 0.5f);
-        dl->AddCircleFilled(dot, 4.0f,
-            active ? IM_COL32(200, 0, 0, 255) : IM_COL32(70, 70, 70, 255), 16);
+        // Bolinha de estado (maior)
+        ImVec2 dot(k.x + 16.0f, k.y + k.h * 0.5f);
+        dl->AddCircleFilled(dot, 5.0f,
+            active ? IM_COL32(200, 0, 0, 255) : IM_COL32(70, 70, 70, 255), 20);
         if (active)
-            dl->AddCircleFilled(dot, 7.0f, IM_COL32(200, 0, 0, 40), 16);
+            dl->AddCircleFilled(dot, 9.0f, IM_COL32(200, 0, 0, 40), 20);
 
-        // Texto (título do painel)
+        // Texto (título da função)
         ImGui::PushFont(Fonts::InterMedium);
         char line[40];
         snprintf(line, sizeof(line), "%s", k.title);
         ImVec2 ts = ImGui::CalcTextSize(line);
-        dl->AddText(ImVec2(k.x + 24.0f, k.y + (k.h - ts.y) * 0.5f),
+        dl->AddText(ImVec2(k.x + 28.0f, k.y + (k.h - ts.y) * 0.5f),
             active ? IM_COL32(255, 235, 235, 255) : IM_COL32(200, 200, 205, 235), line);
         ImGui::PopFont();
 
