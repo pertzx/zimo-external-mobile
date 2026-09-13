@@ -13,7 +13,7 @@ void Namegun::Init() {
 
     // Especiais
     GunData[6016] = { "CHAMAR AIRDROP", "", true };
-    GunData[10006] = { "DROP CAMINH�O", "", true };
+    GunData[10006] = { "DROP CAMINHÃO", "", true };
     GunData[-15524 + 25000] = { "Mini Drone de cura", "", true };
     GunData[-15521 + 25000] = { "Mini Drone de cura (1 USO)", "", true };
     GunData[21001] = { "Pistoleta de cura", "\ue066", true };
@@ -68,6 +68,7 @@ void Namegun::Init() {
     GunData[61] = { "M60-I", "\ue06e" , false, true };
     GunData[122] = { "M60-II", "\ue06e" , false, true };
     GunData[123] = { "M60-III", "\ue06e" , false, true };
+    GunData[21022] = { "Thompsom-X", "\ue06e" , false, true };
     GunData[54] = { "Kord", "" };
 
     // Submetralhadoras (SMG)
@@ -90,7 +91,7 @@ void Namegun::Init() {
     GunData[228] = { "MAC10-I", "\ue06d" , false, true };
     GunData[229] = { "MAC10-II", "\ue06d" , false, true };
     GunData[230] = { "MAC10-III", "\ue06d" , false, true };
-    GunData[150] = { "Bis\xe3o", "\uE06C" };
+    GunData[150] = { "Bisão", "\uE06C" };
 
     // Espingarda 
     GunData[5] = { "M1014", "\ue059" };
@@ -120,7 +121,7 @@ void Namegun::Init() {
     // Pistola
     GunData[3] = { "USP", "\ue04e" };
     GunData[56] = { "USP-2", "\ue060" , false, true };
-    GunData[9] = { (const char*)u8"�guia do Deserto", "\ue051" };
+    GunData[9] = { (const char*)u8"Aguia do Deserto", "\ue051" };
     GunData[10] = { "G18", "\ue052" };
     GunData[20] = { "M1873", "\ue057" };
     GunData[25] = { "M500", "\ue058" };

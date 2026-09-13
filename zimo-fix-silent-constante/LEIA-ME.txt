@@ -1,0 +1,77 @@
+================================================================
+ ZIMO FIX — SILENT CONSTANTE (para de ir 1x a cada ~10s)
+================================================================
+
+SUBSTITUA OS 4 ARQUIVOS ABAIXO (cole o conteudo inteiro, nao
+misture com o antigo):
+
+ 1. app/src/main/cpp/Client/Draw/Silent.cpp
+ 2. app/src/main/cpp/Client/Draw/Silent.hpp
+ 3. app/src/main/cpp/Client/Draw/Draw.cpp
+ 4. app/src/main/cpp/Shared/Globals.hpp
+
+Os caminhos dentro deste ZIP ja sao os mesmos do projeto
+(app/src/main/cpp/...). Recompila o app depois de colar.
+
+----------------------------------------------------------------
+ CONFIG OBRIGATORIA NO PAINEL (1 minuto)
+----------------------------------------------------------------
+Painel -> aba Silent -> "Silent FOV": sobe de 30 pra 150-250.
+
+FOV do silent e em PIXELS (cabeca vs centro da tela). Com 30 o
+alvo so fica selecionado com a mira PRACTICAMENTE colada na
+cabeca; o recoil arrasta a mira pra fora do circulo no meio do
+spray e a selecao derruba o alvo -> silent para no meio. Com
+150+ o alvo continua selecionado o spray inteiro.
+
+(Se o seu config salvo ja tinha FOV 30, o config vai recarregar
+30 — ajusta no slider uma vez e salva de novo. O default novo ja
+e 150 pra config fresco.)
+
+----------------------------------------------------------------
+ O QUE FOI CORRIGIDO (resumo)
+----------------------------------------------------------------
+* SILENT 1X A CADA ~10s:
+  O jogo reescreve o RayDir dele todo frame e so consome no
+  instante do tiro — quem escreve POR ULTIMO antes do tiro ganha
+  a bala. O laco antigo misturava write com leituras (IsFiring +
+  cadeia da cabeca que custa 7-15 reads + origem) e dormia 1-20ms
+  entre passadas; no combate a ponte satura (ESP + aimbot + silent
+  no mesmo socket) e a densidade de write despencava pra dezenas
+  por segundo -> o jogo ganhava a corrida quase sempre.
+  AGORA: atirando o laco vira BURST de escrita sem pausa (mesmo
+  principio do antigo flood de 28000 que funcionava, so que
+  continuo e controlado) usando posicao em cache; toda checagem
+  roda por tempo amortizada (nunca no caminho do write) e tem
+  sched_yield a cada 32 writes pra ESP respirar.
+
+* WEAPONPTR VELHO:
+  m_LastAimingInfoFromWeapon agora e re-lido a cada 100ms. Antes
+  era lido 1x por passada — se o jogo trocasse o objeto da arma
+  (reload/troca de arma), o burst inteiro escrevia no endereco
+  morto e o silent morria sem sinal.
+
+* FovCheck NAO DERRUBA MAIS O SILENT ATIRANDO:
+  O FOV em pixels agora so limita o write "quente" FORA do tiro.
+  Atirando o write segue direto (quem validou o alvo foi a
+  selecao do Draw) — o recoil nao interrompe mais o silent no
+  meio do spray.
+
+* TROCA DE ALVO SEM DERRUBAR O LACO:
+  Alvo trocado agora so invalida a cache de posicao e o burst
+  continua. Antes a troca quebrava o laco, pagava re-aquisicao e
+  o silent passava fome de write durante o combate.
+
+* ALVO SOBREVIVE A ENGGASGO DO SNAPSHOT (Draw.cpp):
+  Quando a ponte satura, snapshotFresh=false e
+  SilentClosestEntity zerava — o ClearTarget derrubava o silent
+  no meio da troca de tiro. O ultimo alvo valido agora sobrevive
+  600ms de keep-alive ate o snapshot voltar.
+
+* DEFAULT Silent FOV 30 -> 150 (Globals.hpp).
+
+* Position velha: ate 250ms escreve com a cache (errar pouco
+  bate nao escrever nada); passou disso, para e re-le.
+
+Validado com g++ -fsyntax-only -std=c++17: Silent.cpp, Draw.cpp
+e Globals.hpp — 0 erros.

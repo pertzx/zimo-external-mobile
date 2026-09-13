@@ -43,10 +43,24 @@ namespace Silent
      * (e a MESMA posicao que a ESP desenha) — silent constante.
      */
 
-    /* Escrita do RayDir: ritmo constante no CANAL DEDICADO (nao disputa
-    * mutex com a ESP — por isso pode ser agressivo de novo). */
-    constexpr LONGLONG WRITE_PACE_FIRING_MS = 1;   // atirando (~800-1200 writes/s)
-    constexpr LONGLONG WRITE_PACE_IDLE_MS   = 5;  // parado (quente pro 1o tiro)
+     /*
+     * NUCLEO DA CONSTANCIA (o core da versao antiga que "ia quase
+     * sempre"): ATIRANDO o write roda EM SEQUENCIA, SEM Sleep — o
+     * proprio roundtrip do canal dedicado da o ritmo (milhares de
+     * writes/s). Cede ao SO apenas a cada BURST_YIELD_EVERY writes
+     * (sched_yield, custo ~zero). PARADO: write morno a cada
+     * WRITE_PACE_IDLE_MS (quente pro 1o tiro).
+     * A ESP NAO sente essa densidade: ela esta na OUTRA conexao
+     * (socket propria dela) com o daemon.
+     */
+    constexpr uint32_t BURST_YIELD_EVERY = 128;  // sched_yield a cada 128 writes
+    constexpr LONGLONG WRITE_PACE_IDLE_MS = 5;   // parado (quente pro 1o tiro)
+
+    /* Refresh da cabeca (snapshot da ESP) POR TEMPO em cima de cache —
+     * nunca por write: o burst nao pode martelar o mutex do snapshot
+     * milhares de vezes por segundo (disputaria com ReadLoop/Draw). */
+    constexpr LONGLONG HEAD_REFRESH_FIRING_MS = 8;   // atirando
+    constexpr LONGLONG HEAD_REFRESH_IDLE_MS   = 33;  // parado
 
     /* Leituras propias do writer, throttled (dezenas de ops/s, nao milhares). */
     constexpr LONGLONG WEAPON_REFRESH_MS  = 250;  // m_LastAimingInfoFromWeapon

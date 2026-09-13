@@ -7,6 +7,7 @@
 #include <Offsets/Offsets.hpp>
 
 #include <pthread.h>
+#include <sched.h>
 
 #include <chrono>
 #include <cstdint>
@@ -534,6 +535,9 @@ namespace Silent
             rngState = 0xDEADBEEF;
 
         uint32_t writeFails = 0;
+        uint32_t writeCount = 0;
+
+        LONGLONG lastHeadMs = 0;
 
         LONGLONG lastMatrixMs = 0;
         LONGLONG lastWeaponMs = 0;
@@ -543,6 +547,17 @@ namespace Silent
         uintptr_t weaponPtr = 0;
 
         Vector3 origin = {};
+
+        /*
+         * Cabeca em cache do burst (refresh por tempo): entre um refresh
+         * e outro o laco so escreve — zero mutex, zero socket.
+         */
+        Vector3 burstHead = {};
+        bool burstHeadOk = false;
+
+        /* Modo do ciclo anterior (define o throttle do refresh da cabeca). */
+        bool burstFiring = false;
+
         Matrix4x4 cachedMatrix = {};
 
         while (
@@ -605,53 +620,78 @@ namespace Silent
                 s_CachedHeadTick = 0;
                 s_CachedHeadTarget = 0;
                 LeaveCriticalSection(&g_HeadCS);
+
+                burstHead = {};
+                burstHeadOk = false;
             }
 
-            Vector3 head = {};
-            LONGLONG headTick = 0;
-            bool headOk =
-                LookupHeadFromSnapshot(
-                    target,
-                    head,
-                    headTick
-                );
-
-            if (!headOk)
+            /*
+             * Refresh POR TEMPO em cima de cache (nunca por write): no
+             * burst o laco roda milhares de vezes por segundo — martelar
+             * o mutex do snapshot a cada ciclo disputaria com o
+             * ReadLoop/Draw. Entre um refresh e outro o laco SO ESCREVE.
+             */
+            if (
+                !burstHeadOk ||
+                nowMs - lastHeadMs >=
+                    (burstFiring ? HEAD_REFRESH_FIRING_MS
+                                 : HEAD_REFRESH_IDLE_MS)
+            )
             {
-                /*
-                 * Alvo saiu da lista (snapshot engasgou): usa a ultima
-                 * boa do MESMO alvo dentro de HEAD_STALE_MAX_MS.
-                 */
-                EnterCriticalSection(&g_HeadCS);
-                head = s_CachedHead;
-                headTick = s_CachedHeadTick;
-                const uintptr_t cachedFor =
-                    s_CachedHeadTarget;
-                LeaveCriticalSection(&g_HeadCS);
+                lastHeadMs = nowMs;
 
-                headOk =
-                    cachedFor == target &&
-                    headTick != 0 &&
-                    nowMs - headTick <=
-                        HEAD_STALE_MAX_MS &&
-                    (head.X != 0.0f ||
-                     head.Y != 0.0f ||
-                     head.Z != 0.0f);
+                Vector3 head = {};
+                LONGLONG headTick = 0;
+                bool headOk =
+                    LookupHeadFromSnapshot(
+                        target,
+                        head,
+                        headTick
+                    );
+
+                if (!headOk)
+                {
+                    /*
+                     * Alvo saiu da lista (snapshot engasgou): usa a
+                     * ultima boa do MESMO alvo dentro de
+                     * HEAD_STALE_MAX_MS.
+                     */
+                    EnterCriticalSection(&g_HeadCS);
+                    head = s_CachedHead;
+                    headTick = s_CachedHeadTick;
+                    const uintptr_t cachedFor =
+                        s_CachedHeadTarget;
+                    LeaveCriticalSection(&g_HeadCS);
+
+                    headOk =
+                        cachedFor == target &&
+                        headTick != 0 &&
+                        nowMs - headTick <=
+                            HEAD_STALE_MAX_MS &&
+                        (head.X != 0.0f ||
+                         head.Y != 0.0f ||
+                         head.Z != 0.0f);
+                }
+                else
+                {
+                    /*
+                     * Achou na lista: mesmo assim respeita LastSeenTick
+                     * — entrada antiga na lista nao vale mais que o
+                     * keep-alive do cache.
+                     */
+                    if (nowMs - headTick > HEAD_STALE_MAX_MS)
+                        headOk = false;
+                }
+
+                burstHeadOk = headOk;
+
+                if (headOk)
+                    burstHead = head;
             }
-            else
-            {
-                /*
-                 * Achou na lista: mesmo assim respeita LastSeenTick —
-                 * entrada antiga na lista (leitura atrasada do ReadLoop)
-                 * nao vale mais que o keep-alive do cache.
-                 */
-                if (nowMs - headTick > HEAD_STALE_MAX_MS)
-                    headOk = false;
-            }
 
-            if (!headOk)
+            if (!burstHeadOk)
             {
-                Sleep(4);
+                Sleep(2);
                 continue;
             }
 
@@ -780,7 +820,7 @@ namespace Silent
                 !firing &&
                 !W2S::FovCheck(
                     cachedMatrix,
-                    head,
+                    burstHead,
                     static_cast<float>(
                         g_Globals.Silent.Fov
                     )
@@ -793,9 +833,9 @@ namespace Silent
 
             Vector3 dir;
 
-            dir.X = head.X - origin.X;
-            dir.Y = head.Y - origin.Y;
-            dir.Z = head.Z - origin.Z;
+            dir.X = burstHead.X - origin.X;
+            dir.Y = burstHead.Y - origin.Y;
+            dir.Z = burstHead.Z - origin.Z;
 
             if (
                 dir.X == 0.0f &&
@@ -884,17 +924,37 @@ namespace Silent
                 }
             }
 
-            /*
-             * Ritmo CONSTANTE — o antigo burst sem freio monopolizava o
-             * mutex da ponte (a ESP perdia update atirando). Densidade
-             * estavel de ~330/s ganha a bala no instante do tiro SEM
-             * estrangular ninguem.
+             /*
+             * ============================================================
+             * O NUCLEO DA CONSTANCIA (o core da versao antiga que "ia
+             * quase sempre") — agora SEM medo, no canal DEDICADO:
+             *
+             * ATIRANDO: write em sequencia, SEM Sleep. O proprio
+             * roundtrip da ponte da o ritmo (milhares por segundo). O
+             * jogo reescreve o RayDir dele todo frame e consome no
+             * instante do tiro; quem escreve POR ULTIMO ganha a bala.
+             *
+             * A ESP NAO sente: ela esta na OUTRA conexao (socket
+             * propria) — este burst nao disputa nada com ela.
+             * ============================================================
              */
-            Sleep(
-                firing
-                    ? WRITE_PACE_FIRING_MS
-                    : WRITE_PACE_IDLE_MS
-            );
+            burstFiring = firing;
+
+            if (firing)
+            {
+                ++writeCount;
+
+                if ((writeCount & (BURST_YIELD_EVERY - 1)) == 0)
+                    sched_yield();
+            }
+            else
+            {
+                /*
+                 * Parado: write morno (mantem o ray apontado pro alvo
+                 * pro primeiro tiro sair silent) — 1 write a cada 5ms.
+                 */
+                Sleep(WRITE_PACE_IDLE_MS);
+            }
         }
 
         InterlockedExchange(
