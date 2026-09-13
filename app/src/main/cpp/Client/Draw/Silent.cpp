@@ -10,6 +10,7 @@
 #include <sched.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -607,9 +608,17 @@ namespace Silent
 
             /*
              * CABECA — do snapshot da ESP (zero socket). Alvo novo =
-             * cache zerado (nunca mira no dado do alvo anterior).
+             * cache zerado (nunca mira no dado do alvo anterior) e
+             * PREDICAO zerada (velocidade do alvo anterior nunca
+             * contamina o proximo).
              */
             static uintptr_t s_HeadForTarget = 0;
+
+            /* Estado da predicacao (por alvo, resetado na troca). */
+            static Vector3 s_ObsHead = {};
+            static LONGLONG s_ObsTick = 0;
+            static bool s_ObsValid = false;
+            static Vector3 s_Vel = {};
 
             if (s_HeadForTarget != target)
             {
@@ -623,6 +632,11 @@ namespace Silent
 
                 burstHead = {};
                 burstHeadOk = false;
+
+                s_ObsHead = {};
+                s_ObsTick = 0;
+                s_ObsValid = false;
+                s_Vel = {};
             }
 
             /*
@@ -686,7 +700,62 @@ namespace Silent
                 burstHeadOk = headOk;
 
                 if (headOk)
+                {
                     burstHead = head;
+
+                    /*
+                     * PREDICAO — observa a velocidade real do alvo. So
+                     * incorpora quando a observacao e NOVA (LastSeenTick
+                     * do snapshot avancou): refresh do proprio laco
+                     * devolvendo o MESMO snapshot nao e movimento.
+                     */
+                    if (s_ObsValid && headTick > s_ObsTick)
+                    {
+                        const float dt =
+                            static_cast<float>(headTick - s_ObsTick) /
+                            1000.0f;
+
+                        if (dt >= 0.004f)
+                        {
+                            Vector3 v;
+
+                            v.X = (head.X - s_ObsHead.X) / dt;
+                            v.Y = (head.Y - s_ObsHead.Y) / dt;
+                            v.Z = (head.Z - s_ObsHead.Z) / dt;
+
+                            const float spd =
+                                std::sqrt(
+                                    v.X * v.X +
+                                    v.Y * v.Y +
+                                    v.Z * v.Z
+                                );
+
+                            if (spd <= PRED_MAX_SPEED_MPS)
+                            {
+                                /* EMA: filtra o ruido de amostragem da
+                                 * ESP sem atrasar a resposta. */
+                                s_Vel.X += (v.X - s_Vel.X) * PRED_EMA_ALPHA;
+                                s_Vel.Y += (v.Y - s_Vel.Y) * PRED_EMA_ALPHA;
+                                s_Vel.Z += (v.Z - s_Vel.Z) * PRED_EMA_ALPHA;
+                            }
+                            else
+                            {
+                                /* Teleporte/reutilizacao de ponteiro:
+                                 * velocidade nao e confiavel, zera. */
+                                s_Vel = {};
+                            }
+                        }
+
+                        s_ObsHead = head;
+                        s_ObsTick = headTick;
+                    }
+                    else if (!s_ObsValid)
+                    {
+                        s_ObsHead = head;
+                        s_ObsTick = headTick;
+                        s_ObsValid = true;
+                    }
+                }
             }
 
             if (!burstHeadOk)
@@ -810,6 +879,29 @@ namespace Silent
             }
 
             /*
+             * PREDICAO — ponto de mira: cabeca observada + velocidade
+             * * (idade da observacao + latencia do write). Envelheceu
+             * demais (ESP engasgada) = nao extrapola alem do teto, o
+             * tiro cai no alvo observado em vez de voar pro nada.
+             */
+            LONGLONG predAgeMs = nowMs - s_ObsTick;
+
+            if (predAgeMs < 0)
+                predAgeMs = 0;
+
+            if (predAgeMs > PRED_MAX_AGE_MS)
+                predAgeMs = PRED_MAX_AGE_MS;
+
+            const float predSec =
+                static_cast<float>(predAgeMs + PRED_LATENCY_MS) / 1000.0f;
+
+            Vector3 aimHead;
+
+            aimHead.X = burstHead.X + s_Vel.X * predSec;
+            aimHead.Y = burstHead.Y + s_Vel.Y * predSec;
+            aimHead.Z = burstHead.Z + s_Vel.Z * predSec;
+
+            /*
              * FovCheck (em PIXELS) so limita o write quente FORA do
              * tiro. ATIRANDO nao passa pelo FOV — quem validou o alvo
              * foi a selecao do Draw (Silent.Fov + MaxDistance), e o
@@ -820,7 +912,7 @@ namespace Silent
                 !firing &&
                 !W2S::FovCheck(
                     cachedMatrix,
-                    burstHead,
+                    aimHead,
                     static_cast<float>(
                         g_Globals.Silent.Fov
                     )
@@ -833,9 +925,9 @@ namespace Silent
 
             Vector3 dir;
 
-            dir.X = burstHead.X - origin.X;
-            dir.Y = burstHead.Y - origin.Y;
-            dir.Z = burstHead.Z - origin.Z;
+            dir.X = aimHead.X - origin.X;
+            dir.Y = aimHead.Y - origin.Y;
+            dir.Z = aimHead.Z - origin.Z;
 
             if (
                 dir.X == 0.0f &&

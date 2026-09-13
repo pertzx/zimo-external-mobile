@@ -1612,6 +1612,11 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         const float fovSq = AimCfg.Fov * AimCfg.Fov;
         const float silentFovSq = g_Globals.Silent.Fov * g_Globals.Silent.Fov;
 
+        /* Bias de distancia do silent (px^2 por m^2): inimigo a 50m custa
+         * +625 "px^2" no score — empata com ~25px de erro de mira. Leve:
+         * nao substitui a mira, so faz o PERTINHO ganhar duvidas. */
+        constexpr float kSilentDistBiasPx2PerM2 = 0.25f;
+
         ImDrawList* DL = ImGui::GetForegroundDrawList( );
         const ImVec2 screenCenter( ( float )ScreenWidth * 0.5f, ( float )ScreenHeight * 0.5f );
 
@@ -1623,6 +1628,10 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         // (nao herda nada do AimCfg).
         float SilentDistSq = FLT_MAX;
         uintptr_t SilentClosestEntity = 0;
+
+        // Nivel VISIVEL (oraculo do auto-lock do jogo): ganha do nivel geral.
+        float SilentVisDistSq = FLT_MAX;
+        uintptr_t SilentVisibleEntity = 0;
 
         int enemyCountFrame = 0;
         ImVec2 closestHead2D( 0.f, 0.f );
@@ -2021,6 +2030,33 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         const float centerX = ( float )ScreenWidth * 0.5f;
         const float centerY = ( float )ScreenHeight * 0.5f;
 
+        /*
+         * ORACULO DE VISIBILIDADE do silent (fix "mira em quem ta atras da
+         * parede"): o proprio jogo resolve, a cada frame, qual inimigo esta
+         * VISIVEL e perto da mira — o auto-lock publica isso em
+         * m_TargetHeuristic (TargetInfo.m_Entity), ja com raycast de parede
+         * feito pelo JOGO. 3 reads UMA vez por frame (nao por entidade):
+         * quem igualar esse ponteiro esta comprovadamente visivel, custo
+         * zero pra gente. 0 = oraculo calado (cai no comportamento de
+         * sempre, silent nunca fica sem alvo).
+         */
+        uintptr_t autoLockTargetEntity = 0;
+
+        if ( g_Globals.Silent.Enabled && localPlayer != 0 )
+        {
+                uintptr_t aimAssist = ReadPtr( localPlayer + Offsets::Player::m_AimAssist );
+
+                if ( aimAssist != 0 )
+                {
+                        uintptr_t targetInfo =
+                                ReadPtr( aimAssist + Offsets::AimAssistAutoLock::m_TargetHeuristic );
+
+                        if ( targetInfo != 0 )
+                                autoLockTargetEntity =
+                                        ReadPtr( targetInfo + Offsets::AimAssistAutoLock::m_Entity );
+                }
+        }
+
         // ==================== Aimbot/Silent target selection ====================
         // Desacoplado do loop de render: roda mesmo com "ESP Player" (master do
         // Visuals.ESP) desligado, porque silent, boneswap, magnet e rage dependem
@@ -2089,22 +2125,60 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 }
                         }
 
-                        // Alvo do silent: config propria (Silent.Fov e Silent.MaxDistance),
-                        // sem VisibleCheck e sem IgnoreKnocked/IgnoreBots do aimbot.
+                                                /*
+                         * Alvo do silent: config propria (Silent.Fov e
+                         * Silent.MaxDistance) com FILTRO DE VISIBILIDADE +
+                         * preferencia por alvo PERTINHO:
+                         *   - visivel (oraculo do auto-lock) ganha de invisivel
+                         *     — fim do "silent prefere o la longe atras da parede";
+                         *   - dentro do mesmo nivel, o score soma a distancia de
+                         *     jogo ao erro de mira (pertinho desempata).
+                         */
                         if ( g_Globals.Silent.Enabled && snapshotFresh && p.Distance >= 0 && p.Distance <= g_Globals.Silent.MaxDistance )
                         {
                                 float sdx = p.HeadScreen.X - centerX;
                                 float sdy = p.HeadScreen.Y - centerY;
                                 float silentCrosshairDistSq = sdx * sdx + sdy * sdy;
 
-                                if ( silentCrosshairDistSq < silentFovSq && silentCrosshairDistSq < SilentDistSq )
+                                if ( silentCrosshairDistSq < silentFovSq )
                                 {
-                                        SilentDistSq = silentCrosshairDistSq;
-                                        SilentClosestEntity = p.Entity;
+                                        const bool silVisible =
+                                                ( autoLockTargetEntity != 0 &&
+                                                  p.Entity == autoLockTargetEntity );
+
+                                        const float gameDist =
+                                                ( p.Distance > 0.0f ) ? p.Distance : 0.0f;
+
+                                        const float silScore =
+                                                silentCrosshairDistSq +
+                                                gameDist * kSilentDistBiasPx2PerM2;
+
+                                        if ( silVisible )
+                                        {
+                                                if ( silScore < SilentVisDistSq )
+                                                {
+                                                        SilentVisDistSq = silScore;
+                                                        SilentVisibleEntity = p.Entity;
+                                                }
+                                        }
+                                        else if ( silScore < SilentDistSq )
+                                        {
+                                                SilentDistSq = silScore;
+                                                SilentClosestEntity = p.Entity;
+                                        }
                                 }
                         }
                 }
         }
+
+        /*
+         * FILTRO DE VISIBILIDADE — decisao final: se o auto-lock do jogo
+         * confirmou alguem VISIVEL dentro do FOV do silent, ele ganha de
+         * QUALQUER invisivel. Ninguem visivel confirmado = mantem o mais
+         * perto da mira (comportamento de sempre, silent nunca sem alvo).
+         */
+        if ( SilentVisibleEntity != 0 )
+                SilentClosestEntity = SilentVisibleEntity;
 
         // Partida ativa (localPlayer + view matrix validos): desenha o snapshot
         // SEMPRE, mesmo quando a leitura de entidades engasga por segundos — as

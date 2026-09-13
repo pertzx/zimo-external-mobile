@@ -1124,38 +1124,38 @@ bool Memory::Read(
         return true;
     }
 
-    /*
-     * ----------------------------------------------------------------
-     * CAMINHO 2/3: fallback local (process_vm_readv -> /proc/pid/mem).
-     * Funciona apenas quando o app roda privilegiado (ex: emulador
-     * com root). Loga uma vez por segundo para nao floodar.
-     * ----------------------------------------------------------------
-     */
-    if (
-        ReadProcessVm(
-            address,
-            outValue,
-            size
-        )
-    )
-    {
-        g_FallbackReads++;
+    // /*
+    //  * ----------------------------------------------------------------
+    //  * CAMINHO 2/3: fallback local (process_vm_readv -> /proc/pid/mem).
+    //  * Funciona apenas quando o app roda privilegiado (ex: emulador
+    //  * com root). Loga uma vez por segundo para nao floodar.
+    //  * ----------------------------------------------------------------
+    //  */
+    // if (
+    //     ReadProcessVm(
+    //         address,
+    //         outValue,
+    //         size
+    //     )
+    // )
+    // {
+    //     g_FallbackReads++;
 
-        return true;
-    }
+    //     return true;
+    // }
 
-    if (
-        ReadProcMem(
-            address,
-            outValue,
-            size
-        )
-    )
-    {
-        g_FallbackReads++;
+    // if (
+    //     ReadProcMem(
+    //         address,
+    //         outValue,
+    //         size
+    //     )
+    // )
+    // {
+    //     g_FallbackReads++;
 
-        return true;
-    }
+    //     return true;
+    // }
 
     if (ShouldLogFail())
     {
@@ -1245,34 +1245,34 @@ bool Memory::Write(
         return true;
     }
 
-    /*
-     * CAMINHOS 2/3: fallback local.
-     */
-    if (
-        WriteProcessVm(
-            address,
-            value,
-            size
-        )
-    )
-    {
-        g_FallbackWrites++;
+    // /*
+    //  * CAMINHOS 2/3: fallback local.
+    //  */
+    // if (
+    //     WriteProcessVm(
+    //         address,
+    //         value,
+    //         size
+    //     )
+    // )
+    // {
+    //     g_FallbackWrites++;
 
-        return true;
-    }
+    //     return true;
+    // }
 
-    if (
-        WriteProcMem(
-            address,
-            value,
-            size
-        )
-    )
-    {
-        g_FallbackWrites++;
+    // if (
+    //     WriteProcMem(
+    //         address,
+    //         value,
+    //         size
+    //     )
+    // )
+    // {
+    //     g_FallbackWrites++;
 
-        return true;
-    }
+    //     return true;
+    // }
 
     if (ShouldLogFail())
     {

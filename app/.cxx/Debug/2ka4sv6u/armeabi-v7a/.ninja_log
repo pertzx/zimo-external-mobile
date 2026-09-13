@@ -286,3 +286,11 @@
 2028	22875	8110347636594060	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	72a5221632be300d
 22875	24900	8110347657583909	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/armeabi-v7a/libclient.so	447489ab51395ce7
 10	324	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+24	560	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+99	11421	8110395747200592	CMakeFiles/client.dir/Client/Draw/Silent.cpp.o	2c2931ea194df140
+196	11556	8110395753732279	CMakeFiles/client.dir/Client/Draw/Skeleton.cpp.o	81cd64663baccae
+1599	12407	8110395769291934	CMakeFiles/client.dir/Client/Memory/Memory.cpp.o	b1db09f69481ba17
+219	12485	8110395769495313	CMakeFiles/client.dir/Client/Draw/Weapon/NameGun.cpp.o	d3f889c0990e4ccd
+140	30652	8110395911870714	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	72a5221632be300d
+30653	55506	8110396179014640	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/armeabi-v7a/libclient.so	447489ab51395ce7
+16	146	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86

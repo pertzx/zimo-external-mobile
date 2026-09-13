@@ -296,3 +296,13 @@
 127	15440	8110347338795094	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	906ac4c7783db770
 15451	18890	8110347372988885	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/arm64-v8a/libclient.so	266d11512d21fcda
 17	275	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+38	354	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+434	7364	8110387398405911	CMakeFiles/client.dir/Client/Draw/Skeleton.cpp.o	c846214438b382d4
+932	11234	8110387434475749	CMakeFiles/client.dir/Client/Draw/Weapon/NameGun.cpp.o	c5f9e249f11537b2
+662	27457	8110387599498596	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	906ac4c7783db770
+4688	5899	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+772	34035	8110395428624799	CMakeFiles/client.dir/Client/Draw/Silent.cpp.o	15abae378223ebd2
+954	34051	8110395428694773	CMakeFiles/client.dir/Client/Memory/Memory.cpp.o	4af837585ea92904
+385	49514	8110395586806294	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	906ac4c7783db770
+49529	53555	8110395630735257	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/arm64-v8a/libclient.so	266d11512d21fcda
+15	247	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08

@@ -1,11 +1,37 @@
 #include "Skeleton.hpp"
 #include <Offsets/Offsets.hpp>
+#include <Memory/Memory.hpp>
+
+#include <chrono>
 #include <cmath>
+#include <cstring>
+#include <vector>
 
 namespace
 {
-	static constexpr int BONE_COUNT = 49;
-	static constexpr int MAX_CACHE = 64;
+        static constexpr int BONE_COUNT = 49;
+        static constexpr int MAX_CACHE = 64;
+
+        /*
+         * =================================================================
+         * FIX "SKELETON TRAVA TUDO": o skeleton lia a ponte POR ENTIDADE
+         * POR FRAME na thread de render (49 idx reads + 2 bulk de 48KB +
+         * cadeia = ~54 roundtrips/frame/entity). Com 2-3 inimigos eram
+         * centenas de roundtrips POR FRAME — o frame explodia, o painel
+         * bugava e as outras ESPs perdiam update.
+         *
+         * AGORA:
+         *   - Posicoes de MUNDO dos bones ficam em cache por entidade;
+         *     entre refreshes o desenho so projeta com a view matrix AO
+         *     VIVO (W2S nao le memoria — custo zero). Osso defasado em
+         *     30ms e invisivel num wireframe.
+         *   - O refresh (a cada SKELETON_REFRESH_MS) usa 1 ReadBatch para
+         *     os 49 indices (1 roundtrip) + 2 bulk — ~3 roundtrips por
+         *     refresh, contra ~54 POR FRAME de antes.
+         * =================================================================
+         */
+        static constexpr long long SKELETON_REFRESH_MS    = 30;   // re-le bones
+        static constexpr long long SKELETON_STALE_MAX_MS  = 250;  // desenha stale se refresh falhar
 	// Janela da hierarquia lida em bulk. 256 entradas nao cobria avatares com
 	// indice de bone alto na TransformHierarchy (a cadeia de pais escapa da
 	// janela e o skeleton resolvia TRS de OUTROS objetos da cena — esqueleto
@@ -72,12 +98,28 @@ namespace
 	};
 	static constexpr int kFingersCount = sizeof(kFingers) / sizeof(kFingers[0]);
 
-	struct BoneCache
-	{
-		uintptr_t entity;
-		uintptr_t UMAData;
-		uintptr_t tAccess[BONE_COUNT];  // TransformAccess* cacheado (estavel)
-	};
+	        static long long NowMs()
+        {
+                return std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()
+                ).count();
+        }
+
+        struct BoneCache
+        {
+                uintptr_t entity;
+                uintptr_t UMAData;
+                uintptr_t tAccess[BONE_COUNT];  // TransformAccess* cacheado (estavel)
+                int boneIndex[BONE_COUNT];      // idx na hierarquia (via ReadBatch)
+                /* Enderecos da hierarquia (estaveis por avatar — zero re-read). */
+                uintptr_t hierBase;
+                uintptr_t hierValues;
+                uintptr_t hierParents;
+                /* Posicoes de MUNDO ja validadas (desenho sem ler a ponte). */
+                Vector3 wpos[BONE_COUNT];
+                long long wtick;
+                bool wok;
+        };
 
 	static BoneCache g_Cache[MAX_CACHE];
 	static int g_CacheCount = 0;
@@ -107,11 +149,19 @@ namespace
 		FB_ROOT, FB_ROOTBONE, FB_LANKLE, FB_RANKLE, FB_LFOOT, FB_RFOOT
 	};
 
-	struct FallbackCache
-	{
-		uintptr_t entity;
-		uintptr_t boneNode[FB_COUNT];
-	};
+	        struct FallbackCache
+        {
+                uintptr_t entity;
+                uintptr_t boneNode[FB_COUNT];
+                /* Mesmo tratamento de cache do caminho UMA. */
+                uintptr_t tAccess[FB_COUNT];
+                int boneIndex[FB_COUNT];
+                uintptr_t hierValues;
+                uintptr_t hierParents;
+                Vector3 wpos[FB_COUNT];
+                long long wtick;
+                bool wok;
+        };
 
 	static FallbackCache g_FbCache[MAX_CACHE];
 	static int g_FbCacheCount = 0;
@@ -312,57 +362,145 @@ bool Skeleton::DrawPlayerUma(ImDrawList* drawList, uintptr_t entity, uintptr_t u
 			}
 		};
 
-	BoneCache* bc = FindCache(entity, umaData);
-	if (!bc) bc = BuildCache();
-	if (!bc) return false;
+	        BoneCache* bc = FindCache(entity, umaData);
+        if (!bc) bc = BuildCache();
+        if (!bc) return false;
 
-	// ===== 2/3/4. Hierarquia + posicoes, com rebuild se o cache estiver stale =====
-	static TMatrix matrices[MAX_HIERARCHY];
-	static int parents[MAX_HIERARCHY];
-	Vector3 pos[BONE_COUNT];
-	int validCount = 0;
+        // ===== 2/3/4. Hierarquia + posicoes — REFRESH POR TEMPO =====
+        // Cache fresco: SO desenha (projeta wpos com a view matrix ao vivo —
+        // zero roundtrip). Senao refaz a leitura (3 roundtrips) e revalida.
+        static TMatrix matrices[MAX_HIERARCHY];
+        static int parents[MAX_HIERARCHY];
+        Vector3 pos[BONE_COUNT];
+        int validCount = 0;
 
-	for (int attempt = 0; attempt < 2; ++attempt)
-	{
-		if (attempt > 0)
-		{
-			// Todos os bones do cache sairam invalidos: tAccess stale
-			// (avatar/ponteiro reutilizado pelo jogo) — descarta e re-resolve.
-			RemoveCache();
-			bc = BuildCache();
-			if (!bc) return false;
-		}
+        const long long nowTick = NowMs();
 
-		uintptr_t anyAccess = bc->tAccess[1];
-		uintptr_t hierBase = ReadPtr(anyAccess + Offsets::GetPosWorld::matrix);
-		if (!hierBase) continue;
+        if (bc->wok && (nowTick - bc->wtick) < SKELETON_REFRESH_MS)
+        {
+                memcpy(pos, bc->wpos, sizeof(pos));
+                validCount = BONE_COUNT;
+        }
+        else
+        {
+                for (int attempt = 0; attempt < 2; ++attempt)
+                {
+                        if (attempt > 0)
+                        {
+                                // Todos os bones do cache sairam invalidos: tAccess stale
+                                // (avatar/ponteiro reutilizado pelo jogo) — descarta e re-resolve.
+                                RemoveCache();
+                                bc = BuildCache();
+                                if (!bc) return false;
+                        }
 
-		uintptr_t pValuesAddr = ReadPtr(hierBase + Offsets::GetPosWorld::matrix_list);
-		uintptr_t pParentsAddr = ReadPtr(hierBase + Offsets::GetPosWorld::matrix_indices);
-		if (!pValuesAddr || !pParentsAddr) continue;
+                        // Enderecos da hierarquia sao estaveis por avatar: so
+                        // re-resolve se nunca resolveu ou se o bulk falhou.
+                        if (!bc->hierBase || !bc->hierValues || !bc->hierParents)
+                        {
+                                uintptr_t anyAccess = bc->tAccess[1];
+                                uintptr_t hierBase = ReadPtr(anyAccess + Offsets::GetPosWorld::matrix);
+                                if (!hierBase) continue;
 
-		if (!g_FreeFireMemory.Read(pValuesAddr, matrices, sizeof(TMatrix) * MAX_HIERARCHY)) continue;
-		if (!g_FreeFireMemory.Read(pParentsAddr, parents, sizeof(int) * MAX_HIERARCHY)) continue;
+                                uintptr_t pValuesAddr = ReadPtr(hierBase + Offsets::GetPosWorld::matrix_list);
+                                uintptr_t pParentsAddr = ReadPtr(hierBase + Offsets::GetPosWorld::matrix_indices);
+                                if (!pValuesAddr || !pParentsAddr) continue;
 
-		validCount = 0;
-		for (int i = 0; i < BONE_COUNT; ++i)
-		{
-			pos[i] = Vector3::Zero();
-			if (!bc->tAccess[i]) continue;
+                                bc->hierBase = hierBase;
+                                bc->hierValues = pValuesAddr;
+                                bc->hierParents = pParentsAddr;
+                        }
 
-			int idx = g_FreeFireMemory.Read<int>(bc->tAccess[i] + Offsets::GetPosWorld::index);
-			Vector3 p = CalcPosition(idx, matrices, parents);
-			if (IsUsableBone(p))
-			{
-				pos[i] = p;
-				++validCount;
-			}
-		}
+                        if (!g_FreeFireMemory.Read(bc->hierValues, matrices, sizeof(TMatrix) * MAX_HIERARCHY))
+                        {
+                                bc->hierBase = bc->hierValues = bc->hierParents = 0;
+                                continue;
+                        }
+                        if (!g_FreeFireMemory.Read(bc->hierParents, parents, sizeof(int) * MAX_HIERARCHY))
+                        {
+                                bc->hierBase = bc->hierValues = bc->hierParents = 0;
+                                continue;
+                        }
 
-		if (validCount >= kMinValidBones) break;
-	}
+                        // Indices dos 49 bones em UM roundtrip (ReadBatch).
+                        // Item falho vem zerado — cai no CalcPosition que zera,
+                        // igual ao Read<int> falho de antes.
+                        bool idxOk = true;
+                        {
+                                Memory::BatchItem items[BONE_COUNT];
+                                int slotOf[BONE_COUNT];
+                                int n = 0;
 
-	if (validCount < kMinValidBones) return false;
+                                for (int i = 0; i < BONE_COUNT; ++i)
+                                {
+                                        if (!bc->tAccess[i]) continue;
+                                        items[n].address = bc->tAccess[i] + Offsets::GetPosWorld::index;
+                                        items[n].size = sizeof(int);
+                                        slotOf[n] = i;
+                                        ++n;
+                                }
+
+                                if (n > 0)
+                                {
+                                        std::vector<uint8_t> blob;
+                                        if (Memory::ReadBatch(items, (size_t)n, blob) &&
+                                                blob.size() >= (size_t)n * sizeof(int))
+                                        {
+                                                for (int k = 0; k < n; ++k)
+                                                {
+                                                        int v;
+                                                        memcpy(&v, blob.data() + (size_t)k * sizeof(int), sizeof(v));
+                                                        bc->boneIndex[slotOf[k]] = v;
+                                                }
+                                        }
+                                        else
+                                        {
+                                                idxOk = false;
+                                        }
+                                }
+                        }
+
+                        if (!idxOk) continue;
+
+                        validCount = 0;
+                        for (int i = 0; i < BONE_COUNT; ++i)
+                        {
+                                pos[i] = Vector3::Zero();
+                                if (!bc->tAccess[i]) continue;
+
+                                const int idx = bc->boneIndex[i];
+                                Vector3 p = CalcPosition(idx, matrices, parents);
+                                if (IsUsableBone(p))
+                                {
+                                        pos[i] = p;
+                                        ++validCount;
+                                }
+                        }
+
+                        if (validCount >= kMinValidBones)
+                        {
+                                memcpy(bc->wpos, pos, sizeof(pos));
+                                bc->wtick = nowTick;
+                                bc->wok = true;
+                                break;
+                        }
+                }
+
+                if (validCount < kMinValidBones)
+                {
+                        // Refresh falhou (ponte engasgou) mas o cache ainda e
+                        // recente: desenha o stale em vez de piscar/sumir.
+                        if (bc->wok && (nowTick - bc->wtick) < SKELETON_STALE_MAX_MS)
+                        {
+                                memcpy(pos, bc->wpos, sizeof(pos));
+                                validCount = BONE_COUNT;
+                        }
+                        else
+                        {
+                                return false;
+                        }
+                }
+        }
 
 	// ===== 5. Desenhar =====
 	ImU32 col = isKnocked ? ImColor(255, 0, 0, 255) : ImColor(g_Globals.Visuals.ESP.SkeletonColor[0], g_Globals.Visuals.ESP.SkeletonColor[1], g_Globals.Visuals.ESP.SkeletonColor[2], g_Globals.Visuals.ESP.SkeletonColor[3]);
@@ -436,65 +574,138 @@ bool Skeleton::DrawPlayerEntityBones(ImDrawList* drawList, uintptr_t entity, boo
 			return false;
 	}
 
-	// 2. Hierarquia (bulk read, igual ao caminho UMA)
-	static TMatrix matrices[MAX_HIERARCHY];
-	static int parents[MAX_HIERARCHY];
+	        // 2/3. Hierarquia + posicoes — REFRESH POR TEMPO (igual ao caminho UMA):
+        // cache fresco = so desenha; refresh = 1 ReadBatch (18 idx) + 2 bulk.
+        static TMatrix matrices[MAX_HIERARCHY];
+        static int parents[MAX_HIERARCHY];
 
-	uintptr_t matrixList = 0, matrixIndices = 0;
-	int baseIndex = -1;
+        Vector3 pos[FB_COUNT];
+        int validCount = 0;
 
-	for ( int i = 0; i < FB_COUNT; ++i )
-	{
-		if ( !fc->boneNode[ i ] ) continue;
-		if ( ResolveBoneAccess( fc->boneNode[ i ], N32, baseIndex, matrixList, matrixIndices ) )
-			break;
-	}
-	if ( baseIndex < 0 || !matrixList || !matrixIndices ) return false;
+        const long long fbNow = NowMs();
 
-	if ( !g_FreeFireMemory.Read( matrixList, matrices, sizeof( TMatrix ) * MAX_HIERARCHY ) ) return false;
-	if ( !g_FreeFireMemory.Read( matrixIndices, parents, sizeof( int ) * MAX_HIERARCHY ) ) return false;
+        if ( fc->wok && ( fbNow - fc->wtick ) < SKELETON_REFRESH_MS )
+        {
+                memcpy( pos, fc->wpos, sizeof( pos ) );
+                validCount = FB_COUNT;
+        }
+        else
+        {
+                // Resolve a hierarquia UMA vez (endereco estavel): o primeiro
+                // bone que resolver fornece values/parents pra todos.
+                if ( !fc->hierValues || !fc->hierParents )
+                {
+                        uintptr_t matrixList = 0, matrixIndices = 0;
+                        int baseIndex = -1;
 
-	// 3. Posicoes dos 18 bones
-	Vector3 pos[FB_COUNT];
-	int validCount = 0;
+                        for ( int i = 0; i < FB_COUNT; ++i )
+                        {
+                                if ( !fc->boneNode[ i ] ) continue;
+                                if ( ResolveBoneAccess( fc->boneNode[ i ], N32, baseIndex, matrixList, matrixIndices ) )
+                                        break;
+                        }
+                        if ( baseIndex < 0 || !matrixList || !matrixIndices ) return false;
 
-	for ( int i = 0; i < FB_COUNT; ++i )
-	{
-		if ( !fc->boneNode[ i ] )
-		{
-			pos[ i ] = Vector3::Zero( );
-			continue;
-		}
+                        fc->hierValues = matrixList;
+                        fc->hierParents = matrixIndices;
+                }
 
-		int idx = -1;
-		uintptr_t ml = 0, mi = 0;
-		if ( ResolveBoneAccess( fc->boneNode[ i ], N32, idx, ml, mi ) )
-		{
-			Vector3 p = CalcPosition( idx, matrices, parents );
-			// Mesma validacao do caminho UMA: bone longe do personagem ou
-			// com valores nao-finitos e' lixo (cache stale / leitura rasgada)
-			// e nao pode ser desenhado.
-			if ( std::isfinite( p.X ) && std::isfinite( p.Y ) && std::isfinite( p.Z )
-				&& ( entityPos == Vector3::Zero( ) || Vector3::Distance( p, entityPos ) <= kMaxBoneDistance ) )
-			{
-				pos[ i ] = p;
-				++validCount;
-			}
-			else
-			{
-				pos[ i ] = Vector3::Zero( );
-			}
-		}
-		else
-		{
-			pos[ i ] = Vector3::Zero( );
-		}
-	}
+                if ( !g_FreeFireMemory.Read( fc->hierValues, matrices, sizeof( TMatrix ) * MAX_HIERARCHY ) ) return false;
+                if ( !g_FreeFireMemory.Read( fc->hierParents, parents, sizeof( int ) * MAX_HIERARCHY ) ) return false;
 
-	// Menos da metade dos bones validos: provavelmente offsets errados —
-	// nao desenha nada em vez de linhas malucas na tela.
-	if ( validCount < FB_COUNT / 2 )
-		return false;
+                // tAccess por bone (estavel) + indices em UM roundtrip.
+                bool fbIdxOk = true;
+                {
+                        for ( int i = 0; i < FB_COUNT && fbIdxOk; ++i )
+                        {
+                                if ( fc->boneNode[ i ] && fc->tAccess[ i ] ) continue;
+                                if ( !fc->boneNode[ i ] ) continue;
+
+                                uintptr_t tr = ReadPtr( fc->boneNode[ i ] + Offsets::GetPosWorld::transObj );
+                                if ( !tr ) continue;
+
+                                uintptr_t ta = ReadPtr( tr + Offsets::GetPosWorld::transObj );
+                                if ( ta )
+                                        fc->tAccess[ i ] = ta;
+                        }
+
+                        Memory::BatchItem items[FB_COUNT];
+                        int slotOf[FB_COUNT];
+                        int n = 0;
+
+                        for ( int i = 0; i < FB_COUNT; ++i )
+                        {
+                                if ( !fc->tAccess[ i ] ) continue;
+                                items[ n ].address = fc->tAccess[ i ] + Offsets::GetPosWorld::index;
+                                items[ n ].size = sizeof( int );
+                                slotOf[ n ] = i;
+                                ++n;
+                        }
+
+                        if ( n > 0 )
+                        {
+                                std::vector<uint8_t> blob;
+                                if ( Memory::ReadBatch( items, ( size_t )n, blob ) &&
+                                        blob.size( ) >= ( size_t )n * sizeof( int ) )
+                                {
+                                        for ( int k = 0; k < n; ++k )
+                                        {
+                                                int v;
+                                                memcpy( &v, blob.data( ) + ( size_t )k * sizeof( int ), sizeof( v ) );
+                                                fc->boneIndex[ slotOf[ k ] ] = v;
+                                        }
+                                }
+                                else
+                                {
+                                        fbIdxOk = false;
+                                }
+                        }
+                }
+
+                if ( !fbIdxOk ) return false;
+
+                validCount = 0;
+
+                for ( int i = 0; i < FB_COUNT; ++i )
+                {
+                        pos[ i ] = Vector3::Zero( );
+                        if ( !fc->tAccess[ i ] ) continue;
+
+                        const int idx = fc->boneIndex[ i ];
+                        Vector3 p = CalcPosition( idx, matrices, parents );
+                        // Mesma validacao do caminho UMA: bone longe do personagem ou
+                        // com valores nao-finitos e' lixo (cache stale / leitura rasgada)
+                        // e nao pode ser desenhado.
+                        if ( std::isfinite( p.X ) && std::isfinite( p.Y ) && std::isfinite( p.Z )
+                                && ( entityPos == Vector3::Zero( ) || Vector3::Distance( p, entityPos ) <= kMaxBoneDistance ) )
+                        {
+                                pos[ i ] = p;
+                                ++validCount;
+                        }
+                        else
+                        {
+                                pos[ i ] = Vector3::Zero( );
+                        }
+                }
+
+                // Menos da metade dos bones validos: provavelmente offsets errados —
+                // nao desenha nada em vez de linhas malucas na tela.
+                if ( validCount >= FB_COUNT / 2 )
+                {
+                        memcpy( fc->wpos, pos, sizeof( pos ) );
+                        fc->wtick = fbNow;
+                        fc->wok = true;
+                }
+                else if ( fc->wok && ( fbNow - fc->wtick ) < SKELETON_STALE_MAX_MS )
+                {
+                        memcpy( pos, fc->wpos, sizeof( pos ) );
+                        validCount = FB_COUNT;
+                }
+                else
+                {
+                        return false;
+                }
+        }
 
 	// 4. Desenha
 	ImU32 col = isKnocked ? ImColor(255, 0, 0, 255) : ImColor(g_Globals.Visuals.ESP.SkeletonColor[0], g_Globals.Visuals.ESP.SkeletonColor[1], g_Globals.Visuals.ESP.SkeletonColor[2], g_Globals.Visuals.ESP.SkeletonColor[3]);

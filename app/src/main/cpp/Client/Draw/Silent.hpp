@@ -70,18 +70,25 @@ namespace Silent
     /* Copia LOCAL da view matrix pro FovCheck do write quente (zero socket). */
     constexpr LONGLONG MATRIX_REFRESH_MS = 33;
 
-    /*
-     * Frescor da cabeca (vinda do snapshot da ESP). Achou o alvo na lista
-     * da ESP = usa LastSeenTick dele. Nao achou (snapshot engasgado) =
-     * usa a ultima boa por ate 600ms, depois para (atirar em fantasma
-     * nao — a ESP vai voltar a atualizar com a ponte aliviada).
-     * 350ms era apertado demais: um ciclo lento do ReadLoop parava o
-     * write no meio do spray.
-     */
     constexpr LONGLONG HEAD_STALE_MAX_MS = 600;
 
     /* Ponte falhando no write: backoff antes de tentar de novo. */
     constexpr LONGLONG WRITE_FAIL_BACKOFF_MS = 25;
+
+    /* ====================================================================
+     * PREDICAO LEVE (fix "silent atira um pouquinho atras do alvo em
+     * movimento"): a cabeca vem do snapshot da ESP — quando o inimigo
+     * corre, ela envelhece (LastSeenTick) e o tiro cai ATRAS dele.
+     *
+     * O writer observa a VELOCIDADE real do alvo entre duas observacoes
+     * novas do snapshot (LastSeenTick mudou) e, na hora do write, mira em
+     * cabeca + velocidade * (idade_da_observacao + latencia). Custo: ZERO
+     * roundtrip — tudo e matematica em cima do dado que ja chegou.
+     * ==================================================================== */
+    constexpr float    PRED_EMA_ALPHA     = 0.35f;  // suavizacao da velocidade (0..1)
+    constexpr float    PRED_MAX_SPEED_MPS = 12.0f;  // acima disso = teleporte/lixo, zera
+    constexpr LONGLONG PRED_LATENCY_MS    = 25;     // compensa roundtrip do write + consumo
+    constexpr LONGLONG PRED_MAX_AGE_MS    = 200;    // nunca extrapola observacao mais velha que isso
 
     extern volatile LONG g_Running;
 
