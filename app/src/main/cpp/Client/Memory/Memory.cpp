@@ -59,7 +59,9 @@ uintptr_t Memory::s_LibIl2Cpp = 0;
 bool Memory::s_Target32Bit = false;
 int Memory::s_ProcMemFd = -1;
 bool Memory::s_Initialized = false;
-volatile bool Memory::s_RestartInProgress = false;
+// volatile bool Memory::s_RestartInProgress = false;
+std::atomic<bool> Memory::s_RestartInProgress{ false };
+std::atomic<long long> Memory::s_LastRestartMs{ 0 };
 const char* Memory::s_LastInitError = "nao inicializado";
 
 namespace
@@ -1635,18 +1637,51 @@ bool Memory::Restart()
 
 bool Memory::RestartAsync()
 {
-    if (s_RestartInProgress)
+    /*
+     * COOLDOWN: sem isso, os 3 chamadores (init por frame com base==0,
+     * ELF-fail a cada 20 frames e o watchdog de snapshot stale) geram
+     * dezenas de ciclos Disconnect->Shutdown->Initialize por segundo
+     * quando a ponte/jogo nao estao disponiveis. Maximo: 1 restart
+     * real a cada 2s.
+     */
+    static constexpr long long RESTART_COOLDOWN_MS = 2000;
+
+    const long long now =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()
+        ).count();
+
+    if (now - s_LastRestartMs.load(std::memory_order_relaxed) < RESTART_COOLDOWN_MS)
         return false;
 
-    s_RestartInProgress = true;
+    /*
+     * SINGLE-FLIGHT real: exchange atomica. A versao antiga usava
+     * volatile bool com check-then-set (corrida) — duas threads
+     * passavam juntas e rodavam Restart() em paralelo.
+     */
+    if (s_RestartInProgress.exchange(true, std::memory_order_acquire))
+        return false;
+
+    s_LastRestartMs.store(now, std::memory_order_relaxed);
 
     std::thread(
         []
         {
             Memory::Restart();
 
-            s_RestartInProgress =
-                false;
+            /*
+             * Cooldown conta a partir do FIM do restart tambem: se o
+             * Restart() demorar mais que o cooldown, nao deixamos um
+             * novo restart partir instantaneamente apos o fim deste.
+             */
+            s_LastRestartMs.store(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()
+                ).count(),
+                std::memory_order_relaxed
+            );
+
+            s_RestartInProgress.store(false, std::memory_order_release);
         }
     ).detach();
 

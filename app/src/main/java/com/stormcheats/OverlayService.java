@@ -57,16 +57,43 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     private int lastScreenW = 0;
     private int lastScreenH = 0;
 
+    // ==================================================================
+    // BOTÕES FLUTUANTES de keybind (FloatingKeys, lado C++)
+    //
+    // O C++ desenha os botões e publica os rects deles; o Java cria uma
+    // PEQUENA janela de toque por cima de cada botão (a janela do painel
+    // só cobre o painel - era por isso que os botões não recebiam toque).
+    // O toque é repassado ao native: DOWN/UP -> nativeFloatingKeyTouch,
+    // arrasto -> nativeFloatingKeyDrag + nativeFloatingKeyMove.
+    // ==================================================================
+
+    private static final int MAX_FLOATING_KEYS = 6;
+    private static final int FK_PADDING_PX = 6;
+
+    private static class KeyWindow {
+        int vk;
+        View view;
+        WindowManager.LayoutParams params;
+        int x, y, w, h;          // ultimo rect absoluto aplicado
+        boolean added = false;   // janela atualmente no WindowManager
+        // estado do gesto em andamento
+        float lastRawX, lastRawY;
+        float downRawX, downRawY;
+        boolean dragging = false;
+    }
+
+    private final KeyWindow[] keyWindows = new KeyWindow[MAX_FLOATING_KEYS];
+    private volatile boolean fkNativeOk = true; // libclient tem os símbolos novos?
+
     private final Handler panelTracker = new Handler(Looper.getMainLooper());
     private final Runnable trackPanelRunnable = new Runnable() {
         @Override
         public void run() {
-            // CORRECAO: se a tela girou (retrato -> paisagem no FreeFire),
-            // a janela de render acompanha NA HORA. Sem isso a janela fica
-            // presa no tamanho captado quando o servico subiu e o overlay
-            // aparece cortado na metade da tela.
+            // se a tela girou (retrato -> paisagem no FreeFire),
+            // a janela de render acompanha NA HORA
             syncScreenSize();
             syncPanelBoundsFromNative();
+            syncFloatingKeys();
             panelTracker.postDelayed(this, 16);
         }
     };
@@ -114,6 +141,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         super.onDestroy();
         panelTracker.removeCallbacks(trackPanelRunnable);
         nativeStopPanel();
+        removeAllKeyWindows();
         try { if (surfaceView != null) windowManager.removeView(surfaceView); } catch (Exception ignored) {}
         try { if (touchView != null) windowManager.removeView(touchView); } catch (Exception ignored) {}
     }
@@ -123,10 +151,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
     /**
      * Retorna o tamanho REAL do display (incluindo a area do notch/cutout e a
-     * barra de status). O MATCH_PARENT em janelas TYPE_APPLICATION_OVERLAY para
-     * ANTES da barra de status / cutout em muitos aparelhos, e era isso que
-     * deixava o ESP deslocado em relacao ao FreeFire (que renderiza na tela
-     * fisica inteira).
+     * barra de status).
      */
     private int[] getRealScreenSize() {
         Point real = new Point(0, 0);
@@ -151,9 +176,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
     /**
      * CORRECAO DO OVERLAY CORTADO: reavalia o tamanho real da tela e atualiza
-     * a janela de render quando mudou (rotacao, dobraveis, etc). Roda a cada
-     * 16ms pelo tracker, entao a virada para paisagem no jogo aplica em ~1 frame.
-     * Retorna true se o tamanho mudou.
+     * a janela de render quando mudou (rotacao, dobraveis, etc).
      */
     private boolean syncScreenSize() {
         if (surfaceView == null || surfaceParams == null || windowManager == null) return false;
@@ -178,8 +201,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
     /**
      * Aplica o modo de cutout que deixa a janela entrar na area do
-     * notch/barra de status. minSdk e 28 (Android P), entao o campo
-     * layoutInDisplayCutoutMode sempre existe no aparelho.
+     * notch/barra de status.
      */
     private void applyCutoutMode(WindowManager.LayoutParams params) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -224,9 +246,8 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         surfaceParams.x = 0;
         surfaceParams.y = 0;
 
-        // overlay cobre a area do notch/cutout igual ao jogo
         applyCutoutMode(surfaceParams);
-        // tamanho inicial = tela fisica inteira
+
         int[] real = getRealScreenSize();
         lastScreenW = real[0];
         lastScreenH = real[1];
@@ -258,7 +279,6 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         touchParams.x = panelX;
         touchParams.y = panelY;
 
-        // se o painel estiver perto do topo, tambem precisa entrar no cutout
         applyCutoutMode(touchParams);
 
         touchView.setFocusable(true);
@@ -373,6 +393,231 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         try { windowManager.updateViewLayout(touchView, touchParams); } catch (Exception ignored) {}
     }
 
+    // ==================================================================
+    // BOTÕES FLUTUANTES - janelas de toque por botão
+    // ==================================================================
+
+    /**
+     * Consulta o native (a cada 16ms) onde estão os botões flutuantes e
+     * cria/move/remove uma janelinha de toque para cada um.
+     * Formato do array: [vk, x, y, w, h, vk, x, y, w, h, ...]
+     * (coordenadas relativas à surfaceView)
+     */
+    private void syncFloatingKeys() {
+        if (!fkNativeOk || surfaceView == null || windowManager == null) return;
+
+        int[] keys;
+        try {
+            keys = nativeGetFloatingKeys();
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "nativeGetFloatingKeys indisponível - flutuantes desativados nesta build");
+            fkNativeOk = false;
+            return;
+        } catch (Throwable t) {
+            return;
+        }
+
+        int groups = (keys == null) ? 0 : keys.length / 5;
+
+        int[] loc = new int[2];
+        try {
+            surfaceView.getLocationOnScreen(loc);
+        } catch (Throwable ignored) {
+            return;
+        }
+
+        boolean[] used = new boolean[MAX_FLOATING_KEYS];
+
+        for (int g = 0; g < groups; g++) {
+            final int vk = keys[g * 5 + 0];
+            int rx = keys[g * 5 + 1];
+            int ry = keys[g * 5 + 2];
+            int rw = keys[g * 5 + 3];
+            int rh = keys[g * 5 + 4];
+
+            if (vk <= 0 || rw <= 0 || rh <= 0) continue;
+
+            int ax = rx + loc[0] - FK_PADDING_PX;
+            int ay = ry + loc[1] - FK_PADDING_PX;
+            int aw = rw + FK_PADDING_PX * 2;
+            int ah = rh + FK_PADDING_PX * 2;
+
+            KeyWindow kw = findKeyWindow(vk);
+            boolean isNew = false;
+
+            if (kw == null) {
+                kw = freeKeyWindow();
+                if (kw == null) continue; // já no máximo de botões
+                kw.vk = vk;
+                isNew = true;
+            }
+
+            used[indexOfKeyWindow(kw)] = true;
+
+            if (isNew) {
+                createKeyWindow(kw);
+            }
+
+            if (!kw.added) {
+                kw.x = ax; kw.y = ay; kw.w = aw; kw.h = ah;
+                kw.params.x = ax;
+                kw.params.y = ay;
+                kw.params.width = aw;
+                kw.params.height = ah;
+                try {
+                    windowManager.addView(kw.view, kw.params);
+                    kw.added = true;
+                } catch (Throwable t) {
+                    Log.w(TAG, "addView botão flutuante falhou: " + t.getMessage());
+                }
+            } else if (ax != kw.x || ay != kw.y || aw != kw.w || ah != kw.h) {
+                kw.x = ax; kw.y = ay; kw.w = aw; kw.h = ah;
+                kw.params.x = ax;
+                kw.params.y = ay;
+                kw.params.width = aw;
+                kw.params.height = ah;
+                try {
+                    windowManager.updateViewLayout(kw.view, kw.params);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        // remove janelas de botões que deixaram de existir
+        for (int i = 0; i < MAX_FLOATING_KEYS; i++) {
+            KeyWindow kw = keyWindows[i];
+            if (kw != null && kw.added && !used[i]) {
+                removeKeyWindow(kw);
+            }
+        }
+    }
+
+    private KeyWindow findKeyWindow(int vk) {
+        for (KeyWindow kw : keyWindows) {
+            if (kw != null && kw.view != null && kw.vk == vk) return kw;
+        }
+        return null;
+    }
+
+    private KeyWindow freeKeyWindow() {
+        for (int i = 0; i < MAX_FLOATING_KEYS; i++) {
+            KeyWindow kw = keyWindows[i];
+            if (kw == null) {
+                kw = new KeyWindow();
+                keyWindows[i] = kw;
+            }
+            if (!kw.added) return kw;
+        }
+        return null;
+    }
+
+    private int indexOfKeyWindow(KeyWindow kw) {
+        for (int i = 0; i < MAX_FLOATING_KEYS; i++) {
+            if (keyWindows[i] == kw) return i;
+        }
+        return -1;
+    }
+
+    private void createKeyWindow(KeyWindow kw) {
+        View v = new View(this);
+        v.setBackgroundColor(Color.TRANSPARENT);
+
+        int flag = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE;
+
+        WindowManager.LayoutParams p = new WindowManager.LayoutParams(
+                kw.w > 0 ? kw.w : 100,
+                kw.h > 0 ? kw.h : 60,
+                flag,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT
+        );
+        p.gravity = Gravity.TOP | Gravity.START;
+
+        applyCutoutMode(p);
+
+        p.x = kw.x;
+        p.y = kw.y;
+        p.width = kw.w;
+        p.height = kw.h;
+
+        v.setOnTouchListener((view, event) -> {
+            final int vk = kw.vk;
+            int action = event.getActionMasked();
+
+            switch (action) {
+                case MotionEvent.ACTION_DOWN: {
+                    kw.view = view;
+                    kw.lastRawX = event.getRawX();
+                    kw.lastRawY = event.getRawY();
+                    kw.downRawX = event.getRawX();
+                    kw.downRawY = event.getRawY();
+                    kw.dragging = false;
+                    try { nativeFloatingKeyTouch(vk, true); } catch (Throwable ignored) {}
+                    return true;
+                }
+
+                case MotionEvent.ACTION_MOVE: {
+                    float totalDx = event.getRawX() - kw.downRawX;
+                    float totalDy = event.getRawY() - kw.downRawY;
+
+                    if (!kw.dragging && Math.hypot(totalDx, totalDy) > touchSlopPx) {
+                        kw.dragging = true;
+                        // virou arrasto: cancela o toggle/hold do toque
+                        try { nativeFloatingKeyDrag(vk); } catch (Throwable ignored) {}
+                    }
+
+                    if (kw.dragging) {
+                        float dx = event.getRawX() - kw.lastRawX;
+                        float dy = event.getRawY() - kw.lastRawY;
+                        if (dx != 0f || dy != 0f) {
+                            try { nativeFloatingKeyMove(vk, dx, dy); } catch (Throwable ignored) {}
+                        }
+                    }
+
+                    kw.lastRawX = event.getRawX();
+                    kw.lastRawY = event.getRawY();
+                    return true;
+                }
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL: {
+                    try { nativeFloatingKeyTouch(vk, false); } catch (Throwable ignored) {}
+                    kw.dragging = false;
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        kw.view = v;
+        kw.params = p;
+    }
+
+    private void removeKeyWindow(KeyWindow kw) {
+        if (kw == null || !kw.added) return;
+        try {
+            windowManager.removeView(kw.view);
+        } catch (Throwable ignored) {
+        }
+        kw.added = false;
+        kw.view = null;
+    }
+
+    private void removeAllKeyWindows() {
+        for (int i = 0; i < MAX_FLOATING_KEYS; i++) {
+            if (keyWindows[i] != null) {
+                removeKeyWindow(keyWindows[i]);
+                keyWindows[i] = null;
+            }
+        }
+    }
+
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         Log.i(TAG, "Surface created");
@@ -421,4 +666,10 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     public native void nativeStopPanel();
     public native void nativeOnTouch(int action, float x, float y, int pointerId);
     public native int[] nativeGetPanelBounds();
+
+    // BOTÕES FLUTUANTES (implementados em Client/main.cpp)
+    public native int[] nativeGetFloatingKeys();
+    public native void nativeFloatingKeyTouch(int vk, boolean down);
+    public native void nativeFloatingKeyDrag(int vk);
+    public native void nativeFloatingKeyMove(int vk, float dx, float dy);
 }

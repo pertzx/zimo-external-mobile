@@ -122,7 +122,9 @@ private:
     static bool s_Initialized;
     static const char* s_LastInitError;
 
-    static volatile bool s_RestartInProgress;
+    // static volatile bool s_RestartInProgress;
+    static std::atomic<bool> s_RestartInProgress;
+    static std::atomic<long long> s_LastRestartMs;
 };
 
 extern Memory g_FreeFireMemory;

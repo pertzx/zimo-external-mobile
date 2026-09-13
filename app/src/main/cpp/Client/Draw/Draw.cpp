@@ -655,6 +655,7 @@ void Data::ReadLoop( )
                          */
                         int entOk = 0, entLocal = 0, entClasse = 0, entAvatar = 0;
                         int entTeam = 0, entPri = 0, entHp = 0, entPos = 0;
+                        int entNulo = 0;                                    // ← ADICIONE
                         bool sampleLogged = false;
 
 
@@ -784,7 +785,11 @@ void Data::ReadLoop( )
                         for (int i = 0; i < dictCount; i++)
                         {
                                 if (itemPtrs[i] == 0)
+                                {
+                                        /* ponteiro nulo = leitura da onda falhou — conta pro diagnóstico */
+                                        entNulo++;
                                         continue;
+                                }
 
                                 EntWork e;
                                 e.Entity = (uintptr_t)itemPtrs[i];
@@ -1211,9 +1216,9 @@ void Data::ReadLoop( )
                         if ( GetTickCount64( ) - s_LastEntSummary > 5000 )
                         {
                                 s_LastEntSummary = GetTickCount64( );
-                                DiagLog( "[ENTITY] lista=%d ok=%d | descartados: local=%d classe=%d avatar=%d team=%d hp=%d pos=%d",
-                                          dictCount, entOk, entLocal, entClasse, entAvatar,
-                                          entTeam, entHp, entPos );
+                                DiagLog( "[ENTITY] lista=%d ok=%d nulo=%d | descartados: local=%d classe=%d avatar=%d team=%d hp=%d pos=%d",
+                                        dictCount, entOk, entNulo, entLocal, entClasse, entAvatar,
+                                        entTeam, entHp, entPos );
                         }
 
                         // Heartbeat de sucesso da busca inicial: prova que a cadeia

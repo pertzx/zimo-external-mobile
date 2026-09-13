@@ -23,6 +23,11 @@
  * cada botão e repassa ACTION_DOWN/UP para nativeFloatingKeyTouch()
  * (Client/main.cpp), que chama FloatingKeys::OnTouch() aqui.
  *
+ * ARRASTAR: se o dedo deslizar mais que o touch-slop, o Java chama
+ * nativeFloatingKeyDrag() (cancela o toggle/hold daquele toque) e depois
+ * nativeFloatingKeyMove() com o delta do dedo — o botão fica onde foi
+ * solto (offset guardado por botão).
+ *
  * IsDown(vk) é o que o gameplay consulta — vk é o mesmo int do KeyBind
  * antigo (faixa 0x7000+), então o resto do código nem precisa saber se
  * o "key" veio de teclado ou de botão de tela.
@@ -85,9 +90,22 @@ namespace FloatingKeys
     void OnTouch(int vk, bool down);
 
     /*
+     * O toque VIROU ARRASTO (dedo deslizou além do slop). Cancela o efeito
+     * do toque: solta o dedo lógico e desfaz o toggle caso o modo seja
+     * toque-simples (o DOWN tinha ligado/desligado o botão).
+     */
+    void DragCancel(int vk);
+
+    /*
+     * Movimento do arrasto: desloca a posição do botão pelo delta do dedo
+     * (em pixels da surface). O Layout mantém o botão dentro da tela.
+     */
+    void MoveBy(int vk, float dx, float dy);
+
+    /*
      * Desenha todos os botões na ImGui::GetForegroundDrawList() e
-     * devolve, via array plano, a lista de retângulos para o Java
-     * posicionar as janelas de toque:
+     * guarda, internamente, a lista de retângulos para o Java posicionar
+     * as janelas de toque:
      *     [vk0, x0, y0, w0, h0, vk1, x1, y1, w1, h1, ...]
      * Coordenadas em pixels da SURFACE (mesma origem do painel).
      *

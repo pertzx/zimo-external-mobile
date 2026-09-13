@@ -164,7 +164,7 @@ namespace Cheat {
              *                  Read<uint64_t> (8 bytes)
              */
             bool N32 = true;
-            bool V31 = true;
+            bool V31 = false;
             bool NoAnogs = true;
 
             char Username[20] = {0};

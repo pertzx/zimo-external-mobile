@@ -9,12 +9,6 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "StormNative", __VA_ARGS__)
 
-// Helper to create a motion event for ImGui
-static AInputEvent* CreateTouchEvent(int action, float x, float y, int pointerId, int64_t eventTime) {
-    // This is a simplified approach - we'll use ImGui IO directly instead
-    return nullptr;
-}
-
 extern "C" {
 
     JNIEXPORT void JNICALL
@@ -77,8 +71,8 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
 }
 
     // ============================================================
-    //  NOVA — devolve [x, y, w, h] do painel ImGui pro Java.
-    //  O OverlayService chama isso a cada 50 ms pra mover a
+    //  Devolve [x, y, w, h] do painel ImGui pro Java.
+    //  O OverlayService chama isso a cada 16 ms pra mover a
     //  janela de toque (Janela B) em cima do painel.
     // ============================================================
     JNIEXPORT jintArray JNICALL
@@ -100,13 +94,19 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
     //  nativeGetFloatingKeys(): devolve array plano com o rect de
     //  cada botão EM COORDENADAS DA SURFACE:
     //      [vk0, x0, y0, w0, h0, vk1, x1, y1, w1, h1, ...]
-    //  O OverlayService usa isso pra posicionar uma pequena janela
-    //  de toque sobre cada botão (os valores são preenchidos pelo
-    //  FloatingKeys::DrawTick a cada frame do painel).
+    //  O OverlayService usa isso pra posicionar UMA JANELINHA DE
+    //  TOQUE sobre cada botão (é isso que torna os botões
+    //  clicáveis fora do painel).
     //
     //  nativeFloatingKeyTouch(): o Java repassa ACTION_DOWN/UP de
-    //  cada janela de toque; o FloatingKeys decide se é toggle
+    //  cada janelinha; o FloatingKeys decide se é toggle
     //  (modo clique) ou hold (modo segurar).
+    //
+    //  nativeFloatingKeyDrag(): o toque virou arrasto (dedo
+    //  deslizou) — cancela o efeito do toque.
+    //
+    //  nativeFloatingKeyMove(): delta do dedo durante o arrasto —
+    //  move o botão (ele fica onde foi solto).
     // ============================================================
     JNIEXPORT jintArray JNICALL
     Java_com_stormcheats_OverlayService_nativeGetFloatingKeys(JNIEnv* env, jobject thiz) {
@@ -129,6 +129,18 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
     Java_com_stormcheats_OverlayService_nativeFloatingKeyTouch(JNIEnv* env, jobject thiz,
         jint vk, jboolean down) {
         FloatingKeys::OnTouch((int)vk, down == JNI_TRUE);
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeFloatingKeyDrag(JNIEnv* env, jobject thiz,
+        jint vk) {
+        FloatingKeys::DragCancel((int)vk);
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeFloatingKeyMove(JNIEnv* env, jobject thiz,
+        jint vk, jfloat dx, jfloat dy) {
+        FloatingKeys::MoveBy((int)vk, (float)dx, (float)dy);
     }
 
 }

@@ -42,6 +42,18 @@ namespace
     static std::atomic<bool> g_OpLogging{ false };
 
     /*
+     * PID alvo atual, memorizado das operações que o recebem por
+     * parâmetro (ReadMem/WriteMem/ModuleBase/Is32Bit).
+     *
+     * CORREÇÃO DO "ESP não aparece / lista=N ok=0": o ReadBatch NÃO
+     * recebe pid por parâmetro e antes enviava req.Pid = 0. O daemon
+     * tentava ler /proc/0/mem, falhava em TODOS os itens e devolvia
+     * o payload todo zerado — todas as entidades eram descartadas
+     * silenciosamente (nenhum contador [ENTITY] se mexia).
+     */
+    static std::atomic<uint32_t> g_ActivePid{ 0 };
+
+    /*
      * Depois de uma falha de conexão, não martela o socket a cada
      * operação: espera este intervalo antes de tentar de novo. Durante
      * a espera, os pedidos falham na hora (caem no fallback local).
@@ -489,6 +501,8 @@ bool ReadMem(
     if (!buffer || size == 0)
         return false;
 
+    g_ActivePid.store(pid);
+
     BridgeRequest req{};
 
     req.Cmd =
@@ -564,9 +578,29 @@ bool ReadBatch(
         memcpy(p + 8, &sz, sizeof(sz));
     }
 
+    /*
+     * CORREÇÃO: usa o pid memorizado das leituras individuais.
+     * Antes req.Pid ficava 0 e o daemon falhava em TODOS os itens
+     * (tudo voltava zerado — "lista=N ok=0, descartados tudo 0").
+     */
+    uint32_t pid = g_ActivePid.load();
+
+    if (pid == 0)
+    {
+        /*
+         * Nenhuma leitura individual aconteceu ainda (nenhum pid
+         * conhecido). Falha explícita — NÃO enviar pid=0 pro daemon,
+         * senão o blob volta zerado e o ESP "some" sem nenhum log.
+         */
+        LOGE("READBATCH sem pid conhecido (nenhuma leitura individual antes)");
+
+        return false;
+    }
+
     BridgeRequest req{};
 
     req.Cmd = BRIDGE_CMD_READ_BATCH;
+    req.Pid = pid;
     req.PayloadSize = static_cast<uint32_t>(payload.size());
 
     BridgeResponse resp{};
@@ -600,6 +634,8 @@ bool WriteMem(
 {
     if (!buffer || size == 0)
         return false;
+
+    g_ActivePid.store(pid);
 
     BridgeRequest req{};
 
@@ -715,6 +751,8 @@ uint64_t ModuleBase(
     if (!moduleName || !*moduleName)
         return 0;
 
+    g_ActivePid.store(pid);
+
     BridgeRequest req{};
 
     req.Cmd =
@@ -759,6 +797,8 @@ bool Is32Bit(
     bool& out32
 )
 {
+    g_ActivePid.store(pid);
+
     BridgeRequest req{};
 
     req.Cmd =

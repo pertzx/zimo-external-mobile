@@ -24,22 +24,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * DaemonService - GERENCIADOR DO DAEMON-PONTE (root)
  * ============================================================================
  *
- * Responsabilidades deste serviço (TUDO logado, tag "StormDaemonMgr"):
- *
  *  1. Verificar acesso root (su).
- *  2. Extrair o executável "stormdaemon" do APK (assets/bin/<abi>/) e
- *     instalá-lo em /data/local/tmp/stormdaemon via su (cp + chmod 755).
- *  3. Copiar libc++_shared.so para /data/local/tmp (o daemon precisa dele
- *     para iniciar fora do linker do app).
+ *  2. Aplicar regras SELinux (magiskpolicy) para o APP poder conectar no
+ *     socket do daemon. SEM ISSO o connect() volta "Permission denied"
+ *     mesmo com o socket em chmod 666 (o Android bloqueia:
+ *     untrusted_app -> unix_stream_socket connectto + sock_file write).
+ *  3. Extrair o executável "stormdaemon" do APK e instalá-lo em
+ *     /data/local/tmp/stormdaemon via su (cp + chmod 755).
  *  4. Iniciar o daemon como root: su -c "exec /data/local/tmp/stormdaemon".
- *     O daemon abre o socket /data/local/tmp/stormbridge.sock e fica
- *     escutando os pedidos READ/WRITE do client (libclient.so).
- *  5. Monitorar: watchdog verifica o processo a cada 3s e reinicia com
- *     backoff se morrer; a cada 15s manda um PING pela ponte e loga a
- *     saúde dela.
+ *  5. Monitorar: watchdog a cada 3s; PING na ponte a cada 15s; se o PING
+ *     falhar, corrige permissões do socket (chmod 666 + restorecon) e
+ *     tenta de novo (auto-cura) antes de reiniciar o daemon.
  *  6. Parar: kill -TERM/-KILL + limpeza de socket/pid ao destruir o serviço.
  *
- * O daemon é SOMENTE PONTE de read/write - nada de lógica de jogo aqui.
+ * Log: tag "StormDaemonMgr". Logs do próprio daemon: tag "StormBridge".
  * ============================================================================
  */
 public class DaemonService extends Service {
@@ -47,10 +45,6 @@ public class DaemonService extends Service {
     private static final String TAG = "StormDaemonMgr";
 
     private static final String CHANNEL_ID = "storm_daemon_channel";
-
-    // ------------------------------------------------------------------
-    // Caminhos fixos (mesmos do daemon_main.cpp e do BridgeClient.cpp)
-    // ------------------------------------------------------------------
 
     private static final String REMOTE_DIR = "/data/local/tmp";
 
@@ -85,6 +79,9 @@ public class DaemonService extends Service {
 
     // Retry da instalação (zombie daemon, root demorando, etc)
     private int installRetries = 0;
+
+    // Healthcheck: quantos PINGs seguidos falharam mesmo com auto-cura
+    private int consecutiveBridgeFails = 0;
 
     // ------------------------------------------------------------------
     // CICLO DE VIDA DO SERVIÇO
@@ -168,6 +165,11 @@ public class DaemonService extends Service {
 
             // Mata QUALQUER stormdaemon antigo antes de mexer nos arquivos
             killAllDaemons();
+
+            // CORREÇÃO DO "Permission denied": o app (untrusted_app) não pode
+            // conectar no socket de um processo root enquanto o SELinux estiver
+            // Enforcing sem regras. Aplica as regras ANTES de subir o daemon.
+            applySelinuxPatch();
 
             String abi = chooseAbi();
             Log.i(TAG, "ABI do daemon: " + abi);
@@ -273,6 +275,120 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
+    // 2) PATCH SELINUX (causa raiz do "Permission denied")
+    //
+    //    O socket do daemon vive em /data/local/tmp (label shell_data_file)
+    //    e o daemon roda como root (domínio su/magisk). O app roda em
+    //    untrusted_app. A policy padrão do Android NÃO permite:
+    //
+    //      - untrusted_app shell_data_file:sock_file write  (connect no socket)
+    //      - untrusted_app <root>:unix_stream_socket connectto
+    //
+    //    Resultado: connect() volta EACCES ("Permission denied") tanto no
+    //    client C++ quanto no PING Java, mesmo com o socket em chmod 666.
+    //
+    //    Correção: magiskpolicy --live (Magisk) ou supolicy (SuperSU).
+    //    Fallback: setenforce 0.
+    // ==================================================================
+
+    private boolean applySelinuxPatch() {
+        try {
+            String before = runAsRoot("getenforce").trim();
+            Log.i(TAG, "SELinux atual: '" + before + "'");
+
+            if (!before.isEmpty() && !before.contains("Enforcing")) {
+                Log.i(TAG, "SELinux Permissive - nenhum patch necessário");
+                return true;
+            }
+
+            /*
+             * O app pode cair em domínios diferentes conforme targetSdk/ABI.
+             * Aplica para as variantes untrusted_app conhecidas. O wildcard
+             * "*" no alvo do connectto cobre qualquer domínio do daemon
+             * (su, magisk, kernel...).
+             */
+            String[] domains = {
+                    "untrusted_app",
+                    "untrusted_app_27",
+                    "untrusted_app_25",
+                    "untrusted_app_32"
+            };
+
+            StringBuilder rules = new StringBuilder();
+
+            for (String d : domains) {
+                rules.append(" 'allow ").append(d).append(" shell_data_file sock_file write'");
+                rules.append(" 'allow ").append(d).append(" shell_data_file dir search'");
+                rules.append(" 'allow ").append(d).append(" * unix_stream_socket connectto'");
+            }
+
+            // 1) Magisk
+            String out = runAsRoot("magiskpolicy --live" + rules);
+            Log.i(TAG, "magiskpolicy: " + (out.isEmpty() ? "(ok, sem saída)" : out));
+
+            if (!out.contains("not found") && !out.contains("No such file")) {
+                Log.i(TAG, "Regras SELinux aplicadas via magiskpolicy");
+                return true;
+            }
+
+            // 2) SuperSU
+            out = runAsRoot("supolicy --live" + rules);
+            Log.i(TAG, "supolicy: " + (out.isEmpty() ? "(ok, sem saída)" : out));
+
+            if (!out.contains("not found") && !out.contains("No such file")) {
+                Log.i(TAG, "Regras SELinux aplicadas via supolicy");
+                return true;
+            }
+
+            // 3) Último recurso: modo permissivo
+            Log.e(TAG, "magiskpolicy/supolicy indisponíveis - usando setenforce 0");
+            runAsRoot("setenforce 0");
+
+            String after = runAsRoot("getenforce").trim();
+            Log.w(TAG, "SELinux agora: '" + after + "'");
+
+            return true;
+
+        } catch (Throwable e) {
+            Log.e(TAG, "Erro no patch SELinux", e);
+            return false;
+        }
+    }
+
+    // ==================================================================
+    // 2.1) CORREÇÃO DE PERMISSÕES DO SOCKET (auto-cura)
+    //
+    //      Se o daemon em execução for uma versão antiga (sem chmod 666
+    //      no bind) ou o socket ficou com dono/mode errados, o app também
+    //      recebe Permission denied. Isso conserta sem reiniciar nada.
+    // ==================================================================
+
+    private void fixSocketPermissions() {
+        try {
+            String qSock = shellQuote(BRIDGE_SOCKET);
+            String qDir = shellQuote(REMOTE_DIR);
+
+            String command =
+                    "if [ -S " + qSock + " ]; then " +
+                    "chmod 666 " + qSock + "; " +
+                    "chown root:root " + qSock + "; " +
+                    "restorecon " + qSock + " 2>/dev/null; " +
+                    "fi; " +
+                    "chmod 771 " + qDir + " 2>/dev/null; " +
+                    "ls -l " + qSock + " 2>/dev/null";
+
+            String out = runAsRoot(command);
+
+            if (!out.isEmpty()) {
+                Log.i(TAG, "fixSocketPermissions: " + out.replace("\n", " | "));
+            }
+
+        } catch (Throwable e) {
+            Log.w(TAG, "fixSocketPermissions falhou: " + e.getMessage());
+        }
+    }
+
+    // ==================================================================
     // 4) INSTALAÇÃO EM /data/local/tmp (via su)
     //
     //    A correção do "Text file busy": rm -f ANTES do cat.
@@ -350,16 +466,7 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 8) PARAR O DAEMON
-    // ==================================================================
-
-    private void stopStormDaemon() {
-        Log.i(TAG, "Parando daemon (kill robusto + limpeza de socket/pid)");
-        killAllDaemons();
-    }
-
-    // ==================================================================
-    // 2) ROOT
+    // 3) ROOT
     // ==================================================================
 
     private boolean checkRoot() {
@@ -420,7 +527,7 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 3) ABI + EXTRAÇÃO DO APK
+    // 3.1) ABI + EXTRAÇÃO DO APK
     // ==================================================================
 
     private String chooseAbi() {
@@ -534,48 +641,6 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 4) INSTALAÇÃO EM /data/local/tmp (via su)
-    // ==================================================================
-
-//     private boolean installFiles(File localDaemon, File localCppShared) {
-//         String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
-//         String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
-//         String qDaemon = shellQuote(REMOTE_DAEMON);
-//         String qCpp = shellQuote(REMOTE_CPP_SHARED);
-
-//         String command =
-//                 "mkdir -p " + shellQuote(REMOTE_DIR) +
-//                 " && cat " + qLocalDaemon + " > " + qDaemon +
-//                 " && chmod 755 " + qDaemon +
-//                 " && chown root:root " + qDaemon +
-//                 " && cat " + qLocalCpp + " > " + qCpp +
-//                 " && chmod 644 " + qCpp +
-//                 " && chmod 771 " + shellQuote(REMOTE_DIR) +
-//                 " && ls -l " + qDaemon;
-
-//         String output = runAsRoot(command);
-
-//         // Confirma tamanho instalado = tamanho extraído
-//         try {
-//             long expected = localDaemon.length();
-//             String check = runAsRoot("stat -c %s " + qDaemon);
-
-//             if (!check.isEmpty()) {
-//                 long installed = Long.parseLong(check.trim());
-//                 if (installed != expected) {
-//                     Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installed);
-//                     return false;
-//                 }
-//                 Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installed + " bytes)");
-//             }
-//         } catch (Throwable e) {
-//             Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
-//         }
-
-//         return !output.contains("Permission denied");
-//     }
-
-    // ==================================================================
     // 5) INICIAR O DAEMON COMO ROOT
     // ==================================================================
 
@@ -603,11 +668,20 @@ public class DaemonService extends Service {
             // Saída do daemon -> logcat (tag StormDaemonMgr, prefixo [DAEMON])
             new Thread(() -> readProcessOutput(process, "DAEMON"), "StormDaemonLog").start();
 
-            // Aguarda o socket aparecer (até 5s)
+            // Aguarda o socket aparecer (até 5s). Se metade do caminho o PING
+            // ainda não responder, corrige permissões do socket e segue.
+            boolean chmodTried = false;
+
             for (int i = 0; i < 25; i++) {
                 if (pingBridge()) {
                     Log.i(TAG, "Daemon-PONTE respondeu PING na tentativa " + (i + 1));
                     return;
+                }
+
+                if (i == 12 && !chmodTried) {
+                    chmodTried = true;
+                    Log.w(TAG, "PING ainda sem resposta - corrigindo permissões do socket");
+                    fixSocketPermissions();
                 }
 
                 Thread.sleep(200);
@@ -631,6 +705,7 @@ public class DaemonService extends Service {
             Log.i(TAG, "Watchdog iniciado (intervalo=3s, ping da ponte a cada 15s)");
 
             int pingCounter = 0;
+            consecutiveBridgeFails = 0;
 
             while (!Thread.currentThread().isInterrupted()) {
                 try {
@@ -660,8 +735,30 @@ public class DaemonService extends Service {
 
                         boolean ok = pingBridge();
 
-                        Log.i(TAG, "Healthcheck ponte: " + (ok ? "OK" : "SEM RESPOSTA") +
-                                " (socket=" + BRIDGE_SOCKET + ")");
+                        if (!ok) {
+                            // AUTO-CURA: corrige permissões do socket e tenta
+                            // mais uma vez antes de declarar a ponte morta.
+                            Log.w(TAG, "Healthcheck falhou - aplicando fix de permissões e retestando");
+                            fixSocketPermissions();
+                            ok = pingBridge();
+
+                            if (ok) {
+                                Log.i(TAG, "AUTO-CURA funcionou: ponte respondeu após corrigir permissões");
+                            }
+                        }
+
+                        if (ok) {
+                            consecutiveBridgeFails = 0;
+                            Log.i(TAG, "Healthcheck ponte: OK (socket=" + BRIDGE_SOCKET + ")");
+                        } else {
+                            consecutiveBridgeFails++;
+                            Log.e(TAG, "Healthcheck ponte: SEM RESPOSTA (" + consecutiveBridgeFails + " seguidos)");
+
+                            if (consecutiveBridgeFails >= 4) {
+                                consecutiveBridgeFails = 0;
+                                onDaemonDead("ponte sem resposta persistente");
+                            }
+                        }
                     }
 
                 } catch (InterruptedException e) {
@@ -712,6 +809,7 @@ public class DaemonService extends Service {
 
         new Thread(() -> {
             try {
+                applySelinuxPatch();
                 startStormDaemon();
                 restartBackoffMs = 3000;
             } catch (Throwable e) {
@@ -803,31 +901,10 @@ public class DaemonService extends Service {
     // 8) PARAR O DAEMON
     // ==================================================================
 
-//     private void stopStormDaemon() {
-//         Log.i(TAG, "Parando daemon (kill via su + limpeza de socket/pid)");
-
-//         try {
-//             runAsRoot(
-//                     "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
-//                     "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
-//                     "sleep 0.5; " +
-//                     "kill -KILL $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
-//                     "fi; " +
-//                     "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET));
-
-//         } catch (Throwable e) {
-//             Log.w(TAG, "Erro no stop via su: " + e.getMessage());
-//         }
-
-//         if (rootProcess != null) {
-//             try {
-//                 rootProcess.destroy();
-//             } catch (Throwable ignored) {
-//             }
-
-//             rootProcess = null;
-//         }
-//     }
+    private void stopStormDaemon() {
+        Log.i(TAG, "Parando daemon (kill robusto + limpeza de socket/pid)");
+        killAllDaemons();
+    }
 
     // ==================================================================
     // 9) LOG DA SAÍDA DO PROCESSO ROOT
