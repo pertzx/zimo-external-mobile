@@ -2136,6 +2136,25 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                          */
                         if ( g_Globals.Silent.Enabled && snapshotFresh && p.Distance >= 0 && p.Distance <= g_Globals.Silent.MaxDistance )
                         {
+                                /*
+                                 * FILTROS PROPRIOS do silent (config da aba):
+                                 * derrubado e bot saem da candidatura ANTES de
+                                 * qualquer score; VisibleCheck exige o oraculo
+                                 * do auto-lock (visivel = m_TargetHeuristic
+                                 * apontando pra ele).
+                                 */
+                                if ( g_Globals.Silent.IgnoreKnocked && p.IsKnocked )
+                                        continue;
+
+                                if ( g_Globals.Silent.IgnoreBots )
+                                {
+                                        bool silIsBot = false;
+                                        g_FreeFireMemory.Read<bool>( p.Entity + Offsets::Player::IsClientBot, silIsBot );
+
+                                        if ( silIsBot )
+                                                continue;
+                                }
+
                                 float sdx = p.HeadScreen.X - centerX;
                                 float sdy = p.HeadScreen.Y - centerY;
                                 float silentCrosshairDistSq = sdx * sdx + sdy * sdy;
@@ -2145,6 +2164,9 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                         const bool silVisible =
                                                 ( autoLockTargetEntity != 0 &&
                                                   p.Entity == autoLockTargetEntity );
+
+                                        if ( g_Globals.Silent.VisibleCheck && !silVisible )
+                                                continue;
 
                                         const float gameDist =
                                                 ( p.Distance > 0.0f ) ? p.Distance : 0.0f;

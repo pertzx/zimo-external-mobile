@@ -93,6 +93,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
             // a janela de render acompanha NA HORA
             syncScreenSize();
             syncPanelBoundsFromNative();
+            syncCaptureBypassFromNative();
             syncFloatingKeys();
             panelTracker.postDelayed(this, 16);
         }
@@ -199,6 +200,70 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         return true;
     }
 
+    /*
+     * STREAM MODE (Task 12) — estado local espelhado do CaptureBypass.
+     * Comeca true (padrao da config): a janela de render JA NASCE com
+     * FLAG_SECURE em createRenderWindow().
+     */
+    private boolean lastCaptureBypass = true;
+    private boolean captureBypassInit = false;
+
+    /**
+     * FIX DO STREAM MODE: o checkbox "Stream Mode" (CaptureBypass) existia,
+     * era salvo... e NUNCA era aplicado em lugar nenhum. Agora o painel
+     * ImGui responde o estado via nativeShouldCaptureBypass() e este loop
+     * aplica/remove FLAG_SECURE na janela de render: com o modo ligado a
+     * ESP some de prints, gravacao de tela e lives (stream-proof real).
+     */
+    private void syncCaptureBypassFromNative() {
+        if (!fkNativeOk) return;
+
+        try {
+            boolean want = nativeShouldCaptureBypass();
+
+            if (captureBypassInit && want == lastCaptureBypass) return;
+
+            captureBypassInit = true;
+            lastCaptureBypass = want;
+
+            if (surfaceView == null || surfaceParams == null || windowManager == null) return;
+
+            int newFlags = surfaceParams.flags & ~WindowManager.LayoutParams.FLAG_SECURE;
+            if (want) newFlags |= WindowManager.LayoutParams.FLAG_SECURE;
+
+            if (newFlags != surfaceParams.flags) {
+                surfaceParams.flags = newFlags;
+                windowManager.updateViewLayout(surfaceView, surfaceParams);
+                Log.i(TAG, "Stream Mode: FLAG_SECURE " + (want ? "ON" : "OFF"));
+            }
+
+            // janela de TOQUE (painel ImGui) entra no stream-proof tambem
+            if (touchView != null && touchParams != null) {
+                int tf = touchParams.flags & ~WindowManager.LayoutParams.FLAG_SECURE;
+                if (want) tf |= WindowManager.LayoutParams.FLAG_SECURE;
+                if (tf != touchParams.flags) {
+                    touchParams.flags = tf;
+                    try { windowManager.updateViewLayout(touchView, touchParams); } catch (Exception ignored) {}
+                }
+            }
+
+            // janelas dos botoes flutuantes idem
+            for (KeyWindow kw : keyWindows) {
+                if (kw == null || kw.view == null || kw.params == null || !kw.added) continue;
+                int kf = kw.params.flags & ~WindowManager.LayoutParams.FLAG_SECURE;
+                if (want) kf |= WindowManager.LayoutParams.FLAG_SECURE;
+                if (kf != kw.params.flags) {
+                    kw.params.flags = kf;
+                    try { windowManager.updateViewLayout(kw.view, kw.params); } catch (Exception ignored) {}
+                }
+            }
+        } catch (Throwable e) {
+            // simbolo antigo do libclient (sem o novo JNI): nao quebra o overlay
+            fkNativeOk = false;
+            Log.w(TAG, "syncCaptureBypassFromNative indisponivel: " + e.getMessage());
+        }
+    }
+
     /**
      * Aplica o modo de cutout que deixa a janela entrar na area do
      * notch/barra de status.
@@ -248,6 +313,15 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
         applyCutoutMode(surfaceParams);
 
+        /*
+         * STREAM MODE (Task 12): se o CaptureBypass ja esta ligado na
+         * config, a janela de render NASCE com FLAG_SECURE (stream-proof
+         * desde o primeiro frame; o toggle em runtime tambem existe).
+         */
+        if (lastCaptureBypass) {
+            surfaceParams.flags |= WindowManager.LayoutParams.FLAG_SECURE;
+        }
+
         int[] real = getRealScreenSize();
         lastScreenW = real[0];
         lastScreenH = real[1];
@@ -280,6 +354,11 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         touchParams.y = panelY;
 
         applyCutoutMode(touchParams);
+
+        /* STREAM MODE: o painel tambem nasce stream-proof se ligado. */
+        if (lastCaptureBypass) {
+            touchParams.flags |= WindowManager.LayoutParams.FLAG_SECURE;
+        }
 
         touchView.setFocusable(true);
         touchView.setFocusableInTouchMode(true);
@@ -540,6 +619,11 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
 
         applyCutoutMode(p);
 
+        /* STREAM MODE: key windows tambem somem da captura. */
+        if (lastCaptureBypass) {
+            p.flags |= WindowManager.LayoutParams.FLAG_SECURE;
+        }
+
         p.x = kw.x;
         p.y = kw.y;
         p.width = kw.w;
@@ -666,6 +750,10 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     public native void nativeStopPanel();
     public native void nativeOnTouch(int action, float x, float y, int pointerId);
     public native int[] nativeGetPanelBounds();
+
+    // STREAM MODE (Task 12): o painel (ImGui) responde se o CaptureBypass
+    // esta ligado; o Java aplica/remove FLAG_SECURE na janela de render.
+    public native boolean nativeShouldCaptureBypass();
 
     // BOTÕES FLUTUANTES (implementados em Client/main.cpp)
     public native int[] nativeGetFloatingKeys();

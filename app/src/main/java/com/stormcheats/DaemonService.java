@@ -48,15 +48,63 @@ public class DaemonService extends Service {
 
     private static final String REMOTE_DIR = "/data/local/tmp";
 
-    private static final String REMOTE_DAEMON = REMOTE_DIR + "/stormdaemon";
+    /*
+     * ============================================================================
+     * STEALTH (Task 12) — NOMES ALEATORIOS POR INSTALACAO
+     * ============================================================================
+     * NADA mais existe com nome fixo "storm" em /data/local/tmp (binario,
+     * socket, pidfile, log): anti-cheat com lista de nomes conhecidos ou
+     * varredura heuristica de tmp nao acha nada. Cada instalacao gera um
+     * token aleatorio (persistido em prefs) e tudo vira arquivo oculto
+     * ".sysa_<tok>". O caminho do socket e gravado em files/stormbridge.path
+     * pro libclient.so descobrir (BridgeClient le esse arquivo).
+     *
+     * LOG do daemon: nenhum. Nem logcat (o binario e mudo sem --verbose),
+     * nem arquivo (o --log nao e mais passado). Zero rastro em disco.
+     * ============================================================================
+     */
+    private static final String PREFS_STEALTH = "sys_pref";
+
+    private String stealthToken = "";
+
+    private String ensureStealthToken() {
+        if (stealthToken != null && !stealthToken.isEmpty()) return stealthToken;
+        try {
+            android.content.SharedPreferences sp = getSharedPreferences(PREFS_STEALTH, MODE_PRIVATE);
+            String t = sp.getString("tok", "");
+            if (t == null || t.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                java.util.Random r = new java.util.Random();
+                for (int i = 0; i < 10; i++) {
+                    int c = r.nextInt(36);
+                    sb.append((char) (c < 10 ? '0' + c : 'a' + c - 10));
+                }
+                t = sb.toString();
+                sp.edit().putString("tok", t).apply();
+            }
+            stealthToken = t;
+        } catch (Throwable e) {
+            stealthToken = String.valueOf(System.currentTimeMillis() % 100000000L);
+        }
+        return stealthToken;
+    }
+
+    /* Caminho do binario do daemon (oculto + aleatorio). */
+    private String remoteDaemon() {
+        return REMOTE_DIR + "/.sysa_" + ensureStealthToken();
+    }
+
+    /* Socket da ponte (oculto + aleatorio). */
+    private String bridgeSocket() {
+        return REMOTE_DIR + "/.sysa_" + ensureStealthToken() + ".s";
+    }
+
+    /* Pidfile (oculto + aleatorio). */
+    private String bridgePidfile() {
+        return REMOTE_DIR + "/.sysa_" + ensureStealthToken() + ".p";
+    }
 
     private static final String REMOTE_CPP_SHARED = REMOTE_DIR + "/libc++_shared.so";
-
-    private static final String BRIDGE_SOCKET = REMOTE_DIR + "/stormbridge.sock";
-
-    private static final String BRIDGE_PIDFILE = REMOTE_DIR + "/stormbridge.pid";
-
-    private static final String BRIDGE_LOGFILE = REMOTE_DIR + "/stormbridge.log";
 
     private static final int BRIDGE_MAGIC = 0x53544F52; // "STOR"
 
@@ -130,7 +178,7 @@ public class DaemonService extends Service {
     private Notification buildNotification() {
         return new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Storm Daemon")
-                .setContentText("Ponte root ativa (/data/local/tmp/stormdaemon)")
+                .setContentText("Ponte root ativa")
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setOngoing(true)
                 .build();
@@ -194,8 +242,8 @@ public class DaemonService extends Service {
             installRetries = 0;
 
             Log.i(TAG, "────────────────────────────────────────");
-            Log.i(TAG, "Daemon-ponte pronto. Socket: " + BRIDGE_SOCKET);
-            Log.i(TAG, "Logs do daemon: logcat -s StormBridge  |  arquivo: " + BRIDGE_LOGFILE);
+            Log.i(TAG, "Daemon-ponte pronto. Socket: " + bridgeSocket());
+            Log.i(TAG, "STEALTH: daemon mudo (sem logcat/logfile), nomes aleatorios ativos");
             Log.i(TAG, "────────────────────────────────────────");
 
         } catch (Throwable e) {
@@ -220,14 +268,22 @@ public class DaemonService extends Service {
 
         try {
             String command =
-                    "if [ -f " + shellQuote(BRIDGE_PIDFILE) + " ]; then " +
-                    "kill -TERM $(cat " + shellQuote(BRIDGE_PIDFILE) + ") 2>/dev/null; " +
+                    "if [ -f " + shellQuote(bridgePidfile()) + " ]; then " +
+                    "kill -TERM $(cat " + shellQuote(bridgePidfile()) + ") 2>/dev/null; " +
                     "fi; " +
+                    // legado (versoes antigas com nome fixo)
                     "killall stormdaemon 2>/dev/null; " +
                     "pkill stormdaemon 2>/dev/null; " +
+                    // masquerade atual: comm do daemon e "appstats"
+                    "killall appstats 2>/dev/null; " +
+                    "pkill appstats 2>/dev/null; " +
                     "sleep 0.5; " +
                     "kill -9 $(pgrep stormdaemon) 2>/dev/null; " +
-                    "rm -f " + shellQuote(BRIDGE_PIDFILE) + " " + shellQuote(BRIDGE_SOCKET);
+                    "kill -9 $(pgrep appstats) 2>/dev/null; " +
+                    // apaga rastros legados da versao anterior
+                    "rm -f " + shellQuote(bridgePidfile()) + " " + shellQuote(bridgeSocket()) +
+                    " /data/local/tmp/stormdaemon /data/local/tmp/stormbridge.sock" +
+                    " /data/local/tmp/stormbridge.pid /data/local/tmp/stormbridge.log";
 
             runAsRoot(command);
 
@@ -365,7 +421,7 @@ public class DaemonService extends Service {
 
     private void fixSocketPermissions() {
         try {
-            String qSock = shellQuote(BRIDGE_SOCKET);
+            String qSock = shellQuote(bridgeSocket());
             String qDir = shellQuote(REMOTE_DIR);
 
             String command =
@@ -402,7 +458,7 @@ public class DaemonService extends Service {
 
         String qLocalDaemon = shellQuote(localDaemon.getAbsolutePath());
         String qLocalCpp = shellQuote(localCppShared.getAbsolutePath());
-        String qDaemon = shellQuote(REMOTE_DAEMON);
+        String qDaemon = shellQuote(remoteDaemon());
         String qCpp = shellQuote(REMOTE_CPP_SHARED);
 
         String command =
@@ -456,7 +512,7 @@ public class DaemonService extends Service {
                     Log.e(TAG, "Tamanho divergente: esperado=" + expected + " instalado=" + installedSize);
                     return false;
                 }
-                Log.i(TAG, "Binário instalado: " + REMOTE_DAEMON + " (" + installedSize + " bytes)");
+                Log.i(TAG, "Binário instalado: " + remoteDaemon() + " (" + installedSize + " bytes)");
             }
         } catch (Throwable e) {
             Log.w(TAG, "Não consegui confirmar tamanho instalado: " + e.getMessage());
@@ -646,18 +702,31 @@ public class DaemonService extends Service {
 
     private void startStormDaemon() {
         try {
-            Log.i(TAG, "Iniciando daemon: " + REMOTE_DAEMON);
+            Log.i(TAG, "Iniciando daemon (STEALTH: sem --log, sem nome fixo): " + remoteDaemon());
 
             // Limpa resquícios da execução anterior (o daemon também faz
             // unlink no bind, mas aqui garantimos estado limpo).
-            runAsRoot("rm -f " + shellQuote(BRIDGE_SOCKET) + " " + shellQuote(BRIDGE_PIDFILE));
+            runAsRoot("rm -f " + shellQuote(bridgeSocket()) + " " + shellQuote(bridgePidfile()));
+
+            /*
+             * STEALTH: grava o caminho do socket aleatorio pra o libclient
+             * descobrir (BridgeClient::SocketPath le este arquivo). E NAO
+             * passa --log: o daemon fica MUDO (sem logcat, sem arquivo).
+             */
+            try {
+                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(getFilesDir(), "stormbridge.path"), false);
+                fw.write(bridgeSocket());
+                fw.flush();
+                fw.close();
+            } catch (Throwable te) {
+                Log.w(TAG, "Nao gravou stormbridge.path: " + te.getMessage());
+            }
 
             String command =
                     "export LD_LIBRARY_PATH=" + REMOTE_DIR +
-                    " && exec " + shellQuote(REMOTE_DAEMON) +
-                    " --socket " + shellQuote(BRIDGE_SOCKET) +
-                    " --pidfile " + shellQuote(BRIDGE_PIDFILE) +
-                    " --log " + shellQuote(BRIDGE_LOGFILE);
+                    " && exec " + shellQuote(remoteDaemon()) +
+                    " --socket " + shellQuote(bridgeSocket()) +
+                    " --pidfile " + shellQuote(bridgePidfile());
 
             rootProcess = new ProcessBuilder("su", "-c", command)
                     .redirectErrorStream(true)
@@ -687,7 +756,7 @@ public class DaemonService extends Service {
                 Thread.sleep(200);
             }
 
-            Log.w(TAG, "Daemon iniciado mas PING não respondeu em 5s (verifique logs [DAEMON] e 'logcat -s StormBridge')");
+            Log.w(TAG, "Daemon iniciado mas PING não respondeu em 5s (rebuild do app pode ser necessário)");
 
         } catch (Throwable e) {
             Log.e(TAG, "Falha iniciando daemon root", e);
@@ -749,7 +818,7 @@ public class DaemonService extends Service {
 
                         if (ok) {
                             consecutiveBridgeFails = 0;
-                            Log.i(TAG, "Healthcheck ponte: OK (socket=" + BRIDGE_SOCKET + ")");
+                            Log.i(TAG, "Healthcheck ponte: OK (socket=" + bridgeSocket() + ")");
                         } else {
                             consecutiveBridgeFails++;
                             Log.e(TAG, "Healthcheck ponte: SEM RESPOSTA (" + consecutiveBridgeFails + " seguidos)");
@@ -829,7 +898,7 @@ public class DaemonService extends Service {
             socket = new LocalSocket();
 
             socket.connect(new LocalSocketAddress(
-                    BRIDGE_SOCKET,
+                    bridgeSocket(),
                     LocalSocketAddress.Namespace.FILESYSTEM));
 
             socket.setSoTimeout(1500);

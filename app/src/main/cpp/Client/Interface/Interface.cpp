@@ -339,19 +339,25 @@ void DrawDock(ImDrawList* dl, ImVec2 windowPos, ImVec2 windowSize, int& currentT
                 dl->AddText(iconPos, iconColor, items[i].icon);
                 ImGui::PopFont();
 
+                /*
+                 * FIX "tooltip trava o toque": NAO existe mais janela de
+                 * tooltip (BeginTooltip cria uma janela ImGui que, no
+                 * touch, aparecia exatamente sob o dedo e impedia o tap
+                 * seguinte). O nome da tab agora e desenhado direto no
+                 * draw list do dock — so pixels, zero captura de input.
+                 */
                 if (isHovered)
                 {
-                        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
-                        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-                        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.12f, 0.12f, 0.15f, 0.95f));
-                        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.25f, 0.25f, 0.30f, 1.0f));
-                        ImGui::BeginTooltip();
                         ImGui::PushFont(Fonts::InterMedium);
-                        ImGui::TextUnformatted(items[i].label);
+                        const ImVec2 labSize = ImGui::CalcTextSize(items[i].label);
+                        const ImVec2 labPos = ImVec2(
+                                center.x - labSize.x * 0.5f,
+                                drawMin.y - labSize.y - 6.0f);
+                        dl->AddText(
+                                labPos,
+                                IM_COL32(235, 235, 240, (int)(210 * alpha)),
+                                items[i].label);
                         ImGui::PopFont();
-                        ImGui::EndTooltip();
-                        ImGui::PopStyleColor(2);
-                        ImGui::PopStyleVar(2);
                 }
 
                 if (activeAnims[i] > 0.1f)
@@ -422,10 +428,16 @@ void Interface::RenderGui()
         static bool s_FabWasDrag = false;
         static ImVec2 s_FabGrab(0, 0);
         static ImVec2 s_FabClickPos(0, 0);
-        const float kFabSize = 72.0f;    // ícone maior (era 58)
+        const float kFabSize = 96.0f;    // FIX "aumente o tamanho": era 72
 
+        /*
+         * FIX "FAB no meio que nem o painel": posicao inicial = CENTRO da
+         * tela (antes nascia no canto esquerdo a 45% da altura).
+         */
         if (s_FabPos.x < 0)
-                s_FabPos = ImVec2(18.0f, io.DisplaySize.y * 0.45f);
+                s_FabPos = ImVec2(
+                        (io.DisplaySize.x - kFabSize) * 0.5f,
+                        (io.DisplaySize.y - kFabSize) * 0.5f);
 
         /*
          * O FAB só aparece DEPOIS que a animação de minimizar termina —
@@ -482,7 +494,13 @@ void Interface::RenderGui()
                                                 (io.DisplaySize.y - ws.y) * 0.5f);
                                 }
 
-                                s_FabPos = ImVec2(18.0f, io.DisplaySize.y * 0.45f);
+                                /*
+                                 * FIX "FAB no meio": volta pro CENTRO da tela
+                                 * junto com o painel (antes voltava pro canto).
+                                 */
+                                s_FabPos = ImVec2(
+                                        (io.DisplaySize.x - kFabSize) * 0.5f,
+                                        (io.DisplaySize.y - kFabSize) * 0.5f);
                         }
                 }
 
@@ -1264,8 +1282,25 @@ lastFrameHoveredId = gc.HoveredId;
                                                                 Custom::ColorEdit4(XorStr("Fov Filled Color"), g_Globals.Misc.Screen.SilentFilledFovColor);
                                                         }
                                                         Custom::SliderInt(XorStr("Silent FOV"), &g_Globals.Silent.Fov, 0, 360, "%d");
-                                                        
+
                                                         Custom::SliderInt(XorStr("Silent Distance"), &g_Globals.Silent.MaxDistance, 0, 200, "%d m");
+
+                                                        /*
+                                                         * SILENT FINO (Task 12): forca, hit
+                                                         * chance e filtros de alvo.
+                                                         * Forca 100 = linha reta pro alvo.
+                                                         * HitChance baixa = estatistica
+                                                         * humana no servidor (anti-ban).
+                                                         */
+                                                        Custom::SliderInt(XorStr("Forca do Silent"), &g_Globals.Silent.Forca, 0, 100, "%d%%");
+
+                                                        Custom::SliderInt(XorStr("Hit Chance"), &g_Globals.Silent.HitChance, 0, 100, "%d%%");
+
+                                                        Custom::Checkbox(XorStr("Visibilidade"), &g_Globals.Silent.VisibleCheck);
+
+                                                        Custom::Checkbox(XorStr("Ignorar Derrubados"), &g_Globals.Silent.IgnoreKnocked);
+
+                                                        Custom::Checkbox(XorStr("Ignorar Bots"), &g_Globals.Silent.IgnoreBots);
                                                 }
                                                 Custom::EndCustomChild();
                                         }

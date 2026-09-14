@@ -200,6 +200,13 @@ namespace Silent
         {
             close(fd);
 
+            /*
+             * Socket sumiu/velho: invalida o caminho resolvido pra o
+             * proximo connect re-ler o stormbridge.path (daemon pode
+             * ter respawnado com outro nome aleatorio).
+             */
+            BridgeClient::InvalidateSocketPath();
+
             return false;
         }
 
@@ -939,6 +946,43 @@ namespace Silent
                 continue;
             }
 
+            /*
+             * ====================================================================
+             * FORCA + HIT CHANCE (config do painel) + erro humano.
+             * ====================================================================
+             * 1) FORCA (0-100): escala o jitter. Quanto maior, menos o
+             *    ray desvia da cabeca (100 = linha reta). O padrao 65
+             *    ja sai mais forte que o jitter fixo antigo.
+             *
+             * 2) HIT CHANCE (0-100%): cada write rola o dado. Write de
+             *    "erro" desloca o ray em 1.0-3.5% do proprio comprimento
+             *    (erro humano que erra de verdade em qualquer distancia).
+             *    Como o jogo consome o ULTIMO write antes do disparo, a
+             *    chance da bala acertar ≈ HitChance. A DENSIDADE de
+             *    write nao muda (stealth do ritmo intacto) e o servidor
+             *    enxerga estatistica de jogador, nao de robo.
+             * ====================================================================
+             */
+
+            int forcaCfg = g_Globals.Silent.Forca;
+
+            if (forcaCfg < 0)
+                forcaCfg = 0;
+
+            if (forcaCfg > 100)
+                forcaCfg = 100;
+
+            const float forceT =
+                static_cast<float>(forcaCfg) / 100.0f;
+
+            /* Comprimento do ray (para o erro humano ser em % da distancia). */
+            const float dirLen =
+                sqrtf(
+                    dir.X * dir.X +
+                    dir.Y * dir.Y +
+                    dir.Z * dir.Z
+                );
+
             const float randomA =
                 static_cast<float>(
                     NextRandom(rngState) &
@@ -960,12 +1004,16 @@ namespace Silent
                 ) /
                 static_cast<float>(0x01000000);
 
+            /* Jitter base escalado pela forca (0 = reto, max = fraco). */
+            const float jitterHi =
+                (1.0f - forceT) *
+                (SMOOTH_MAX * 2.0f);
+
+            const float jitterLo = jitterHi * 0.35f;
+
             const float jitter =
-                (
-                    randomA *
-                    (SMOOTH_MAX - SMOOTH_MIN)
-                ) +
-                SMOOTH_MIN;
+                (randomA * (jitterHi - jitterLo)) +
+                jitterLo;
 
             dir.X +=
                 (randomB * jitter) -
@@ -978,6 +1026,43 @@ namespace Silent
             dir.Z +=
                 (randomA * jitter) -
                 (jitter * 0.5f);
+
+            /* HIT CHANCE: rola o dado por write. */
+            int hitCfg = g_Globals.Silent.HitChance;
+
+            if (hitCfg < 0)
+                hitCfg = 0;
+
+            if (hitCfg > 100)
+                hitCfg = 100;
+
+            const uint32_t hitRoll =
+                NextRandom(rngState) % 100u;
+
+            if (
+                static_cast<int>(hitRoll) >= hitCfg &&
+                dirLen > 1.0f
+            )
+            {
+                const float missR =
+                    static_cast<float>(
+                        NextRandom(rngState) & 0xFFFF
+                    ) / 65535.0f;
+
+                /* Erro humano: 1.0%..3.5% da distancia (erra de verdade). */
+                const float missMag =
+                    (0.010f + 0.025f * missR) *
+                    dirLen;
+
+                dir.X +=
+                    (randomB * 2.0f - 1.0f) * missMag;
+
+                dir.Y +=
+                    (randomC * 2.0f - 1.0f) * missMag;
+
+                dir.Z +=
+                    (randomA * 2.0f - 1.0f) * missMag * 0.4f;
+            }
 
             const uintptr_t directionVA =
                 weaponPtr +
@@ -1043,9 +1128,19 @@ namespace Silent
             {
                 /*
                  * Parado: write morno (mantem o ray apontado pro alvo
-                 * pro primeiro tiro sair silent) — 1 write a cada 5ms.
+                 * pro primeiro tiro sair silent). JITTER de ritmo: o
+                 * intervalo varia +-4ms por write — cadencia nunca
+                 * fica metronomica (padrao regular e o que ferramenta
+                 * de deteccao procura).
                  */
-                Sleep(WRITE_PACE_IDLE_MS);
+                Sleep(
+                    static_cast<DWORD>(
+                        WRITE_PACE_IDLE_MS +
+                        static_cast<LONGLONG>(
+                            NextRandom(rngState) % 5u
+                        )
+                    )
+                );
             }
         }
 

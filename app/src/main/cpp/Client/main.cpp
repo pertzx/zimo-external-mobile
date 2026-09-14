@@ -89,6 +89,19 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
     }
 
     // ============================================================
+    //  STREAM MODE (Task 12) — FIX do CaptureBypass nunca aplicado.
+    //
+    //  O OverlayService pergunta a cada ciclo de 16ms se o "Stream
+    //  Mode" está ligado; quando muda, ele adiciona/remove
+    //  FLAG_SECURE na janela de render — a ESP some de prints,
+    //  gravação de tela e lives (stream-proof de verdade).
+    // ============================================================
+    JNIEXPORT jboolean JNICALL
+    Java_com_stormcheats_OverlayService_nativeShouldCaptureBypass(JNIEnv* env, jobject thiz) {
+        return g_Globals.General.CaptureBypass ? JNI_TRUE : JNI_FALSE;
+    }
+
+    // ============================================================
     //  BOTÕES FLUTUANTES de keybind — ponte Java <-> C++
     //
     //  nativeGetFloatingKeys(): devolve array plano com o rect de

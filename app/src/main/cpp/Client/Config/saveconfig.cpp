@@ -119,6 +119,11 @@ namespace Cheat {
                 wInt(ofs, "KeyBind", g_Globals.Silent.KeyBind);
                 wInt(ofs, "Fov", g_Globals.Silent.Fov);
                 wInt(ofs, "MaxDistance", g_Globals.Silent.MaxDistance);
+                wInt(ofs, "Forca", g_Globals.Silent.Forca);
+                wInt(ofs, "HitChance", g_Globals.Silent.HitChance);
+                wBool(ofs, "VisibleCheck", g_Globals.Silent.VisibleCheck);
+                wBool(ofs, "IgnoreKnocked", g_Globals.Silent.IgnoreKnocked);
+                wBool(ofs, "IgnoreBots", g_Globals.Silent.IgnoreBots);
                 wBool(ofs, "ShowFov", g_Globals.Misc.Screen.ShowSilentFov);
                 wFloat4(ofs, "FovColor", g_Globals.Misc.Screen.SilentFovColor);
                 wFloat4(ofs, "FilledFovColor", g_Globals.Misc.Screen.SilentFilledFovColor);
@@ -258,6 +263,11 @@ namespace Cheat {
             gInt("Silent", "KeyBind", g_Globals.Silent.KeyBind);
             gInt("Silent", "Fov", g_Globals.Silent.Fov);
             gInt("Silent", "MaxDistance", g_Globals.Silent.MaxDistance);
+            gInt("Silent", "Forca", g_Globals.Silent.Forca);
+            gInt("Silent", "HitChance", g_Globals.Silent.HitChance);
+            gBool("Silent", "VisibleCheck", g_Globals.Silent.VisibleCheck);
+            gBool("Silent", "IgnoreKnocked", g_Globals.Silent.IgnoreKnocked);
+            gBool("Silent", "IgnoreBots", g_Globals.Silent.IgnoreBots);
             gBool("Silent", "ShowFov", g_Globals.Misc.Screen.ShowSilentFov);
             gF4("Silent", "FovColor", g_Globals.Misc.Screen.SilentFovColor);
             gF4("Silent", "FilledFovColor", g_Globals.Misc.Screen.SilentFilledFovColor);

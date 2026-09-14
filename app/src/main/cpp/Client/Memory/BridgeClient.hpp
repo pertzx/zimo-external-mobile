@@ -141,4 +141,11 @@ namespace BridgeClient
      * STORM_BRIDGE_SOCK antes do primeiro uso).
      */
     const char* GetSocketPath();
+
+    /*
+     * Invalida o caminho resolvido do arquivo .path — a proxima
+     * chamada de GetSocketPath() re-le o arquivo (usado quando o
+     * connect falha, ex.: daemon respawnou com outro socket).
+     */
+    void InvalidateSocketPath();
 }

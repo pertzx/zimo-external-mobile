@@ -81,14 +81,202 @@ namespace
     static std::atomic<long long> g_NextConnectAttemptMs{ 0 };
     static constexpr long long CONNECT_RETRY_INTERVAL_MS = 750;
 
+    /*
+     * ====================================================================
+     * STEALTH (Task 12): o caminho do socket NAO e mais fixo. O Java
+     * (DaemonService) gera um nome ALEATORIO por instalacao, passa pro
+     * daemon via --socket e grava o caminho em files/stormbridge.path.
+     * Nada de "stormbridge.sock" estatico em /data/local/tmp pra
+     * varredura de nomes conhecidos do anti-cheat achar.
+     *
+     * CORRECAO DA "PONTE INDISPONIVEL":
+     *  - o arquivo .path e RELIDO enquanto ele nao existir (o C++ pode
+     *    iniciar ANTES do Java gravar — cache de leitura unica travava
+     *    no nome velho pra sempre);
+     *  - o cache e INVALIDADO quando o connect falha (daemon respawnou
+     *    com outro socket => proxima tentativa re-le o arquivo);
+     *  - o pacote vem de /proc/self/cmdline (sem nome hardcoded) com
+     *    fallback pro caminho do pacote conhecido.
+     * ====================================================================
+     */
+    static std::mutex g_PathMutex;
+    static char       s_PathFromFile[160] = { 0 };
+    static bool       s_PathResolved      = false;
+
+    bool ReadPathFileInto(
+        const char* file,
+        char*       out,
+        size_t      cap
+    )
+    {
+        FILE* fp =
+            fopen(file, "rb");
+
+        if (!fp)
+            return false;
+
+        char buf[192] = { 0 };
+
+        const size_t n =
+            fread(
+                buf,
+                1,
+                sizeof(buf) - 1,
+                fp
+            );
+
+        fclose(fp);
+
+        if (n == 0)
+            return false;
+
+        buf[strcspn(buf, "\r\n")] = '\0';
+
+        if (buf[0] != '/')
+            return false;
+
+        snprintf(
+            out,
+            cap,
+            "%s",
+            buf
+        );
+
+        return true;
+    }
+
+    /*
+     * Pacote do proprio app via /proc/self/cmdline (conteudo:
+     * "com.pkg\0args..." — strlen para no primeiro NUL).
+     */
+    void GetOwnPackage(
+        char*  out,
+        size_t cap
+    )
+    {
+        out[0] = '\0';
+
+        FILE* fp =
+            fopen("/proc/self/cmdline", "rb");
+
+        if (!fp)
+            return;
+
+        char buf[128] = { 0 };
+
+        const size_t n =
+            fread(
+                buf,
+                1,
+                sizeof(buf) - 1,
+                fp
+            );
+
+        fclose(fp);
+
+        if (n > 0 && buf[0] != '\0')
+            snprintf(
+                out,
+                cap,
+                "%s",
+                buf
+            );
+    }
+
+    void ResolveSocketPath()
+    {
+        char pkg[128];
+
+        GetOwnPackage(
+            pkg,
+            sizeof(pkg)
+        );
+
+        char cand[256];
+
+        if (pkg[0] != '\0')
+        {
+            snprintf(
+                cand,
+                sizeof(cand),
+                "/data/user/0/%s/files/stormbridge.path",
+                pkg
+            );
+
+            if (ReadPathFileInto(
+                    cand,
+                    s_PathFromFile,
+                    sizeof(s_PathFromFile)))
+            {
+                s_PathResolved = true;
+
+                return;
+            }
+
+            snprintf(
+                cand,
+                sizeof(cand),
+                "/data/data/%s/files/stormbridge.path",
+                pkg
+            );
+
+            if (ReadPathFileInto(
+                    cand,
+                    s_PathFromFile,
+                    sizeof(s_PathFromFile)))
+            {
+                s_PathResolved = true;
+
+                return;
+            }
+        }
+
+        if (ReadPathFileInto(
+                "/data/data/com.stormcheats/files/stormbridge.path",
+                s_PathFromFile,
+                sizeof(s_PathFromFile)))
+        {
+            s_PathResolved = true;
+
+            return;
+        }
+
+        /*
+         * Arquivo ainda nao existe (Java ainda nao gravou): NAO marca
+         * como resolvido — proxima chamada tenta de novo.
+         */
+    }
+
     const char* SocketPath()
     {
         const char* env =
             getenv("STORM_BRIDGE_SOCK");
 
-        return (env && *env)
-            ? env
-            : DEFAULT_SOCKET_PATH;
+        if (env && *env)
+            return env;
+
+        {
+            std::lock_guard<std::mutex> lock(g_PathMutex);
+
+            if (!s_PathResolved)
+                ResolveSocketPath();
+
+            if (s_PathFromFile[0])
+                return s_PathFromFile;
+        }
+
+        return DEFAULT_SOCKET_PATH;
+    }
+
+    /*
+     * Connect falhou => o caminho pode ter ficado velho (daemon respawnou
+     * ou arquivo apareceu depois). Invalida pra re-ler no proximo acesso.
+     */
+    void InvalidateResolvedSocketPath()
+    {
+        std::lock_guard<std::mutex> lock(g_PathMutex);
+
+        s_PathResolved = false;
     }
 
     long long NowMs()
@@ -231,6 +419,8 @@ namespace
                 path,
                 strerror(errno)
             );
+
+            InvalidateResolvedSocketPath();
 
             return false;
         }
@@ -949,6 +1139,11 @@ Stats GetStats()
 const char* GetSocketPath()
 {
     return SocketPath();
+}
+
+void InvalidateSocketPath()
+{
+    InvalidateResolvedSocketPath();
 }
 
 } // namespace BridgeClient

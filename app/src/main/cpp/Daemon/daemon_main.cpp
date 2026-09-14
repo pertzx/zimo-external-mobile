@@ -43,6 +43,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/un.h>
@@ -58,14 +59,30 @@
 
 #define LOG_TAG "StormBridge"
 
+/*
+ * ============================================================================
+ * STEALTH (Task 12) — O DAEMON NAO SE ENTREGA MAIS
+ * ============================================================================
+ * Antes: logcat com tag "StormBridge" (leitor de logcat com root achava
+ * na hora) + arquivo /data/local/tmp/stormbridge.log crescente em disco
+ * (evidencia estatica que varredura de anti-cheat acha por nome).
+ *
+ * Agora: NADA de log por padrao. LOGx so fala com --verbose (debug);
+ * FileLog so escreve se --log for passado explicitamente. O Java NAO
+ * passa mais --log. Em producao o daemon e MUDO e nao deixa rastro.
+ * ============================================================================
+ */
+static std::atomic<int> g_Verbose{ 0 };
+static std::atomic<int> g_LogFileEnabled{ 0 };
+
 #define LOGI(...) \
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+    do { if (g_Verbose.load()) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__); } while (0)
 
 #define LOGW(...) \
-    __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+    do { if (g_Verbose.load()) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__); } while (0)
 
 #define LOGE(...) \
-    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+    do { if (g_Verbose.load()) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__); } while (0)
 
 /*
  * ============================================================================
@@ -99,6 +116,10 @@ static void FileLog(
     ...
 )
 {
+    /* MUDO por padrao: so grava se --log foi passado (debug). */
+    if (!g_LogFileEnabled.load())
+        return;
+
     std::lock_guard<std::mutex> lock(g_LogFileMutex);
 
     FILE* fp =
@@ -161,86 +182,22 @@ static void FileLog(
 namespace
 {
     /*
-     * Cache de fds de /proc/<pid>/mem. Como o daemon roda como root,
-     * open() sempre que funciona evita reabrir a cada operação.
+     * ============================================================================
+     * STEALTH (Task 12) — HIGIENE DE FD
+     * ============================================================================
+     * ANTES: o daemon mantinha um fd de /proc/<pid>/mem ABERTO PRA SEMPRE
+     * (cache g_ProcMemFds). Um handle persistente apontando pro mem do jogo
+     * e uma assinatura classica: varredura de fd de QUALQUER processo root
+     * (via /proc) acha o handle na hora.
+     *
+     * AGORA: NENHUM fd fica aberto. O caminho principal e process_vm_readv/
+     * writev (NAO usa fd nenhum). O fallback pread/pwrite abre o mem, usa e
+     * FECHA na mesma chamada. Em momento algum existe handle exposto.
+     * ============================================================================
      */
-    static std::mutex g_ProcMemMutex;
-    static std::map<pid_t, int> g_ProcMemFds;
-
-    int GetProcMemFd(
-        pid_t pid
-    )
-    {
-        std::lock_guard<std::mutex> lock(g_ProcMemMutex);
-
-        auto it =
-            g_ProcMemFds.find(pid);
-
-        if (it != g_ProcMemFds.end())
-            return it->second;
-
-        char path[64];
-
-        snprintf(
-            path,
-            sizeof(path),
-            "/proc/%d/mem",
-            pid
-        );
-
-        int fd =
-            open(
-                path,
-                O_RDWR | O_CLOEXEC
-            );
-
-        if (fd < 0)
-        {
-            LOGE(
-                "open(%s) falhou: %s",
-                path,
-                strerror(errno)
-            );
-
-            return -1;
-        }
-
-        g_ProcMemFds[pid] =
-            fd;
-
-        LOGI(
-            "[MEM] /proc/%d/mem aberto (fd=%d)",
-            pid,
-            fd
-        );
-
-        FileLog(
-            "open /proc/%d/mem ok",
-            pid
-        );
-
-        return fd;
-    }
-
-    void InvalidateProcMemFd(
-        pid_t pid
-    )
-    {
-        std::lock_guard<std::mutex> lock(g_ProcMemMutex);
-
-        auto it =
-            g_ProcMemFds.find(pid);
-
-        if (it == g_ProcMemFds.end())
-            return;
-
-        close(it->second);
-
-        g_ProcMemFds.erase(it);
-    }
 
     /*
-     * process_vm_readv - caminho principal.
+     * process_vm_readv - caminho principal (sem fd, sem rastro de handle).
      */
     bool SyscallRead(
         pid_t pid,
@@ -344,7 +301,8 @@ namespace
     }
 
     /*
-     * pread64 em /proc/<pid>/mem - fallback.
+     * pread64 em /proc/<pid>/mem - fallback. ABRE-USA-FECHA na mesma
+     * chamada: nenhum handle do mem do jogo fica exposto entre ops.
      */
     bool FileRead(
         pid_t pid,
@@ -353,13 +311,26 @@ namespace
         size_t size
     )
     {
+        char path[64];
+
+        snprintf(
+            path,
+            sizeof(path),
+            "/proc/%d/mem",
+            pid
+        );
+
         int fd =
-            GetProcMemFd(pid);
+            open(
+                path,
+                O_RDONLY | O_CLOEXEC
+            );
 
         if (fd < 0)
             return false;
 
         size_t total = 0;
+        bool ok = true;
 
         while (total < size)
         {
@@ -373,24 +344,22 @@ namespace
 
             if (n <= 0)
             {
-                /*
-                 * fd pode ter ficado inválido (processo reiniciou).
-                 * Invalida para reabrir na próxima.
-                 */
-                InvalidateProcMemFd(pid);
+                ok = false;
 
-                return false;
+                break;
             }
 
             total +=
                 static_cast<size_t>(n);
         }
 
-        return true;
+        close(fd);
+
+        return ok;
     }
 
     /*
-     * pwrite64 em /proc/<pid>/mem - fallback.
+     * pwrite64 em /proc/<pid>/mem - fallback. ABRE-USA-FECHA idem.
      */
     bool FileWrite(
         pid_t pid,
@@ -399,13 +368,26 @@ namespace
         size_t size
     )
     {
+        char path[64];
+
+        snprintf(
+            path,
+            sizeof(path),
+            "/proc/%d/mem",
+            pid
+        );
+
         int fd =
-            GetProcMemFd(pid);
+            open(
+                path,
+                O_WRONLY | O_CLOEXEC
+            );
 
         if (fd < 0)
             return false;
 
         size_t total = 0;
+        bool ok = true;
 
         while (total < size)
         {
@@ -419,16 +401,18 @@ namespace
 
             if (n <= 0)
             {
-                InvalidateProcMemFd(pid);
+                ok = false;
 
-                return false;
+                break;
             }
 
             total +=
                 static_cast<size_t>(n);
         }
 
-        return true;
+        close(fd);
+
+        return ok;
     }
 
     bool BridgeReadMem(
@@ -1614,6 +1598,63 @@ int main(
         {
             g_LogFilePath =
                 argv[++i];
+
+            /* So grava log se --log for passado (debug). */
+            g_LogFileEnabled =
+                1;
+        }
+        else if (strcmp(argv[i], "--verbose") == 0)
+        {
+            g_Verbose =
+                1;
+        }
+    }
+
+    /*
+     * ============================================================================
+     * STEALTH (Task 12) — MASQUERADE DO PROCESSO
+     * ============================================================================
+     * comm (o que `ps`/`pgrep` mostram) e cmdline(/proc/<pid>/cmdline) viram
+     * um nome neutro de sistema. Nenhum "storm", nenhum caminho de
+     * /data/local/tmp fica visivel no processo. Feito DEPOIS do parse dos
+     * argumentos (o socket path randomizado fica fora da cmdline).
+     * ============================================================================
+     */
+    prctl(
+        PR_SET_NAME,
+        "appstats",
+        0,
+        0,
+        0
+    );
+
+    if (argc > 0 && argv[0] != nullptr)
+    {
+        const size_t arg0Len =
+            strlen(argv[0]);
+
+        memset(
+            argv[0],
+            0,
+            arg0Len
+        );
+
+        snprintf(
+            argv[0],
+            arg0Len,
+            "/system/bin/appstats"
+        );
+    }
+
+    for (int i = 1; i < argc; i++)
+    {
+        if (argv[i] != nullptr)
+        {
+            memset(
+                argv[i],
+                0,
+                strlen(argv[i])
+            );
         }
     }
 
@@ -1858,13 +1899,6 @@ int main(
     LOGI("stormdaemon encerrando...");
 
     close(serverFd);
-
-    for (
-        auto& kv : g_ProcMemFds
-    )
-    {
-        close(kv.second);
-    }
 
     unlink(g_SocketPath.c_str());
     unlink(g_PidFilePath.c_str());

@@ -41,6 +41,30 @@ namespace Cheat {
              */
             int Fov = 150;
             int MaxDistance = 100;
+
+            /*
+             * ====================================================================
+             * SILENT FINO (Task 12) — forca, hit chance e filtros proprios.
+             * ====================================================================
+             * Forca (0-100): quanto MAIOR, menos jitter o write leva e
+             * mais reto o tiro vai pra cabeca. 100 = linha reta (forca
+             * maxima). Padrao 65 ja sai mais forte que o jitter fixo antigo.
+             *
+             * HitChance (0-100): % de writes que miram de verdade. Os
+             * outros levam um desvio humano (em % da distancia) que ERRa
+             * de verdade — e o desempenho no servidor vira estatistica de
+             * jogador, nao de robo (anti-ban comportamental).
+             *
+             * VisibleCheck / IgnoreKnocked / IgnoreBots: filtros da
+             * selecao de alvo do silent (Draw.cpp). Visivel ganha sempre;
+             * derrubado e bot saem da candidatura.
+             * ====================================================================
+             */
+            int  Forca         = 65;   // 0-100
+            int  HitChance     = 70;   // 0-100 (%)
+            bool VisibleCheck  = true;
+            bool IgnoreKnocked = false;
+            bool IgnoreBots    = false;
         } Silent;
         struct Visuals
         {
