@@ -56,12 +56,15 @@ namespace Cheat {
              * jogador, nao de robo (anti-ban comportamental).
              *
              * VisibleCheck / IgnoreKnocked / IgnoreBots: filtros da
-             * selecao de alvo do silent (Draw.cpp). Visivel ganha sempre;
-             * derrubado e bot saem da candidatura.
+             * selecao de alvo do silent (Draw.cpp), gemeos dos do aimbot
+             * e INDEPENDENTES. Visivel confirmado pelo jogo ganha sempre;
+             * sem confirmacao nenhuma, ninguem e cortado (o silent nunca
+             * morre por falta de sinal do oraculo); derrubado e bot saem
+             * da candidatura.
              * ====================================================================
              */
-            int  Forca         = 65;   // 0-100
-            int  HitChance     = 70;   // 0-100 (%)
+            int  Forca         = 70;   // 0-100
+            int  HitChance     = 60;   // 0-100 (%)
             bool VisibleCheck  = true;
             bool IgnoreKnocked = false;
             bool IgnoreBots    = false;

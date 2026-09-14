@@ -1296,11 +1296,11 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         Custom::SliderInt(XorStr("Hit Chance"), &g_Globals.Silent.HitChance, 0, 100, "%d%%");
 
-                                                        Custom::Checkbox(XorStr("Visibilidade"), &g_Globals.Silent.VisibleCheck);
+                                                        Custom::Checkbox(XorStr("Visible Check"), &g_Globals.Silent.VisibleCheck);
 
-                                                        Custom::Checkbox(XorStr("Ignorar Derrubados"), &g_Globals.Silent.IgnoreKnocked);
+                                                        Custom::Checkbox(XorStr("Ignore Bots"), &g_Globals.Silent.IgnoreBots);
 
-                                                        Custom::Checkbox(XorStr("Ignorar Bots"), &g_Globals.Silent.IgnoreBots);
+                                                        Custom::Checkbox(XorStr("Ignore Knocked"), &g_Globals.Silent.IgnoreKnocked);
                                                 }
                                                 Custom::EndCustomChild();
                                         }

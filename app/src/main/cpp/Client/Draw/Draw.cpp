@@ -1279,6 +1279,14 @@ void Data::ReadLoop( )
                                 pd.HealthPercent = HealthPercent;
                                 pd.IsKnocked = IsKnocked;
                                 pd.IsTeammate = (e.isTeam != 0);
+                                /*
+                                 * BOT — fonte unica de verdade pro aimbot/silent:
+                                 * flag IsClientBot (onda 2, batch) OU o nome caiu
+                                 * no placeholder "BOT" (perfil sem nick utilizavel,
+                                 * tipico de bot de treino). Lido 1x por ciclo aqui;
+                                 * os filtros usam pd.IsBot sem re-read por frame.
+                                 */
+                                pd.IsBot = (e.isBot != 0) || (nameStr == "BOT");
                                 pd.WeaponID = WeaponID;
                                 pd.Entity = e.Entity;
                                 pd.UMAData = e.umaData;
@@ -2031,18 +2039,35 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         const float centerY = ( float )ScreenHeight * 0.5f;
 
         /*
-         * ORACULO DE VISIBILIDADE do silent (fix "mira em quem ta atras da
-         * parede"): o proprio jogo resolve, a cada frame, qual inimigo esta
-         * VISIVEL e perto da mira — o auto-lock publica isso em
-         * m_TargetHeuristic (TargetInfo.m_Entity), ja com raycast de parede
-         * feito pelo JOGO. 3 reads UMA vez por frame (nao por entidade):
-         * quem igualar esse ponteiro esta comprovadamente visivel, custo
-         * zero pra gente. 0 = oraculo calado (cai no comportamento de
-         * sempre, silent nunca fica sem alvo).
+         * ORACULO DE VISIBILIDADE (AIMBOT + SILENT) — lido UMA vez por
+         * ciclo da ReadLoop: o proprio jogo publica em m_TargetHeuristic
+         * (m_AimAssist E m_AimAssistOnSighting) quando existe inimigo
+         * VISIVEL, com raycast de parede feito pelo JOGO.
+         *
+         *   gameAnyVisible      = "tem inimigo visivel" (gate do
+         *                         VisibleCheck, igual ao do aimbot);
+         *   autoLockTargetEntity= QUEM o auto-lock confirmou agora
+         *                         (preferencia do silent: visivel
+         *                         comprovado ganha o score).
+         *
+         * FIX "ativei visibilidade e o silent morreu": o gate GLOBAL
+         * (!gameAnyVisible) morria junto com o sinal do auto-lock —
+         * inimigo visivel na tela, fora do cone estreito do assist,
+         * virava "invisivel" e o silent ficava sem alvo. Agora o
+         * Visible Check do silent e INDEPENDENTE (config e decisao
+         * proprias): so corta candidato quando o jogo CONFIRMA quem
+         * esta visivel e o candidato nao e ele; sem confirmacao,
+         * ninguem e cortado. E o gate do AIMBOT nunca mais derruba a
+         * iteracao inteira do loop (antes pulava o bloco do silent).
+         *
+         * FIX PERF: antes o aimbot refazia estes 4-6 reads POR ENTIDADE
+         * dentro do loop (20 alvos = 120 roundtrips a mais por ciclo) —
+         * snapshot atrasava, skeleton/ESP engasgavam.
          */
         uintptr_t autoLockTargetEntity = 0;
+        bool gameAnyVisible = false;
 
-        if ( g_Globals.Silent.Enabled && localPlayer != 0 )
+        if ( localPlayer != 0 )
         {
                 uintptr_t aimAssist = ReadPtr( localPlayer + Offsets::Player::m_AimAssist );
 
@@ -2052,8 +2077,23 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 ReadPtr( aimAssist + Offsets::AimAssistAutoLock::m_TargetHeuristic );
 
                         if ( targetInfo != 0 )
+                        {
+                                gameAnyVisible = true;
+
                                 autoLockTargetEntity =
                                         ReadPtr( targetInfo + Offsets::AimAssistAutoLock::m_Entity );
+                        }
+                }
+
+                uintptr_t aimAssistSighting = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
+
+                if ( aimAssistSighting != 0 )
+                {
+                        uintptr_t targetInfo =
+                                ReadPtr( aimAssistSighting + Offsets::AimAssistAutoLock::m_TargetHeuristic );
+
+                        if ( targetInfo != 0 )
+                                gameAnyVisible = true;
                 }
         }
 
@@ -2074,58 +2114,54 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         // nunca a selecao de alvo do aimbot/silent/magnet.
                         if ( p.IsTeammate ) continue;
 
-                        if ( snapshotFresh && p.Distance >= 0 && p.Distance <= AimCfg.MaxDistance )
+                        /*
+                         * FIX "visible check do aimbot influencia o silent": a
+                         * candidatura do AIMBOT agora e local (aimCandidate), SEM
+                         * continue — o gate antigo derrubava a iteracao INTEIRA
+                         * do loop e o bloco do SILENT (abaixo) nem rodava: com o
+                         * Visible Check do aimbot ligado e o oraculo sem sinal,
+                         * o silent perdia o alvo junto. Cada feature agora
+                         * decide a SUA candidatura na mesma passada.
+                         */
+                        bool aimCandidate =
+                                snapshotFresh && p.Distance >= 0 && p.Distance <= AimCfg.MaxDistance;
+
+                        if ( aimCandidate )
                         {
                                 enemiesvisible = true;
 
-                                // Visible check
-                                if ( g_Globals.AimBot.VisibleCheck )
+                                /*
+                                 * Visible check do AIMBOT — ORACULO HOISTED
+                                 * (gameAnyVisible, lido 1x por ciclo, NAO por
+                                 * entidade). Antes eram 4-6 reads sincronos POR
+                                 * ENTIDADE aqui dentro: 20 alvos = 120 roundtrips
+                                 * a mais por ciclo, snapshot atrasado.
+                                 */
+                                if ( g_Globals.AimBot.VisibleCheck && !gameAnyVisible )
                                 {
-                                        bool anyVisible = false;
-
-                                        uintptr_t aimAssist = ReadPtr( localPlayer + Offsets::Player::m_AimAssist );
-                                        if ( aimAssist != 0 )
-                                        {
-                                                uintptr_t targetInfo = ReadPtr( aimAssist + Offsets::AimAssistAutoLock::m_TargetHeuristic );
-                                                if ( targetInfo != 0 )
-                                                        anyVisible = true;
-                                        }
-
-                                        uintptr_t aimAssistSighting = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
-                                        if ( aimAssistSighting != 0 )
-                                        {
-                                                uintptr_t targetInfo = ReadPtr( aimAssistSighting + Offsets::AimAssistAutoLock::m_TargetHeuristic );
-                                                if ( targetInfo != 0 )
-                                                        anyVisible = true;
-                                        }
-
-                                        if ( !anyVisible )
-                                        {
-                                                enemiesvisible = false;
-                                                continue;
-                                        }
-                                }
-
-                                // Ignore bots and knocked
-                                bool IsClientBot = false;
-                                g_FreeFireMemory.Read<bool>( p.Entity + Offsets::Player::IsClientBot, IsClientBot );
-
-                                if ( ( !AimCfg.IgnoreKnocked || !p.IsKnocked ) && ( !AimCfg.IgnoreBots || !IsClientBot ) )
-                                {
-                                        float dx = p.HeadScreen.X - centerX;
-                                        float dy = p.HeadScreen.Y - centerY;
-                                        float crosshairDistSq = dx * dx + dy * dy;
-
-                                        if ( crosshairDistSq < fovSq && crosshairDistSq < ClosestDistSq )
-                                        {
-                                                ClosestDistSq = crosshairDistSq;
-                                                ClosestEntity = p.Entity;
-                                                ClosestHP = p.CurrentHealth;
-                                        }
+                                        enemiesvisible = false;
+                                        aimCandidate = false;
                                 }
                         }
 
-                                                /*
+                        // Ignore bots and knocked — pd.IsBot vem do snapshot
+                        // (flag da onda 2 + placeholder "BOT"), sem re-read.
+                        if ( aimCandidate &&
+                             ( !AimCfg.IgnoreKnocked || !p.IsKnocked ) && ( !AimCfg.IgnoreBots || !p.IsBot ) )
+                        {
+                                float dx = p.HeadScreen.X - centerX;
+                                float dy = p.HeadScreen.Y - centerY;
+                                float crosshairDistSq = dx * dx + dy * dy;
+
+                                if ( crosshairDistSq < fovSq && crosshairDistSq < ClosestDistSq )
+                                {
+                                        ClosestDistSq = crosshairDistSq;
+                                        ClosestEntity = p.Entity;
+                                        ClosestHP = p.CurrentHealth;
+                                }
+                        }
+
+                        /*
                          * Alvo do silent: config propria (Silent.Fov e
                          * Silent.MaxDistance) com FILTRO DE VISIBILIDADE +
                          * preferencia por alvo PERTINHO:
@@ -2139,21 +2175,14 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 /*
                                  * FILTROS PROPRIOS do silent (config da aba):
                                  * derrubado e bot saem da candidatura ANTES de
-                                 * qualquer score; VisibleCheck exige o oraculo
-                                 * do auto-lock (visivel = m_TargetHeuristic
-                                 * apontando pra ele).
+                                 * qualquer score. IsBot vem do snapshot (flag da
+                                 * onda 2 + placeholder "BOT") — sem re-read.
                                  */
                                 if ( g_Globals.Silent.IgnoreKnocked && p.IsKnocked )
                                         continue;
 
-                                if ( g_Globals.Silent.IgnoreBots )
-                                {
-                                        bool silIsBot = false;
-                                        g_FreeFireMemory.Read<bool>( p.Entity + Offsets::Player::IsClientBot, silIsBot );
-
-                                        if ( silIsBot )
-                                                continue;
-                                }
+                                if ( g_Globals.Silent.IgnoreBots && p.IsBot )
+                                        continue;
 
                                 float sdx = p.HeadScreen.X - centerX;
                                 float sdy = p.HeadScreen.Y - centerY;
@@ -2165,7 +2194,25 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                 ( autoLockTargetEntity != 0 &&
                                                   p.Entity == autoLockTargetEntity );
 
-                                        if ( g_Globals.Silent.VisibleCheck && !silVisible )
+                                        /*
+                                         * Visible check do SILENT — funcao gemea da
+                                         * do aimbot, mas com config e decisao PROPRIAS
+                                         * (nada do aimbot entra aqui):
+                                         *   - o jogo confirmou QUEM esta visivel
+                                         *     (autoLockTargetEntity, raycast feito
+                                         *     pelo JOGO) e este candidato NAO e ele
+                                         *     => provavel atras de parede, fora;
+                                         *   - oraculo SEM confirmacao nenhuna
+                                         *     (ninguem no cone do auto-lock) =>
+                                         *     candidato MANTIDO. O gate antigo
+                                         *     (!gameAnyVisible) derrubava TODO mundo
+                                         *     quando o auto-lock nao publicava alvo —
+                                         *     inimigo visivel na tela, fora do cone
+                                         *     estreito do assist, virava "invisivel"
+                                         *     e o silent morria.
+                                         */
+                                        if ( g_Globals.Silent.VisibleCheck &&
+                                             autoLockTargetEntity != 0 && !silVisible )
                                                 continue;
 
                                         const float gameDist =
@@ -2190,6 +2237,45 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                         }
                                 }
                         }
+                }
+        }
+
+        /*
+         * [BOTCHK] telemetria do IgnoreBots (5s): na ilha de treino com
+         * bots na tela, "inimigos=N flagged_bot=0" prova que o byte
+         * IsClientBot do perfil de offsets esta defasado (o jogo parou de
+         * setar o flag nesse endereco) — com esse logcat eu ajusto o
+         * offset/mascara. flagged_bot>0 = deteccao saudavel.
+         */
+        {
+                static long long s_NextBotChkMs = 0;
+
+                const long long botChkNow = GetTickCount64();
+
+                if ( ( g_Globals.Silent.IgnoreBots || g_Globals.AimBot.IgnoreBots ) &&
+                     botChkNow >= s_NextBotChkMs &&
+                     !snapshot.empty() )
+                {
+                        s_NextBotChkMs = botChkNow + 5000;
+
+                        int botEnemies = 0;
+                        int botFlagged = 0;
+
+                        for ( const auto& q : snapshot )
+                        {
+                                if ( q.IsTeammate ) continue;
+
+                                ++botEnemies;
+
+                                if ( q.IsBot ) ++botFlagged;
+                        }
+
+                        DiagLog(
+                            "[BOTCHK] inimigos=%d flagged_bot=%d (aim=%d sil=%d)",
+                            botEnemies,
+                            botFlagged,
+                            g_Globals.AimBot.IgnoreBots ? 1 : 0,
+                            g_Globals.Silent.IgnoreBots ? 1 : 0 );
                 }
         }
 
@@ -2626,7 +2712,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 {
                         static bool s_AimFloodRunning = false;
 
-                        bool isShooting = rageFiringActive; // so enquanto ATIRA (UGCStartFiring)
+                        bool isShooting = rageFiringActive;
                         /*
                          * MOBILE (FIX "RAGE NUNCA ATIVA"): MouseDown[0] do painel
                          * nunca fica true durante o gameplay — o toque vai pro jogo,

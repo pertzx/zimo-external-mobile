@@ -156,13 +156,13 @@ namespace WebPanel
                 F("Aimbot", "aim_keybind", "Tecla do Aimbot (VK)",
                         FEAT_KEY, &Aim.KeyBind, 0, 255, 1);
 
-                F("Aimbot", "aim_ignore_knocked", "Ignorar caidos",
+                F("Aimbot", "aim_ignore_knocked", "Ignore Knocked",
                         FEAT_BOOL, &Aim.IgnoreKnocked, 0, 1, 1);
 
-                F("Aimbot", "aim_ignore_bots", "Ignorar bots",
+                F("Aimbot", "aim_ignore_bots", "Ignore Bots",
                         FEAT_BOOL, &Aim.IgnoreBots, 0, 1, 1);
 
-                F("Aimbot", "aim_visible", "Check de visibilidade",
+                F("Aimbot", "aim_visible", "Visible Check",
                         FEAT_BOOL, &Aim.VisibleCheck, 0, 1, 1);
 
                 F("Aimbot", "aim_magnet", "Magnet (pull)",
@@ -204,13 +204,13 @@ namespace WebPanel
                 F("Silent", "silent_hitchance", "Hit Chance (%)",
                         FEAT_INT, &Sil.HitChance, 0, 100, 1);
 
-                F("Silent", "silent_vischeck", "Visibilidade",
+                F("Silent", "silent_vischeck", "Visible Check",
                         FEAT_BOOL, &Sil.VisibleCheck, 0, 1, 1);
 
-                F("Silent", "silent_ignknock", "Ignorar Derrubados",
+                F("Silent", "silent_ignknock", "Ignore Knocked",
                         FEAT_BOOL, &Sil.IgnoreKnocked, 0, 1, 1);
 
-                F("Silent", "silent_ignbots", "Ignorar Bots",
+                F("Silent", "silent_ignbots", "Ignore Bots",
                         FEAT_BOOL, &Sil.IgnoreBots, 0, 1, 1);
 
                 F("Silent", "silent_keybind", "Tecla do Silent (VK)",
