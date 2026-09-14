@@ -59,7 +59,7 @@ namespace Silent
     /* Refresh da cabeca (snapshot da ESP) POR TEMPO em cima de cache —
      * nunca por write: o burst nao pode martelar o mutex do snapshot
      * milhares de vezes por segundo (disputaria com ReadLoop/Draw). */
-    constexpr LONGLONG HEAD_REFRESH_FIRING_MS = 8;   // atirando
+    constexpr LONGLONG HEAD_REFRESH_FIRING_MS = 4;   // atirando
     constexpr LONGLONG HEAD_REFRESH_IDLE_MS   = 33;  // parado
 
     /* Leituras propias do writer, throttled (dezenas de ops/s, nao milhares). */
@@ -72,7 +72,7 @@ namespace Silent
 
     /* Cabeca mais velha que isso NAO vale tiro: atira no nada/atras.
      * 250ms ainda cobre engasgo da ponte sem mirar em fantasma. */
-    constexpr LONGLONG HEAD_STALE_MAX_MS = 250;
+    constexpr LONGLONG HEAD_STALE_MAX_MS = 600;
 
     /* Ponte falhando no write: backoff antes de tentar de novo. */
     constexpr LONGLONG WRITE_FAIL_BACKOFF_MS = 25;
@@ -89,7 +89,7 @@ namespace Silent
      * humano. Mais stealth = menor (15-18); mais alcance = maior.
      * ====================================================================
      */
-    constexpr float STEALTH_MAX_ANGLE_DEG = 25.0f;
+    constexpr float STEALTH_MAX_ANGLE_DEG = 0.0f;
 
     /* Refresh do RayDir atual do jogo (cache pra o limite angular).
      * ATIRANDO refresha 2x mais rapido (o recoil anda o RayDir). */
@@ -119,7 +119,7 @@ namespace Silent
      * teleport de snapshot) nunca mais arremessa o ponto de mira
      * metros fora do alvo.
      */
-    constexpr float    PRED_MAX_OFFSET_M    = 0.9f;   // deslocamento total maximo
+    constexpr float    PRED_MAX_OFFSET_M    = 1.4f;   // deslocamento total maximo
     constexpr float    PRED_MAX_OFFSET_Y_M  = 0.45f;  // deslocamento vertical maximo
 
     extern volatile LONG g_Running;

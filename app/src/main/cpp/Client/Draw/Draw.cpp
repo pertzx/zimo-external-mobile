@@ -2656,7 +2656,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         uintptr_t silentTargetNow = SilentClosestEntity;
 
         if ( silentTargetNow == 0 && s_SilentKeepAliveTarget != 0 &&
-             ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < 600 )
+             ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < 1200 )
         {
                 silentTargetNow = s_SilentKeepAliveTarget;
         }
