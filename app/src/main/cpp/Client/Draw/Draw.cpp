@@ -1633,13 +1633,10 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         short ClosestHP = 0;
 
         // Alvo do silent: selecao independente, com FOV/distancia proprios
-        // (nao herda nada do AimCfg).
+        // (nao herda nada do AimCfg). Visible check IGUAL AO DO RAGE:
+        // um unico nivel de score, gate global gameAnyVisible.
         float SilentDistSq = FLT_MAX;
         uintptr_t SilentClosestEntity = 0;
-
-        // Nivel VISIVEL (oraculo do auto-lock do jogo): ganha do nivel geral.
-        float SilentVisDistSq = FLT_MAX;
-        uintptr_t SilentVisibleEntity = 0;
 
         int enemyCountFrame = 0;
         ImVec2 closestHead2D( 0.f, 0.f );
@@ -2044,21 +2041,20 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
          * (m_AimAssist E m_AimAssistOnSighting) quando existe inimigo
          * VISIVEL, com raycast de parede feito pelo JOGO.
          *
-         *   gameAnyVisible      = "tem inimigo visivel" (gate do
-         *                         VisibleCheck, igual ao do aimbot);
+         *   gameAnyVisible      = "tem inimigo visivel" (gate GLOBAL do
+         *                         VisibleCheck — o MESMO gate do aimbot
+         *                         RAGE, agora tambem pro silent);
          *   autoLockTargetEntity= QUEM o auto-lock confirmou agora
-         *                         (preferencia do silent: visivel
-         *                         comprovado ganha o score).
+         *                         (so telemetria [VISCHK]).
          *
-         * FIX "ativei visibilidade e o silent morreu": o gate GLOBAL
-         * (!gameAnyVisible) morria junto com o sinal do auto-lock —
-         * inimigo visivel na tela, fora do cone estreito do assist,
-         * virava "invisivel" e o silent ficava sem alvo. Agora o
-         * Visible Check do silent e INDEPENDENTE (config e decisao
-         * proprias): so corta candidato quando o jogo CONFIRMA quem
-         * esta visivel e o candidato nao e ele; sem confirmacao,
-         * ninguem e cortado. E o gate do AIMBOT nunca mais derruba a
-         * iteracao inteira do loop (antes pulava o bloco do silent).
+         * FIX "visible check do silent nao funciona": a versao anterior
+         * dependia do autoLockTargetEntity (cone ESTREITO do auto-lock)
+         * pra cortar candidato — na pratica o assist raramente publica
+         * quem o silent escolheu, o gate cortava o alvo errado e o
+         * silent morria com a config ligada. AGORA o silent usa a MESMA
+         * coisa do RAGE que o usuario confirmou funcionar: oraculo
+         * global gameAnyVisible. Sem sinal = sem candidato (igual o
+         * rage para de floodar); com sinal = melhor candidato por score.
          *
          * FIX PERF: antes o aimbot refazia estes 4-6 reads POR ENTIDADE
          * dentro do loop (20 alvos = 120 roundtrips a mais por ciclo) —
@@ -2094,6 +2090,30 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                         if ( targetInfo != 0 )
                                 gameAnyVisible = true;
+                }
+        }
+
+        /*
+         * [VISCHK] telemetria do oraculo (5s): mostra se o auto-lock do
+         * jogo esta publicando sinal. "oracle=0" mesmo com inimigo na
+         * cara = offset m_AimAssist/m_TargetHeuristic defasou (me manda
+         * o logcat). Com oracle=1 o Visible Check (aimbot E silent) abre.
+         */
+        {
+                static LONGLONG s_NextVisChkMs = 0;
+
+                const LONGLONG visChkNow = GetTickCount64( );
+
+                if ( ( g_Globals.Silent.VisibleCheck || g_Globals.AimBot.VisibleCheck ) &&
+                     visChkNow >= s_NextVisChkMs &&
+                     localPlayer != 0 )
+                {
+                        s_NextVisChkMs = visChkNow + 5000;
+
+                        DiagLog(
+                            "[VISCHK] oracle=%d autolock=0x%lX",
+                            gameAnyVisible ? 1 : 0,
+                            ( unsigned long )autoLockTargetEntity );
                 }
         }
 
@@ -2163,12 +2183,8 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                         /*
                          * Alvo do silent: config propria (Silent.Fov e
-                         * Silent.MaxDistance) com FILTRO DE VISIBILIDADE +
-                         * preferencia por alvo PERTINHO:
-                         *   - visivel (oraculo do auto-lock) ganha de invisivel
-                         *     — fim do "silent prefere o la longe atras da parede";
-                         *   - dentro do mesmo nivel, o score soma a distancia de
-                         *     jogo ao erro de mira (pertinho desempata).
+                         * Silent.MaxDistance). Visible check = A MESMA
+                         * COISA do aimbot RAGE: gate GLOBAL no oraculo.
                          */
                         if ( g_Globals.Silent.Enabled && snapshotFresh && p.Distance >= 0 && p.Distance <= g_Globals.Silent.MaxDistance )
                         {
@@ -2190,29 +2206,20 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                                 if ( silentCrosshairDistSq < silentFovSq )
                                 {
-                                        const bool silVisible =
-                                                ( autoLockTargetEntity != 0 &&
-                                                  p.Entity == autoLockTargetEntity );
-
                                         /*
-                                         * Visible check do SILENT — funcao gemea da
-                                         * do aimbot, mas com config e decisao PROPRIAS
-                                         * (nada do aimbot entra aqui):
-                                         *   - o jogo confirmou QUEM esta visivel
-                                         *     (autoLockTargetEntity, raycast feito
-                                         *     pelo JOGO) e este candidato NAO e ele
-                                         *     => provavel atras de parede, fora;
-                                         *   - oraculo SEM confirmacao nenhuna
-                                         *     (ninguem no cone do auto-lock) =>
-                                         *     candidato MANTIDO. O gate antigo
-                                         *     (!gameAnyVisible) derrubava TODO mundo
-                                         *     quando o auto-lock nao publicava alvo —
-                                         *     inimigo visivel na tela, fora do cone
-                                         *     estreito do assist, virava "invisivel"
-                                         *     e o silent morria.
+                                         * Visible check do SILENT — EXATAMENTE a
+                                         * mesma coisa do aimbot RAGE (o que o
+                                         * usuario confirmou funcionar): oraculo
+                                         * GLOBAL gameAnyVisible, lido 1x por ciclo.
+                                         *   - Sem confirmacao do jogo => NINGUEM
+                                         *     candidata (o silent fica sem alvo,
+                                         *     igual o rage para de floodar);
+                                         *   - Com confirmacao => melhor candidato
+                                         *     por score, sem preferencia de cone
+                                         *     estreito (o autoLock cortava alvo
+                                         *     errado — fim desse bug).
                                          */
-                                        if ( g_Globals.Silent.VisibleCheck &&
-                                             autoLockTargetEntity != 0 && !silVisible )
+                                        if ( g_Globals.Silent.VisibleCheck && !gameAnyVisible )
                                                 continue;
 
                                         const float gameDist =
@@ -2222,15 +2229,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                                 silentCrosshairDistSq +
                                                 gameDist * kSilentDistBiasPx2PerM2;
 
-                                        if ( silVisible )
-                                        {
-                                                if ( silScore < SilentVisDistSq )
-                                                {
-                                                        SilentVisDistSq = silScore;
-                                                        SilentVisibleEntity = p.Entity;
-                                                }
-                                        }
-                                        else if ( silScore < SilentDistSq )
+                                        if ( silScore < SilentDistSq )
                                         {
                                                 SilentDistSq = silScore;
                                                 SilentClosestEntity = p.Entity;
@@ -2279,14 +2278,6 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 }
         }
 
-        /*
-         * FILTRO DE VISIBILIDADE — decisao final: se o auto-lock do jogo
-         * confirmou alguem VISIVEL dentro do FOV do silent, ele ganha de
-         * QUALQUER invisivel. Ninguem visivel confirmado = mantem o mais
-         * perto da mira (comportamento de sempre, silent nunca sem alvo).
-         */
-        if ( SilentVisibleEntity != 0 )
-                SilentClosestEntity = SilentVisibleEntity;
 
         // Partida ativa (localPlayer + view matrix validos): desenha o snapshot
         // SEMPRE, mesmo quando a leitura de entidades engasga por segundos — as

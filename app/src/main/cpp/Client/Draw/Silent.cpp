@@ -568,6 +568,14 @@ namespace Silent
 
         Matrix4x4 cachedMatrix = {};
 
+        /*
+         * ANTI-BAN: RayDir ATUAL do jogo (cache). Base do limite
+         * angular — o write final nunca sai mais que
+         * STEALTH_MAX_ANGLE_DEG disso.
+         */
+        Vector3 curDir = {};
+        LONGLONG lastCurDirMs = 0;
+
         while (
             InterlockedCompareExchange(
                 &g_Running,
@@ -845,6 +853,28 @@ namespace Silent
             }
 
             /*
+             * RAYDIR ATUAL DO JOGO (cache por tempo) — base do limite
+             * angular anti-ban. ATIRANDO refresha 2x mais rapido: o
+             * recoil anda o RayDir do jogo a cada frame.
+             */
+            if (
+                ( curDir.X == 0.0f &&
+                  curDir.Y == 0.0f &&
+                  curDir.Z == 0.0f ) ||
+                nowMs - lastCurDirMs >=
+                    ( burstFiring ? STEALTH_CURDIR_FIRING_MS
+                                  : STEALTH_CURDIR_IDLE_MS )
+            )
+            {
+                curDir = SilReadVal<Vector3>(
+                    weaponPtr +
+                    Offsets::HitObjectInfo::RayDir
+                );
+
+                lastCurDirMs = nowMs;
+            }
+
+            /*
              * ESTADO DE TIRO — publicado pela UI (NotifyFiring, 250ms de
              * frescor) OU read proprio a cada FIRE_FALLBACK_MS.
              */
@@ -902,11 +932,48 @@ namespace Silent
             const float predSec =
                 static_cast<float>(predAgeMs + PRED_LATENCY_MS) / 1000.0f;
 
+            /*
+             * TETO FISICO da predicao (fix "bala vai muito acima do
+             * player / em posicao nada a ver"): velocidade ruidosa da
+             * ESP (pulo, queda, teleport de snapshot) nao pode
+             * arremessar o ponto de mira metros fora do alvo.
+             */
+            Vector3 predOff;
+
+            predOff.X = s_Vel.X * predSec;
+            predOff.Y = s_Vel.Y * predSec;
+            predOff.Z = s_Vel.Z * predSec;
+
+            const float predOffLen =
+                sqrtf(
+                    predOff.X * predOff.X +
+                    predOff.Y * predOff.Y +
+                    predOff.Z * predOff.Z
+                );
+
+            if (predOffLen > PRED_MAX_OFFSET_M)
+            {
+                const float predScale =
+                    PRED_MAX_OFFSET_M / predOffLen;
+
+                predOff.X *= predScale;
+                predOff.Y *= predScale;
+                predOff.Z *= predScale;
+            }
+
+            /* Vertical (pulo/queda) com teto PROPRIO — e o que mais
+             * aparentava "bala muito acima do player". */
+            if (predOff.Y > PRED_MAX_OFFSET_Y_M)
+                predOff.Y = PRED_MAX_OFFSET_Y_M;
+
+            if (predOff.Y < -PRED_MAX_OFFSET_Y_M)
+                predOff.Y = -PRED_MAX_OFFSET_Y_M;
+
             Vector3 aimHead;
 
-            aimHead.X = burstHead.X + s_Vel.X * predSec;
-            aimHead.Y = burstHead.Y + s_Vel.Y * predSec;
-            aimHead.Z = burstHead.Z + s_Vel.Z * predSec;
+            aimHead.X = burstHead.X + predOff.X;
+            aimHead.Y = burstHead.Y + predOff.Y;
+            aimHead.Z = burstHead.Z + predOff.Z;
 
             /*
              * FovCheck (em PIXELS) so limita o write quente FORA do
@@ -969,8 +1036,8 @@ namespace Silent
             if (forcaCfg < 0)
                 forcaCfg = 0;
 
-            if (forcaCfg > 100)
-                forcaCfg = 100;
+            if (forcaCfg > 500)
+                forcaCfg = 500;
 
             const float forceT =
                 static_cast<float>(forcaCfg) / 100.0f;
@@ -1068,6 +1135,102 @@ namespace Silent
                 weaponPtr +
                 Offsets::HitObjectInfo::RayDir;
 
+            /*
+             * ====================================================================
+             * ANTI-BAN — LIMITE ANGULAR (PRIORIDADE: BAN)
+             * ====================================================================
+             * O servidor compara a direcao do tiro com a camera. Direcao
+             * apontando pra uma cabeca a 60-90 graus da mira = assinatura
+             * de aimbot = ban. O write final fica a NO MAXIMO
+             * STEALTH_MAX_ANGLE_DEG do RayDir que o PROPRIO JOGO acabou
+             * de escrever: pro servidor, todo tiro sai dentro de um
+             * flick humano. O silent continua lando — basta a mira
+             * estar a menos de 25 graus do alvo (o FOV do silent ja
+             * seleciona dentro disso).
+             * ====================================================================
+             */
+            if (
+                STEALTH_MAX_ANGLE_DEG > 0.0f &&
+                ( curDir.X != 0.0f ||
+                  curDir.Y != 0.0f ||
+                  curDir.Z != 0.0f )
+            )
+            {
+                const float curLen =
+                    sqrtf(
+                        curDir.X * curDir.X +
+                        curDir.Y * curDir.Y +
+                        curDir.Z * curDir.Z
+                    );
+
+                /* dir ja saiu do jitter/erro: comprimento real agora. */
+                const float outLen =
+                    sqrtf( dir.X * dir.X + dir.Y * dir.Y + dir.Z * dir.Z );
+
+                if ( curLen > 0.0001f && outLen > 0.0001f )
+                {
+                    const float ax = curDir.X / curLen;
+                    const float ay = curDir.Y / curLen;
+                    const float az = curDir.Z / curLen;
+
+                    const float bx = dir.X / outLen;
+                    const float by = dir.Y / outLen;
+                    const float bz = dir.Z / outLen;
+
+                    float dot = ax * bx + ay * by + az * bz;
+
+                    if (dot > 1.0f)
+                        dot = 1.0f;
+
+                    if (dot < -1.0f)
+                        dot = -1.0f;
+
+                    const float angDeg =
+                        acosf( dot ) * ( 180.0f / 3.14159265f );
+
+                    if ( angDeg > STEALTH_MAX_ANGLE_DEG )
+                    {
+                        /*
+                         * Projeta dir NO CONE de maxAngle em torno do
+                         * RayDir do jogo: b' = a*cos(m) + t*sin(m),
+                         * onde t e a componente de b perpendicular a a
+                         * (normalizada). Comprimento original mantido.
+                         */
+                        const float maxRad =
+                            STEALTH_MAX_ANGLE_DEG *
+                            ( 3.14159265f / 180.0f );
+
+                        const float cosM = cosf( maxRad );
+                        const float sinM = sinf( maxRad );
+
+                        float tx = bx - ax * dot;
+                        float ty = by - ay * dot;
+                        float tz = bz - az * dot;
+
+                        const float tLen =
+                            sqrtf( tx * tx + ty * ty + tz * tz );
+
+                        if ( tLen > 0.0001f )
+                        {
+                            tx /= tLen;
+                            ty /= tLen;
+                            tz /= tLen;
+
+                            dir.X = ( ax * cosM + tx * sinM ) * outLen;
+                            dir.Y = ( ay * cosM + ty * sinM ) * outLen;
+                            dir.Z = ( az * cosM + tz * sinM ) * outLen;
+                        }
+                        /*
+                         * tLen ~ 0 = dir antiparalelo ao RayDir (atirar
+                         * 180 graus pro lado contrario): nao ha projecao
+                         * possivel — deixa o dir como esta, o FovCheck da
+                         * selecao garante que isso nao acontece na
+                         * pratica (mira precisa estar perto do alvo).
+                         */
+                    }
+                }
+            }
+
             if (
                 SilWriteMem(
                     static_cast<uint32_t>(
@@ -1119,10 +1282,40 @@ namespace Silent
 
             if (firing)
             {
-                ++writeCount;
+                /*
+                 * FORCA = PERSISTENCIA (o que a config sempre deveria
+                 * controlar): densidade do burst de writes ATIRANDO.
+                 *   Forca 100 = sem Sleep (densidade maxima, spin)
+                 *   Forca  70 = ~0.9ms entre writes (~1000/s) — ainda
+                 *               ganha do RayDir que o jogo reescreve
+                 *               a cada frame de ~16ms
+                 *   Forca   0 = ~3ms entre writes
+                 * Jitter de ate +25% no intervalo: a cadencia NUNCA
+                 * fica metronomica (ritmo perfeito e assinatura de
+                 * automacao — o que ferramenta de deteccao procura).
+                 */
+                const LONGLONG paceUs =
+                    static_cast<LONGLONG>(100 - forcaCfg) * 30;
 
-                if ((writeCount & (BURST_YIELD_EVERY - 1)) == 0)
-                    sched_yield();
+                if (paceUs <= 0)
+                {
+                    ++writeCount;
+
+                    if ((writeCount & (BURST_YIELD_EVERY - 1)) == 0)
+                        sched_yield();
+                }
+                else
+                {
+                    const LONGLONG jitterUs =
+                        static_cast<LONGLONG>(
+                            NextRandom(rngState) %
+                            static_cast<uint32_t>(paceUs / 4 + 1)
+                        );
+
+                    usleep(
+                        static_cast<useconds_t>(paceUs + jitterUs)
+                    );
+                }
             }
             else
             {

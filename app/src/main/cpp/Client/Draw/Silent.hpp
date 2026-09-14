@@ -70,10 +70,31 @@ namespace Silent
     /* Copia LOCAL da view matrix pro FovCheck do write quente (zero socket). */
     constexpr LONGLONG MATRIX_REFRESH_MS = 33;
 
-    constexpr LONGLONG HEAD_STALE_MAX_MS = 600;
+    /* Cabeca mais velha que isso NAO vale tiro: atira no nada/atras.
+     * 250ms ainda cobre engasgo da ponte sem mirar em fantasma. */
+    constexpr LONGLONG HEAD_STALE_MAX_MS = 250;
 
     /* Ponte falhando no write: backoff antes de tentar de novo. */
     constexpr LONGLONG WRITE_FAIL_BACKOFF_MS = 25;
+
+    /*
+     * ====================================================================
+     * ANTI-BAN — LIMITE ANGULAR (PRIORIDADE: BAN)
+     * ====================================================================
+     * O servidor compara a direcao do tiro com a camera. Direcao
+     * apontando pra uma cabeca a 60-90 graus da mira = assinatura de
+     * aimbot = ban. Antes de cada write, o RayDir final e puxado pra
+     * DENTRO deste cone em torno do RayDir que o PROPRIO JOGO acabou
+     * de escrever: pro servidor, todo tiro sai dentro de um flick
+     * humano. Mais stealth = menor (15-18); mais alcance = maior.
+     * ====================================================================
+     */
+    constexpr float STEALTH_MAX_ANGLE_DEG = 25.0f;
+
+    /* Refresh do RayDir atual do jogo (cache pra o limite angular).
+     * ATIRANDO refresha 2x mais rapido (o recoil anda o RayDir). */
+    constexpr LONGLONG STEALTH_CURDIR_IDLE_MS = 33;
+    constexpr LONGLONG STEALTH_CURDIR_FIRING_MS = 16;
 
     /* ====================================================================
      * PREDICAO LEVE (fix "silent atira um pouquinho atras do alvo em
@@ -87,8 +108,19 @@ namespace Silent
      * ==================================================================== */
     constexpr float    PRED_EMA_ALPHA     = 0.35f;  // suavizacao da velocidade (0..1)
     constexpr float    PRED_MAX_SPEED_MPS = 12.0f;  // acima disso = teleporte/lixo, zera
-    constexpr LONGLONG PRED_LATENCY_MS    = 25;     // compensa roundtrip do write + consumo
-    constexpr LONGLONG PRED_MAX_AGE_MS    = 200;    // nunca extrapola observacao mais velha que isso
+    constexpr LONGLONG PRED_LATENCY_MS    = 18;     // compensa roundtrip do write + consumo
+    constexpr LONGLONG PRED_MAX_AGE_MS    = 120;    // nunca extrapola observacao mais velha que isso
+
+    /*
+     * TETO FISICO da predicao (fix "bala vai muito acima do player /
+     * em posicao nada a ver"): o offset predito (velocidade * tempo)
+     * e limitado — total PRED_MAX_OFFSET_M e o componente VERTICAL a
+     * PRED_MAX_OFFSET_Y_M. Velocidade ruidosa da ESP (pulo, queda,
+     * teleport de snapshot) nunca mais arremessa o ponto de mira
+     * metros fora do alvo.
+     */
+    constexpr float    PRED_MAX_OFFSET_M    = 0.9f;   // deslocamento total maximo
+    constexpr float    PRED_MAX_OFFSET_Y_M  = 0.45f;  // deslocamento vertical maximo
 
     extern volatile LONG g_Running;
 
