@@ -2150,14 +2150,7 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         {
                                 enemiesvisible = true;
 
-                                /*
-                                 * Visible check do AIMBOT — ORACULO HOISTED
-                                 * (gameAnyVisible, lido 1x por ciclo, NAO por
-                                 * entidade). Antes eram 4-6 reads sincronos POR
-                                 * ENTIDADE aqui dentro: 20 alvos = 120 roundtrips
-                                 * a mais por ciclo, snapshot atrasado.
-                                 */
-                                if ( g_Globals.AimBot.VisibleCheck && !gameAnyVisible )
+                                if ( ( g_Globals.AimBot.VisibleCheck || g_Globals.Silent.VisibleCheck ) && !gameAnyVisible )
                                 {
                                         enemiesvisible = false;
                                         aimCandidate = false;
@@ -2207,19 +2200,12 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 if ( silentCrosshairDistSq < silentFovSq )
                                 {
                                         /*
-                                         * Visible check do SILENT — EXATAMENTE a
-                                         * mesma coisa do aimbot RAGE (o que o
-                                         * usuario confirmou funcionar): oraculo
-                                         * GLOBAL gameAnyVisible, lido 1x por ciclo.
-                                         *   - Sem confirmacao do jogo => NINGUEM
-                                         *     candidata (o silent fica sem alvo,
-                                         *     igual o rage para de floodar);
-                                         *   - Com confirmacao => melhor candidato
-                                         *     por score, sem preferencia de cone
-                                         *     estreito (o autoLock cortava alvo
-                                         *     errado — fim desse bug).
-                                         */
-                                        if ( g_Globals.Silent.VisibleCheck && !gameAnyVisible )
+                                        * FIX FINAL "visible check do silent": o silent agora le a MESMA
+                                        * VARIAVEL que o gate do rage le (enemiesvisible — global unica
+                                        * deste arquivo, default true). O gameAnyVisible piscava frame a
+                                        * frame (cone estreito do aim-assist) e derrubava o candidato.
+                                        */
+                                        if ( g_Globals.Silent.VisibleCheck && !enemiesvisible )
                                                 continue;
 
                                         const float gameDist =

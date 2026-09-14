@@ -634,9 +634,12 @@ namespace Silent
             static LONGLONG s_ObsTick = 0;
             static bool s_ObsValid = false;
             static Vector3 s_Vel = {};
+            static Vector3 s_LastGoodHead = {};
+            static LONGLONG s_LastGoodHeadMs = 0;
 
             if (s_HeadForTarget != target)
             {
+                   
                 s_HeadForTarget = target;
 
                 EnterCriticalSection(&g_HeadCS);
@@ -652,6 +655,8 @@ namespace Silent
                 s_ObsTick = 0;
                 s_ObsValid = false;
                 s_Vel = {};
+                s_LastGoodHead = {};
+                s_LastGoodHeadMs = 0;
             }
 
             /*
@@ -718,6 +723,13 @@ namespace Silent
                 {
                     burstHead = head;
 
+                    if ( headTick != 0 &&
+                        nowMs - headTick <= HEAD_STALE_MAX_MS )
+                    {
+                        s_LastGoodHead = head;
+                        s_LastGoodHeadMs = headTick;
+                    }
+
                     /*
                      * PREDICAO — observa a velocidade real do alvo. So
                      * incorpora quando a observacao e NOVA (LastSeenTick
@@ -773,11 +785,11 @@ namespace Silent
                 }
             }
 
-            if (!burstHeadOk)
-            {
-                Sleep(2);
-                continue;
-            }
+            // if (!burstHeadOk)
+            // {
+            //     Sleep(2);
+            //     continue;
+            // }
 
             /*
              * WEAPONPTR — 1 read a cada 250ms (o jogo pode trocar o
@@ -897,6 +909,25 @@ namespace Silent
                 lastFireMs = nowMs;
 
                 firing = ReadIsFiring(localPlayer);
+                if ( !burstHeadOk )
+                {
+                        const bool staleOk =
+                                firing &&
+                                s_LastGoodHeadMs != 0 &&
+                                nowMs - s_LastGoodHeadMs <=
+                                        HEAD_STALE_HARD_MAX_MS;
+
+                        if ( !staleOk )
+                        {
+                                Sleep( 2 );
+                                continue;
+                        }
+
+                        burstHead = s_LastGoodHead;
+
+                        s_Vel = {};
+                        s_ObsValid = false;
+                }
             }
 
             /*
