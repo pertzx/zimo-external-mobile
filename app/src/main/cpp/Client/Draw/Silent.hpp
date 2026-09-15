@@ -73,7 +73,7 @@ namespace Silent
     /* Cabeca mais velha que isso NAO vale tiro: atira no nada/atras.
      * 250ms ainda cobre engasgo da ponte sem mirar em fantasma. */
     constexpr LONGLONG HEAD_STALE_MAX_MS = 600;
-    constexpr LONGLONG HEAD_STALE_HARD_MAX_MS = 2500;
+    constexpr LONGLONG HEAD_STALE_HARD_MAX_MS = 0;
 
     /* Ponte falhando no write: backoff antes de tentar de novo. */
     constexpr LONGLONG WRITE_FAIL_BACKOFF_MS = 25;

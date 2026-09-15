@@ -2621,15 +2621,31 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 BS_ActiveByCursor = false;
         }
 
-        // ==================== Silent Aim Target ====================
-        // Usa o alvo PRÓPRIO do silent (SilentClosestEntity), selecionado com
-        // Silent.Fov/Silent.MaxDistance — independente do aimbot.
-        //
-        // FIX "SILENT NAO FICA CONSTANTE": quando a ponte satura no combate,
-        // o snapshot engasga (snapshotFresh=false por alguns frames) e
-        // SilentClosestEntity zera — o ClearTarget derrubava o silent
-        // EXATAMENTE no meio do spray. Agora o último alvo válido sobrevive
-        // 600ms (keep-alive) até o snapshot voltar a ficar fresco.
+        // ==================== Silent Firing Feed (1c: ANTES do alvo) ====================
+        // 1c: este bloco agora roda ANTES do SetTarget. Quando o laco do
+        // silent acorda, o estado "tah atirando" ja esta atualizado NESTE
+        // frame (na ordem antiga ele chegava 1 frame atrasado).
+        static LONGLONG s_SilFireLastMs = 0;
+        static bool s_SilFireCache = false;
+
+        const LONGLONG nowSilFireMs = ( LONGLONG )GetTickCount64( );
+
+        if ( nowSilFireMs - s_SilFireLastMs >= 32 )
+        {
+                s_SilFireLastMs = nowSilFireMs;
+
+                s_SilFireCache = localPlayer != 0 &&
+                                 Offsets::Player::IsFiring != 0 &&
+                                 ReadLocalFiring( localPlayer );
+        }
+
+        Silent::NotifyFiring( s_SilFireCache );
+
+        // ==================== Silent Aim Target (1c: DEPOIS do feed) ====================
+        // 1c KEEP-ALIVE: ATIRANDO, o ultimo alvo valido sobrevive 3000ms
+        // (parado continua 1200ms). O oracle do jogo PISCA no meio do
+        // spray; com 1200ms fixo o ClearTarget derrubava o alvo no meio
+        // da bala.
         static uintptr_t s_SilentKeepAliveTarget = 0;
         static LONGLONG s_SilentKeepAliveTickMs = 0;
 
@@ -2641,10 +2657,12 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
         uintptr_t silentTargetNow = SilentClosestEntity;
 
-        if ( silentTargetNow == 0 && s_SilentKeepAliveTarget != 0 &&
-             ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < 1200 )
+        if ( silentTargetNow == 0 && s_SilentKeepAliveTarget != 0 )
         {
-                silentTargetNow = s_SilentKeepAliveTarget;
+                const LONGLONG silKeepMs = s_SilFireCache ? 3000 : 1200;
+
+                if ( ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < silKeepMs )
+                        silentTargetNow = s_SilentKeepAliveTarget;
         }
 
         if ( silentTargetNow != 0 && localPlayer != 0 )
@@ -2652,29 +2670,6 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         else
                 Silent::ClearTarget( );
 
-        
-        // ==================== Silent Firing Feed ====================
-        // Publica o estado de tiro pro Silent::NotifyFiring — 2a fonte do
-        // modo burst (a 1a e o IsFiring lido pela feed do silent). Usa a
-        // leitura que o Draw ja conhece (ReadLocalFiring), com throttling
-        // de 32ms: custo de 31 reads/s, nada pra ponte.
-        {
-                static LONGLONG s_SilFireLastMs = 0;
-                static bool s_SilFireCache = false;
-
-                const LONGLONG nowSilFireMs = ( LONGLONG )GetTickCount64( );
-
-                if ( nowSilFireMs - s_SilFireLastMs >= 32 )
-                {
-                        s_SilFireLastMs = nowSilFireMs;
-
-                        s_SilFireCache = localPlayer != 0 &&
-                                         Offsets::Player::IsFiring != 0 &&
-                                         ReadLocalFiring( localPlayer );
-                }
-
-                Silent::NotifyFiring( s_SilFireCache );
-        }
 
         // ==================== Rage Aimbot ====================
 
