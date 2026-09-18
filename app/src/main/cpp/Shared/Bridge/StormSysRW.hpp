@@ -574,6 +574,30 @@ namespace StormRW
             break;
         }
 
+        /*
+         * (PONTEFIX-V5) FALLBACK EXATO: o bloco de 256 bytes e preenchido
+         * com UM pread a partir do endereco ALINHADO. Se o fim do bloco
+         * invade area nao mapeada (fim de regiao / PROT_NONE — comum no
+         * heap do jogo), o pread do bloco falha INTEIRO ou volta parcial
+         * mesmo quando o range pedido (menor, dentro do objeto) e 100%
+         * legivel. Sem isso, leituras VALIDAS falham de forma intermitente
+         * ("uma hora le, depois nao le, mesmo endereco"). Antes de
+         * declarar falha: tenta a leitura EXATA do range pedido por cima
+         * do mesmo fd ainda aberto.
+         */
+        bool exactOk = false;
+
+        if (n <= 0 || (size_t)n < off + size)
+        {
+            exactOk =
+                ReadDirectFd(
+                    fd,
+                    address,
+                    buffer,
+                    size
+                );
+        }
+
         SysClose(fd);
 
         s.syscalls.fetch_add(3);                /* open + pread + close */
@@ -593,6 +617,18 @@ namespace StormRW
 
             if (n <= 0)
             {
+                if (exactOk)
+                {
+                    /*
+                     * (PONTEFIX-V5) leitura exata funcionou: NAO marca
+                     * entrada negativa — o proximo pedido neste bloco
+                     * tenta de novo normalmente.
+                     */
+                    slot.used = false;
+
+                    return true;
+                }
+
                 slot.validLen = 0;              /* negativa: pread falhou */
 
                 return false;
@@ -610,6 +646,9 @@ namespace StormRW
 
                 return true;
             }
+
+            if (exactOk)
+                return true;                    /* (PONTEFIX-V5) */
         }
 
         /*

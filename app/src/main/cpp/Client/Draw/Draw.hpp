@@ -170,6 +170,11 @@ class Data
         // Draw para nunca desenhar posições congeladas por mais que ~3s (transição
         // real de partida), como o cheat de referência que limpa as entidades.
         static std::atomic<int64_t> m_LastFreshTick;
+        // (PONTEFIX-V6) Tick do ultimo GameFacade != 0 lido pela cabeca da
+        // cadeia — prova de vida do alvo. O watchdog NAO reinicia enquanto
+        // a cabeca leu ha menos de 15s (cadeia presa em passo de estado ou
+        // de offset nao se conserta com restart; o restart so custa caro).
+        static std::atomic<int64_t> m_LastHeadOkTick;
 
         template <bool N32, bool V31>
         static void* ReadLoopWrapper(void*);

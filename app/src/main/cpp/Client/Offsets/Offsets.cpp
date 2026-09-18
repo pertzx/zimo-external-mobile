@@ -638,7 +638,7 @@ void Offsets::GameConfig()
  */
 void Offsets::FFTHV8A() // 64-bit
 {
-        AccessClass = 0x0; 
+        AccessClass = 0xB8; 
 
         // GameVarDef
         GameVarDef::GameVarDef_TypeInfo = 0xac1e810; // TODO: update manualy

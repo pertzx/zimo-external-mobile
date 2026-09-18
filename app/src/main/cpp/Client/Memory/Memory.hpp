@@ -62,6 +62,14 @@ public:
      */
     static const char* GetLastInitError();
 
+    /*
+     * (PONTEFIX-V4) Marca/consulta "offsets quebrados" (offset CHAVE do
+     * perfil em 0 — erro de configuracao, restart nao resolve). Enquanto
+     * true, o watchdog e o elf-fail suspendem o RestartAsync.
+     */
+    static void SetOffsetsBroken(bool broken);
+    static bool IsOffsetsBroken();
+
     template<typename T>
     static bool Read(uintptr_t address, T& outValue)
     {

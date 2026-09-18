@@ -14,6 +14,7 @@
 #include <Math/Quaternion/Quaternion.hpp>
 #include <Math/MathUtils.hpp>
 #include "Skeleton.hpp"
+#include "../Memory/BridgeClient.hpp"
 #include <android/log.h>
 #include <cstdarg>
 #include <cstdint>
@@ -34,6 +35,12 @@ bool Data::m_ThreadValid = false;
 bool Data::m_SnapshotFresh = false;
 
 std::atomic<int64_t> Data::m_LastFreshTick{ 0 };
+
+// (PONTEFIX-V6) Prova de vida do alvo: atualizado todo frame em que a
+// cabeca da cadeia (GameFacade != 0) le com transporte OK. Com isso o
+// watchdog distingue "cadeia presa em estado/offset" (alvo VIVO, sem
+// restart) de "processo/ponte/base mortos" (restart de verdade).
+std::atomic<int64_t> Data::m_LastHeadOkTick{ 0 };
 
 static void DiagLog(
     const char* format,
@@ -107,14 +114,24 @@ static unsigned long long ChainTickMs()
 static void ChainFailLog(int step, const char* fmt, ...)
 {
     static unsigned long long s_Last[ReadChain::STEP_COUNT] = { 0 };
+    /* (PONTEFIX-V6) ocorrencias desde o ultimo log deste passo. O
+     * rate-limit de 5s escondia o VOLUME real: "nulo" e "LEITURA
+     * FALHOU" dividem o mesmo balde por passo, entao 1 linha por 5s
+     * podia representar dezenas de falhas. O contador mostra o volume. */
+    static unsigned long long s_Since[ReadChain::STEP_COUNT] = { 0 };
 
     if (step < 0 || step >= ReadChain::STEP_COUNT)
         return;
+
+    s_Since[step]++;
 
     unsigned long long now = ChainTickMs();
     if (now - s_Last[step] < 5000ull)
         return;
     s_Last[step] = now;
+
+    const unsigned long long ocorrencias = s_Since[step];
+    s_Since[step] = 0;
 
     char detail[192];
     va_list a;
@@ -122,7 +139,8 @@ static void ChainFailLog(int step, const char* fmt, ...)
     vsnprintf(detail, sizeof(detail), fmt, a);
     va_end(a);
 
-    ChainLogRaw("[CHAIN] cadeia parou em %s — %s", ReadChain::Name(step), detail);
+    ChainLogRaw("[CHAIN] cadeia parou em %s (x%llu no intervalo) — %s",
+                ReadChain::Name(step), ocorrencias, detail);
 }
 
 // Cadeia completa — heartbeat de sucesso a cada 10s
@@ -407,8 +425,39 @@ void* Data::ReadLoopWrapper(void*)
 
 void Data::StartReadThread()
 {
+    const bool N32 =
+        g_Globals.General.N32;
+
+    const bool V31 =
+        g_Globals.General.V31;
+
+    /*
+     * (PONTEFIX-V5) CORRECAO DO "buff vindo errado / cadeia para em um
+     * passo diferente a cada hora" no v8a: a thread de leitura nasce com
+     * o N32 capturado no PRIMEIRO frame do painel — ANTES do
+     * Memory::Initialize (que roda na thread do RestartAsync) publicar
+     * g_Globals.General.N32 = profileIs32. No primeiro frame o global
+     * ainda vale o DEFAULT true (Globals.hpp) => pthread criada com
+     * ReadLoopWrapper<true,...> => leitura de ponteiro com 4 BYTES num
+     * jogo 64-bit PARA SEMPRE (a thread nunca era recriada). Todo
+     * ponteiro vem truncado < 4GB (GameFacade=0xE300E890,
+     * Match=0x8AA2E000) e a cadeia quebra ora num passo, ora em outro —
+     * exatamente o logcat reportado. Agora: divergencia N32/V31 entre a
+     * thread viva e o global => thread PARADA e RECRIADA (o que o
+     * m_ThreadN32/m_ThreadV31 do Draw.hpp prometia e nunca fez).
+     */
     if (m_Running.load())
-        return;
+    {
+        if (m_ThreadN32 == N32 && m_ThreadV31 == V31)
+            return;
+
+        DiagLog(
+            "[diag] StartReadThread: arquitetura mudou (N32 %d->%d, V31 %d->%d) — recriando thread de leitura",
+            m_ThreadN32 ? 1 : 0, N32 ? 1 : 0,
+            m_ThreadV31 ? 1 : 0, V31 ? 1 : 0 );
+
+        StopReadThread();
+    }
 
         /*
          * LOG DE OPERACAO DESLIGADO: logar cada READ no logd custa uma
@@ -418,12 +467,6 @@ void Data::StartReadThread()
          */
 
     m_Running.store(true);
-
-    const bool N32 =
-        g_Globals.General.N32;
-
-    const bool V31 =
-        g_Globals.General.V31;
 
     pthread_t thread{};
 
@@ -475,6 +518,9 @@ void Data::StartReadThread()
 
     m_ThreadHandle = thread;
     m_ThreadValid = true;
+
+    m_ThreadN32 = N32;
+    m_ThreadV31 = V31;
 }
 
 void Data::StopReadThread()
@@ -550,7 +596,28 @@ void Data::ReadLoop( )
                         // mantem o snapshot congelado (ESP nao some) e agenda restart apos
                         // falha sustentada.
                         uint32_t ElfMagic = 0;
-                        const bool elfReadOk = g_FreeFireMemory.Read<uint32_t>( Offsets::LibIl2Cpp, ElfMagic );
+
+                        /*
+                         * (PONTEFIX-V4) 2 guardas ANTES da leitura do magic:
+                         *
+                         * 1. Base 0 = restart em andamento ainda nao re-resolveu o
+                         *    alvo: ler em 0 so geraria "leitura falhou" enganoso.
+                         *
+                         * 2. Ponte fora do ar (janela de reconexao): frame perdido
+                         *    NAO conta como "base invalida". Antes, um restart
+                         *    derrubava as leituras dos ~40 frames seguintes e o
+                         *    failCount x20 disparava OUTRO restart — o loop se
+                         *    auto-alimentava ("uma hora para em um passo, depois em
+                         *    outro"). O watchdog de snapshot ja cuida do restart.
+                         */
+                        const uintptr_t chainBase = Offsets::LibIl2Cpp;
+                        if ( chainBase == 0 )
+                                break;
+
+                        if ( !Memory::IsBridgeConnected( ) )
+                                break;
+
+                        const bool elfReadOk = g_FreeFireMemory.Read<uint32_t>( chainBase, ElfMagic );
                         if ( !elfReadOk || ElfMagic != 0x464C457F )
                         {
                                 ChainFailLog( ReadChain::ElfMagic,
@@ -561,8 +628,15 @@ void Data::ReadLoop( )
                                 if ( ++failCount > 20 )
                                 {
                                         failCount = 0;
-                                        DiagLog( "[diag] ELF fail: restart async apos %d frames com base invalida", 20 );
-                                        g_FreeFireMemory.RestartAsync( );
+                                        if ( Memory::IsOffsetsBroken( ) )
+                                        {
+                                                DiagLog( "[diag] ELF fail x20: restart SUSPENSO — offset zerado no perfil (preencha Offsets.cpp; restart nao resolve)" );
+                                        }
+                                        else
+                                        {
+                                                DiagLog( "[diag] ELF fail: restart async apos %d frames com base invalida", 20 );
+                                                g_FreeFireMemory.RestartAsync( );
+                                        }
                                 }
                                 break;
                         }
@@ -573,16 +647,120 @@ void Data::ReadLoop( )
                                 return N32 ? g_FreeFireMemory.Read<uint32_t>( addr ) : g_FreeFireMemory.Read<uint64_t>( addr );
                         };
 
-                        uintptr_t GameFacade = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo );
+                        /*
+                         * (PONTEFIX-V5) Leitura de ponteiro COM diagnostico de
+                         * transporte: ate hoje "nulo" misturava duas causas
+                         * totamente diferentes — (a) a LEITURA FALHOU (ponte/
+                         * daemon/endereco invalido) e (b) o valor real na
+                         * memoria e 0. Era impossivel saber qual das duas
+                         * derrubou a cadeia ("uma hora para em um, depois em
+                         * outro"). okOut=false => loga a causa REAL (status da
+                         * ponte) e o chamador deve parar a cadeia.
+                         */
+                        auto ReadPtrChk = [ & ] ( uintptr_t addr, int step, const char* passo, bool& okOut ) -> uintptr_t
+                        {
+                                okOut = false;
+
+                                if ( N32 )
+                                {
+                                        uint32_t v = 0;
+
+                                        if ( !g_FreeFireMemory.Read<uint32_t>( addr, v ) )
+                                        {
+                                                ChainFailLog( step,
+                                                              "%s: LEITURA FALHOU (addr=0x%lX, ponte=%s) — transporte/daemon/endereco invalido, NAO e offset",
+                                                              passo, ( unsigned long )addr, BridgeClient::LastStatusText() );
+                                                return 0;
+                                        }
+
+                                        okOut = true;
+                                        return v;
+                                }
+
+                                uint64_t v = 0;
+
+                                if ( !g_FreeFireMemory.Read<uint64_t>( addr, v ) )
+                                {
+                                        ChainFailLog( step,
+                                                      "%s: LEITURA FALHOU (addr=0x%lX, ponte=%s) — transporte/daemon/endereco invalido, NAO e offset",
+                                                      passo, ( unsigned long )addr, BridgeClient::LastStatusText() );
+                                        return 0;
+                                }
+
+                                okOut = true;
+                                return v;
+                        };
+
+                        /*
+                         * (PONTEFIX-V4) Guarda de offset zerado: offset CHAVE do
+                         * perfil em 0 = erro de CONFIGURACAO (Offsets.cpp), nao de
+                         * estado do jogo. Ler com offset 0 cai no primeiro campo do
+                         * objeto (vtable/lixo) e produz cadeia enganosa. Marca
+                         * offsets quebrados (watchdog suspende o restart) e diz
+                         * EXATAMENTE qual campo preencher no perfil.
+                         */
+                        auto OffsetZeroGuard = [ & ] ( uintptr_t off, int step, const char* nome ) -> bool
+                        {
+                                if ( off != 0 )
+                                        return false;
+
+                                Memory::SetOffsetsBroken( true );
+                                ChainFailLog( step,
+                                              "offset %s = 0 — NAO preenchido no perfil (GameProfile=%d): preencha em Offsets.cpp (restart NUNCA resolve)",
+                                              nome, g_Globals.General.GameProfile );
+                                return true;
+                        };
+
+                        if ( OffsetZeroGuard( Offsets::GameFacade::GameFacade_TypeInfo, ReadChain::GameFacade, "GameFacade_TypeInfo" ) )
+                                break;
+
+                        bool gfOk = false;
+                        uintptr_t GameFacade = ReadPtrChk( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo, ReadChain::GameFacade, "GameFacade_TypeInfo", gfOk );
+                        if ( !gfOk )
+                                break;
+
                         if ( GameFacade == 0 )
                         {
-                                // Nulo aqui = estamos no lobby OU o offset GameFacade_TypeInfo
-                                // nao serve para esta versao do jogo (cai sempre neste break).
-                                ChainFailLog( ReadChain::GameFacade,
-                                              "GameFacade nulo (lib+0x%lX) — lobby ou offset TypeInfo errado para esta versao",
-                                              ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
-                                break;
+                                /* (PONTEFIX-V6) Chegou AQUI com transporte OK (status da
+                                 * ponte = OK): o zero veio DE VERDADE do /proc/pid/mem — o
+                                 * caminho de dados nao fabrica zero. Antes de desistir, 3
+                                 * re-leituras imediatas: se for janela transitoria de zero
+                                 * na pagina (jogo descarta/reescreve), a re-leitura devolve
+                                 * o valor e a cadeia SEGUE; se todas vierem 0, o estado real
+                                 * do jogo agora e 0 (lobby/limpeza do proprio jogo). */
+                                const uintptr_t gfAddr =
+                                        Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo;
+
+                                for ( int probe = 0; probe < 3 && GameFacade == 0; ++probe )
+                                {
+                                        uintptr_t reLido = ReadPtr( gfAddr );
+
+                                        if ( reLido != 0 )
+                                                GameFacade = reLido;
+                                }
+
+                                if ( GameFacade == 0 )
+                                {
+                                        // Nulo aqui = estamos no lobby OU o offset GameFacade_TypeInfo
+                                        // nao serve para esta versao do jogo (cai sempre neste break).
+                                        ChainFailLog( ReadChain::GameFacade,
+                                                      "GameFacade nulo (lib+0x%lX) — lobby ou offset TypeInfo errado para esta versao",
+                                                      ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
+                                        break;
+                                }
+
+                                static LONGLONG s_LastGfRecover = 0;
+
+                                if ( GetTickCount64( ) - s_LastGfRecover > 5000 )
+                                {
+                                        s_LastGfRecover = GetTickCount64( );
+                                        DiagLog( "[CHAIN] GameFacade 0 -> 0x%lX na re-leitura (janela de zero na pagina — cadeia segue)",
+                                                 ( unsigned long )GameFacade );
+                                }
                         }
+
+                        /* (PONTEFIX-V6) cabeca da cadeia leu OK = alvo vivo */
+                        m_LastHeadOkTick.store( ( int64_t )GetTickCount64( ) );
                         static LONGLONG s_LastGfLog = 0;
                         if ( GetTickCount64( ) - s_LastGfLog > 10000 )
                         {
@@ -592,16 +770,45 @@ void Data::ReadLoop( )
                                          ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
                         }
 
-                        uintptr_t AccessClass = ReadPtr( GameFacade + Offsets::AccessClass );
+                        if ( OffsetZeroGuard( Offsets::AccessClass, ReadChain::AccessClass, "AccessClass" ) )
+                                break;
+
+                        bool acOk = false;
+                        uintptr_t AccessClass = ReadPtrChk( GameFacade + Offsets::AccessClass, ReadChain::AccessClass, "AccessClass", acOk );
+                        if ( !acOk )
+                                break;
+
                         if ( AccessClass == 0 )
                         {
-                                ChainFailLog( ReadChain::AccessClass,
-                                              "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — offset AccessClass errado?",
-                                              ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
+                                if ( !N32 && GameFacade < 0x100000000ULL )
+                                {
+                                        /*
+                                         * (PONTEFIX-V4) Em 64-bit, Il2CppClass* vive no heap
+                                         * (0x7xxxxxxxxx). Valor baixo tipo 0x2001B431 NAO e
+                                         * ponteiro: o offset GameFacade_TypeInfo esta lendo
+                                         * dados/codigo, nao o TypeInfo — desatualizado.
+                                         */
+                                        ChainFailLog( ReadChain::AccessClass,
+                                                      "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — GameFacade < 4GB em modo 64-bit = ponteiro truncado (thread lendo 4 bytes): PONTEFIX-V5 recria a thread com ptr 8 bytes — se persistir, confirme Game Type=FF v8a na Settings",
+                                                      ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
+                                }
+                                else
+                                {
+                                        ChainFailLog( ReadChain::AccessClass,
+                                                      "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — offset AccessClass errado?",
+                                                      ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
+                                }
                                 break;
                         }
 
-                        uintptr_t MatchGame = ReadPtr( AccessClass + Offsets::GameFacade::CurrentMatchGame );
+                        if ( OffsetZeroGuard( Offsets::GameFacade::CurrentMatchGame, ReadChain::MatchGame, "CurrentMatchGame" ) )
+                                break;
+
+                        bool mgOk = false;
+                        uintptr_t MatchGame = ReadPtrChk( AccessClass + Offsets::GameFacade::CurrentMatchGame, ReadChain::MatchGame, "CurrentMatchGame", mgOk );
+                        if ( !mgOk )
+                                break;
+
                         if ( MatchGame == 0 )
                         {
                                 ChainFailLog( ReadChain::MatchGame,
@@ -610,7 +817,14 @@ void Data::ReadLoop( )
                                 break;
                         }
 
-                        uintptr_t Match = ReadPtr( MatchGame + Offsets::MatchGame::m_Match );
+                        if ( OffsetZeroGuard( Offsets::MatchGame::m_Match, ReadChain::Match, "m_Match" ) )
+                                break;
+
+                        bool mOk = false;
+                        uintptr_t Match = ReadPtrChk( MatchGame + Offsets::MatchGame::m_Match, ReadChain::Match, "m_Match", mOk );
+                        if ( !mOk )
+                                break;
+
                         if ( Match == 0 )
                         {
                                 ChainFailLog( ReadChain::Match,
@@ -620,7 +834,18 @@ void Data::ReadLoop( )
                         }
                         matchRead = true;
 
-                        int MatchRaw = g_FreeFireMemory.Read<int>( Match + Offsets::Match::m_State );
+                        if ( OffsetZeroGuard( Offsets::Match::m_State, ReadChain::MatchState, "m_State" ) )
+                                break;
+
+                        int MatchRaw = 0;
+
+                        if ( !g_FreeFireMemory.Read<int>( Match + Offsets::Match::m_State, MatchRaw ) )
+                        {
+                                ChainFailLog( ReadChain::MatchState,
+                                              "m_State: LEITURA FALHOU (Match=0x%lX, ponte=%s) — transporte/daemon/endereco invalido, NAO e offset",
+                                              ( unsigned long )Match, BridgeClient::LastStatusText() );
+                                break;
+                        }
                         auto MatchState = static_cast< Offsets::MatchState >( MatchRaw );
                         readMatchState = true;
                         if ( !Offsets::IsMatchActive( MatchState ) )
@@ -632,22 +857,101 @@ void Data::ReadLoop( )
                         }
                         matchActive = true;
 
-                        uintptr_t LocalObserver = ReadPtr( Match + Offsets::Match::m_LocalObserver );
+                        if ( OffsetZeroGuard( Offsets::Match::m_LocalObserver, ReadChain::LocalPlayer, "m_LocalObserver" ) )
+                                break;
+
+                        bool loOk = false;
+                        uintptr_t LocalObserver = ReadPtrChk( Match + Offsets::Match::m_LocalObserver, ReadChain::LocalPlayer, "m_LocalObserver", loOk );
+                        if ( !loOk )
+                                break;
                         bool IsObserving = ( LocalObserver != 0 );
                         uintptr_t LocalPlayer;
                         if ( LocalObserver != 0 )
                         {
-                                LocalPlayer = ReadPtr( LocalObserver + Offsets::Observer::m_TargetPlayer );
+                                if ( OffsetZeroGuard( Offsets::Observer::m_TargetPlayer, ReadChain::LocalPlayer, "m_TargetPlayer" ) )
+                                        break;
+
+                                bool lpOkObs = false;
+                                LocalPlayer = ReadPtrChk( LocalObserver + Offsets::Observer::m_TargetPlayer, ReadChain::LocalPlayer, "m_TargetPlayer", lpOkObs );
+                                if ( !lpOkObs )
+                                        break;
                         }
                         else
                         {
-                                LocalPlayer = ReadPtr( Match + Offsets::Match::m_LocalPlayer );
+                                if ( OffsetZeroGuard( Offsets::Match::m_LocalPlayer, ReadChain::LocalPlayer, "m_LocalPlayer" ) )
+                                        break;
+
+                                bool lpOkLp = false;
+                                LocalPlayer = ReadPtrChk( Match + Offsets::Match::m_LocalPlayer, ReadChain::LocalPlayer, "m_LocalPlayer", lpOkLp );
+                                if ( !lpOkLp )
+                                        break;
                         }
                         if ( LocalPlayer == 0 )
                         {
+                                /* (PONTEFIX-V6) Prova de vizinhanca: le a janela ao redor de
+                                 * Match+m_LocalPlayer (32B v7a / 64B v8a) e reporta VIZINHOS
+                                 * com ponteiro plausivel. Vizinho com ponteiro = offset desta
+                                 * build esta deslocado; janela toda 0 = o Match realmente nao
+                                 * tem player agora (estado/lobby) — o state= do log mostra em
+                                 * que estado o jogo estava no momento. */
+                                static LONGLONG s_LastVizProbe = 0;
+                                const LONGLONG nowViz = GetTickCount64( );
+
+                                if ( nowViz - s_LastVizProbe > 2000 )
+                                {
+                                        s_LastVizProbe = nowViz;
+
+                                        const uintptr_t lpOff = Offsets::Match::m_LocalPlayer;
+                                        const unsigned int kBack = N32 ? 16u : 32u;
+                                        const unsigned int kWin = N32 ? 32u : 64u;
+
+                                        if ( lpOff >= kBack )
+                                        {
+                                                const uintptr_t winAddr = Match + lpOff - kBack;
+                                                uint8_t win[64] = { };
+
+                                                if ( g_FreeFireMemory.Read( winAddr, win, kWin ) )
+                                                {
+                                                        const size_t kStep = N32 ? 4u : 8u;
+                                                        int achou = 0;
+
+                                                        for ( size_t o = 0; o + kStep <= kWin && achou < 2; o += kStep )
+                                                        {
+                                                                uintptr_t v = 0;
+
+                                                                if ( N32 )
+                                                                {
+                                                                        uint32_t lo = 0;
+                                                                        memcpy( &lo, win + o, sizeof( lo ) );
+                                                                        v = lo;
+                                                                }
+                                                                else
+                                                                {
+                                                                        memcpy( &v, win + o, sizeof( v ) );
+                                                                }
+
+                                                                const bool plausivel = N32
+                                                                        ? ( v >= 0x1000000ull && v < 0x100000000ull )
+                                                                        : ( v >= 0x10000000000ull );
+
+                                                                if ( plausivel )
+                                                                {
+                                                                        const long long delta =
+                                                                                ( long long )( winAddr + ( uintptr_t )o )
+                                                                                - ( long long )( Match + lpOff );
+
+                                                                        DiagLog( "[CHAIN] vizinho de m_LocalPlayer: Match+0x%lX %+lld = 0x%lX parece ponteiro de heap — offset pode estar deslocado nesta build",
+                                                                                 ( unsigned long )lpOff, delta, ( unsigned long )v );
+                                                                        achou++;
+                                                                }
+                                                        }
+                                                }
+                                        }
+                                }
+
                                 ChainFailLog( ReadChain::LocalPlayer,
-                                              "LocalPlayer nulo (observando=%d, Match=0x%lX) — offset m_LocalPlayer/m_TargetPlayer errado?",
-                                              IsObserving ? 1 : 0, ( unsigned long )Match );
+                                              "LocalPlayer nulo (state=%d, observando=%d, Match=0x%lX) — se o state=[1..3] e voce esta DENTRO da partida, veja os vizinhos acima (offset deslocado?); fora de partida, e estado normal",
+                                              MatchRaw, IsObserving ? 1 : 0, ( unsigned long )Match );
                                 break;
                         }
 
@@ -659,6 +963,9 @@ void Data::ReadLoop( )
                         uintptr_t MainCamera = ReadPtr( LocalPlayer + Offsets::Player::MainCameraTransform );
                         tempCtx.MainCamera = MainCamera;
 
+                        if ( OffsetZeroGuard( Offsets::MatchGame::m_CameraControllerManager, ReadChain::CameraControllerManager, "m_CameraControllerManager" ) )
+                                break;
+
                         uintptr_t m_CameraControllerManager = ReadPtr( MatchGame + Offsets::MatchGame::m_CameraControllerManager );
                         if ( m_CameraControllerManager == 0 )
                         {
@@ -668,6 +975,9 @@ void Data::ReadLoop( )
                                 break;
                         }
 
+                        if ( OffsetZeroGuard( Offsets::CameraControllerManager::m_Camera, ReadChain::Camera, "m_Camera" ) )
+                                break;
+
                         uintptr_t m_Camera = ReadPtr( m_CameraControllerManager + Offsets::CameraControllerManager::m_Camera );
                         if ( m_Camera == 0 )
                         {
@@ -676,6 +986,9 @@ void Data::ReadLoop( )
                                               ( unsigned long )m_CameraControllerManager, ( unsigned long )Offsets::CameraControllerManager::m_Camera );
                                 break;
                         }
+
+                        if ( OffsetZeroGuard( Offsets::Camera::m_CachedPtr, ReadChain::CachedPtr, "m_CachedPtr" ) )
+                                break;
 
                         uintptr_t m_CachedPtr = ReadPtr( m_Camera + Offsets::Camera::m_CachedPtr );
                         if ( m_CachedPtr == 0 )
@@ -705,6 +1018,9 @@ void Data::ReadLoop( )
                                 break;
                         }
                         tempCtx.ViewMatrix = ViewMatrix;
+
+                        if ( OffsetZeroGuard( Offsets::Match::m_AttackableEntities, ReadChain::EntityList, "m_AttackableEntities" ) )
+                                break;
 
                         auto EntityList = reinterpret_cast< Offsets::UnityList<N32>* >( ReadPtr( Match + Offsets::Match::m_AttackableEntities ) );
                         if ( EntityList == nullptr )
@@ -1549,13 +1865,17 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         DiagLog( "[init] base==0: procurando jogo via ponte (EnableFuncs=%d)", ( int )g_Globals.General.EnableFuncs );
                 }
         }
-        else if ( !m_Running.load( ) )
+        else
         {
                 /*
-                 * Base valida mas a thread de leitura nunca existiu
-                 * (StartReadThread so era chamado no watchdog, que por
-                 * sua vez exigia m_ThreadValid=true — ou seja, nunca
-                 * subia). Sobe agora.
+                 * (PONTEFIX-V5) StartReadThread e IDEMPOTENTE: thread ja
+                 * rodando com a arquitetura correta = no-op instantaneo;
+                 * se o Initialize (thread do RestartAsync) reclassificou
+                 * N32/V31 depois do start (o caso v8a!), a thread e PARADA
+                 * e RECRIADA com o tamanho de ponteiro certo. Antes este
+                 * caminho so chamava quando m_Running=false, e a thread
+                 * nascida no 1o frame com N32 default true ficava com ptr
+                 * de 4 bytes para sempre.
                  */
                 StartReadThread( );
         }
@@ -1839,6 +2159,19 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         //   >= 6s -> RestartAsync (re-localiza a base; single-flight + cooldown)
         // Se a thread de leitura morreu (crash fora do alcance do try/catch do
         // ReadLoop), recria a thread aqui — a ESP se recupera sozinha.
+        /*
+         * (PONTEFIX-V4) Backoff do watchdog: restart a cada 2s quando a
+         * cadeia quebra num passo consistente (ex.: LocalPlayer=0) era so
+         * martelada eterna — restart NAO conserta offset/estado que nao
+         * muda. O intervalo dobra 2s->4s->8s->15s->30s (teto) e volta pro
+         * minimo assim que a leitura fica fresca de novo.
+         */
+        static LONGLONG s_WdBackoffMs = 2000;
+        static LONGLONG s_LastWdRestart = 0;
+
+        if ( snapshotFresh )
+                s_WdBackoffMs = 2000;               /* leitura voltou: reseta */
+
         if ( !snapshotFresh )
         {
                 LONGLONG staleMs = GetTickCount64( ) - m_LastFreshTick.load( );
@@ -1851,8 +2184,53 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 lastWatchdogAct = nowWd;
                                 if ( staleMs > 4000 )
                                 {
-                                        DiagLog( "[diag] watchdog: %lldms sem leitura fresca — restart forcado", ( long long )staleMs );
-                                        g_FreeFireMemory.RestartAsync( );
+                                        /* (PONTEFIX-V6) RESTART SO COM ALVO MORTO. Cadeia presa em
+                                         * passo de ESTADO/OFFSET (GameFacade=0, LocalPlayer=0,
+                                         * lobby, entity list...) NAO se conserta com restart — e
+                                         * cada restart re-resolve alvo+perfil e derruba frames.
+                                         * Se a cabeca da cadeia leu GameFacade != 0 ha menos de
+                                         * 15s, processo, ponte e base estao VIVOS: suspende o
+                                         * restart (log rate-limited) e deixa a cadeia tentar de
+                                         * novo no proximo frame. So reinicia com a cabeca morta
+                                         * ha 15s+ (jogo fechado, ponte morta, base stale). */
+                                        const long long msDesdeCabeca =
+                                                ( long long )( GetTickCount64( ) - m_LastHeadOkTick.load( ) );
+
+                                        if ( msDesdeCabeca >= 0 && msDesdeCabeca < 15000 )
+                                        {
+                                                static LONGLONG s_LastAliveLog = 0;
+                                                const LONGLONG nowAlive = GetTickCount64( );
+
+                                                if ( nowAlive - s_LastAliveLog > 5000 )
+                                                {
+                                                        s_LastAliveLog = nowAlive;
+                                                        DiagLog( "[diag] watchdog: %lldms sem snapshot fresco, mas alvo VIVO (cabeca leu ha %lldms) — restart desnecessario, aguardando cadeia",
+                                                                 ( long long )staleMs, msDesdeCabeca );
+                                                }
+                                        }
+                                        else
+                                        {
+                                        const LONGLONG nowWdR = GetTickCount64( );
+
+                                        if ( nowWdR - s_LastWdRestart >= s_WdBackoffMs )
+                                        {
+                                                s_LastWdRestart = nowWdR;
+
+                                                DiagLog( "[diag] watchdog: %lldms sem leitura fresca — restart forcado (backoff %lldms)",
+                                                         ( long long )staleMs, ( long long )s_WdBackoffMs );
+
+                                                if ( Memory::IsOffsetsBroken( ) )
+                                                {
+                                                        DiagLog( "[diag] watchdog: restart SUSPENSO — offset zerado no perfil (corrige Offsets.cpp e reinstala)" );
+                                                }
+                                                else
+                                                {
+                                                        g_FreeFireMemory.RestartAsync( );
+                                                }
+
+                                                s_WdBackoffMs = ( s_WdBackoffMs >= 30000 ) ? 30000 : ( s_WdBackoffMs * 2 );
+                                        }
+                                        }
                                 }
                                 else
                                 {

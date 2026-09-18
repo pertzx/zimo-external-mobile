@@ -48,6 +48,15 @@ namespace BridgeClient
     const char* LastConnectError();
 
     /*
+     * (PONTEFIX-V5) Status da ULTIMA resposta da ponte em texto
+     * ("OK", "GENERIC", "PERM", ... ou "SEM RESPOSTA (socket)" quando a
+     * ultima operacao nem chegou a ter resposta — falha de transporte).
+     * Usado nos logs da cadeia pra separar "valor 0 real" de "leitura
+     * falhou" — hoje os dois aparecem como "nulo" e a causa real some.
+     */
+    const char* LastStatusText();
+
+    /*
      * Envia um pedido completo e devolve a resposta.
      * Internamente reconecta UMA vez em caso de falha (daemon reiniciou).
      */

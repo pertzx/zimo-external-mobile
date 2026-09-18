@@ -62,12 +62,23 @@ bool Memory::s_Initialized = false;
 // volatile bool Memory::s_RestartInProgress = false;
 std::atomic<bool> Memory::s_RestartInProgress{ false };
 std::atomic<long long> Memory::s_LastRestartMs{ 0 };
+
+/*
+ * (PONTEFIX-V4) "Offsets quebrados": a cadeia de leitura detectou um
+ * offset CHAVE do perfil atual zerado (ex.: AccessClass = 0 no v8a).
+ * Offset zerado e erro de CONFIGURACAO (Offsets.cpp), nao de estado do
+ * jogo: restart/reconnect NUNCA resolve. O watchdog e o elf-fail
+ * SUSPENDEM o restart enquanto isto estiver true. Limpo sempre que um
+ * perfil e (re)aplicado (Initialize/RefreshCR3) — se o perfil novo
+ * ainda tiver offset chave em 0, a cadeia marca de novo no 1o frame.
+ */
+static std::atomic<bool> s_OffsetsBroken{ false };
 const char* Memory::s_LastInitError = "nao inicializado";
 
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-18-PONTEFIX-V3";
+        "StormMemory-2026-09-18-PONTEFIX-V6";
 
     /*
      * Prioridade de acesso:
@@ -1503,6 +1514,16 @@ bool Memory::IsBridgeConnected()
     return BridgeClient::IsConnected();
 }
 
+void Memory::SetOffsetsBroken(bool broken)
+{
+    s_OffsetsBroken.store(broken, std::memory_order_release);
+}
+
+bool Memory::IsOffsetsBroken()
+{
+    return s_OffsetsBroken.load(std::memory_order_acquire);
+}
+
 bool Memory::Initialize()
 {
     LOGI("[INIT] ========================================");
@@ -1606,6 +1627,26 @@ bool Memory::Initialize()
 
     libAddress = il2cpp;
 
+    /*
+     * (PONTEFIX-V5) Flags de arquitetura PUBLICADAS AQUI, ANTES de
+     * qualquer coisa que a thread de leitura usa pra decidir o tamanho
+     * do ponteiro. Antes eram setadas no FIM do Initialize: a
+     * StartReadThread do primeiro frame (thread de render) lia o DEFAULT
+     * N32=true (Globals.hpp) e criava ReadLoop<true,...> => ponteiro de
+     * 4 bytes num jogo v8a — TODOS os enderecos lidos ficavam truncados
+     * abaixo de 4GB e a cadeia quebrava num passo diferente a cada frame.
+     * Com o set aqui + StartReadThread idempotente, no maximo 1 frame roda
+     * com o template errado e a thread e recriada em seguida.
+     */
+    g_Globals.General.N32     = profileIs32;
+    g_Globals.General.V31     = profileIs32;
+    g_Globals.General.NoAnogs = profileIs32;
+
+    LOGI("[INIT] N32=%d V31=%d (leitura de ptr: %d bytes)",
+         g_Globals.General.N32 ? 1 : 0,
+         g_Globals.General.V31 ? 1 : 0,
+         profileIs32 ? 4 : 8);
+
     bool opened = OpenProcessMemory(pid);
 
     LOGI("[INIT] OpenProcessMemory = %s", opened ? "OK" : "FALHA");
@@ -1623,21 +1664,14 @@ bool Memory::Initialize()
     Offsets::LibIl2CppCandidates.clear();
     Offsets::LibIl2CppCandidates.push_back(il2cpp);
 
-    /*
-     * Flags derivadas da escolha — o ReadLoop/Silent/Skeleton leem
-     * ponteiros com o template N32 (v7a = Read<uint32_t> 4 bytes,
-     * v8a = Read<uint64_t> 8 bytes). Nao ha nada manual aqui.
-     */
-    g_Globals.General.N32     = profileIs32;
-    g_Globals.General.V31     = profileIs32;
-    g_Globals.General.NoAnogs = profileIs32;
-
-    LOGI("[INIT] N32=%d V31=%d (leitura de ptr: %d bytes)",
-         g_Globals.General.N32 ? 1 : 0,
-         g_Globals.General.V31 ? 1 : 0,
-         profileIs32 ? 4 : 8);
-
     LOGI("[INIT] Offsets::LibIl2Cpp = 0x%lX", static_cast<unsigned long>(Offsets::LibIl2Cpp));
+
+    /*
+     * (PONTEFIX-V4) Perfil (re)aplicado: limpa a marcacao de offsets
+     * quebrados. Se o perfil ainda tiver offset chave em 0, a cadeia
+     * marca de novo no primeiro frame.
+     */
+    s_OffsetsBroken.store(false, std::memory_order_release);
 
     LOGI("[INIT] Chamando Offsets::GameConfig()...");
     Offsets::GameConfig();
@@ -1660,17 +1694,30 @@ bool Memory::Restart()
 {
     LOGI("[RESTART] reiniciando memoria (pid/base podem ter mudado)");
 
-    BridgeClient::Disconnect();
+    /*
+     * (PONTEFIX-V4) NAO derruba a ponte aqui. O daemon root nao depende
+     * do estado do cliente (pid/base sao conceitos do CLIENTE); o Restart
+     * so re-resolve alvo+base. Se a ponte cair de verdade, o Request()
+     * reconecta sozinho com retry.
+     *
+     * (PONTEFIX-V6) FIM DA JANELA MORTA: o Shutdown() ANTES do
+     * Initialize() zerava pid/base e abria ~150ms onde TODA leitura
+     * falhava (pid=-1) — a propria cadeia marcava "elf-magic / leitura
+     * falhou" DURANTE o restart e alimentava failCount x20 -> outro
+     * restart (loop auto-alimentado; "uma hora para em um, depois em
+     * outro"). Agora: re-resolve POR CIMA do estado atual — as leituras
+     * continuam valendo com o pid/base antigo (que so e invalido se o
+     * jogo morreu de verdade, caso em que falhariam de qualquer forma) —
+     * e so derruba o estado se o re-resolve falhar.
+     */
+    s_Initialized = false;
 
-    Shutdown();
+    const bool ok = Initialize();
 
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(
-            100
-        )
-    );
+    if ( !ok )
+        Shutdown();
 
-    return Initialize();
+    return ok;
 }
 
 bool Memory::RestartAsync()
@@ -1785,6 +1832,9 @@ bool Memory::RefreshCR3()
     g_Globals.General.N32     = profileIs32;
     g_Globals.General.V31     = profileIs32;
     g_Globals.General.NoAnogs = profileIs32;
+
+    /* (PONTEFIX-V4) perfil re-aplicado: limpa marcacao de offsets quebrados */
+    s_OffsetsBroken.store(false, std::memory_order_release);
 
     Offsets::GameConfig();
 

@@ -56,6 +56,16 @@ namespace
     static std::atomic<bool> g_OpLogging{ false };
 
     /*
+     * (PONTEFIX-V5) Status da ultima resposta recebida (BridgeStatus) ou
+     * BRIDGE_STATUS_NONE quando a ultima operacao nao teve resposta
+     * (falha de send/recv/timeout — problema de transporte, nao do jogo).
+     * Exposto via BridgeClient::LastStatusText().
+     */
+    static constexpr uint32_t BRIDGE_STATUS_NONE = 0xFFFFFFFFu;
+
+    static std::atomic<uint32_t> g_LastRespStatus{ BRIDGE_STATUS_NONE };
+
+    /*
      * PID alvo atual, memorizado das operações que o recebem por
      * parâmetro (ReadMem/WriteMem/ModuleBase/Is32Bit).
      *
@@ -83,6 +93,7 @@ namespace
             case BRIDGE_ERR_PERM:      return "PERM";
             case BRIDGE_ERR_PARTIAL:   return "PARTIAL";
             case BRIDGE_ERR_TOOBIG:    return "TOOBIG";
+            case BRIDGE_STATUS_NONE:   return "SEM RESPOSTA (socket)";
             default:                   return "DESCONHECIDO";
         }
     }
@@ -567,6 +578,11 @@ namespace
         std::vector<uint8_t>& payloadOut
     )
     {
+        g_LastRespStatus.store(
+            BRIDGE_STATUS_NONE,
+            std::memory_order_relaxed
+        );
+
         if (!SendAll(
                 fd,
                 &req,
@@ -610,6 +626,11 @@ namespace
 
             return false;
         }
+
+        g_LastRespStatus.store(
+            resp.Status,
+            std::memory_order_relaxed
+        );
 
         payloadOut.clear();
 
@@ -725,6 +746,17 @@ bool IsConnected()
 const char* LastConnectError()
 {
     return g_LastConnectErr;
+}
+
+/*
+ * (PONTEFIX-V5) Texto do status da ultima resposta (ou "SEM RESPOSTA
+ * (socket)"). Thread-safe (atomic + texto estatico).
+ */
+const char* LastStatusText()
+{
+    return DecodeStatus(
+        g_LastRespStatus.load(std::memory_order_relaxed)
+    );
 }
 
 bool Request(
