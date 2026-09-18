@@ -66,6 +66,15 @@ namespace Cheat {
             int  Forca         = 70;   // 0-100
             int  HitChance     = 60;   // 0-100 (%)
             bool VisibleCheck  = true;
+            /*
+             * VisibleCheckFov ("FOV Real"): visibilidade REAL por
+             * entidade — mesh renderizado + cabeca na frente da
+             * camera + dentro do FOV. NAO depende de mirar no alvo
+             * (nao usa o oraculo do auto-lock). Independente do
+             * VisibleCheck classico: os dois podem ficar ligados
+             * juntos (vale o mais restritivo).
+             */
+            bool VisibleCheckFov = false;
             bool IgnoreKnocked = false;
             bool IgnoreBots    = false;
         } Silent;

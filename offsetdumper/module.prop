@@ -1,0 +1,6 @@
+id=offset_dumper
+name=Offset Dumper (Free Fire)
+version=v1.0.0
+versionCode=1
+author=pertzx
+description=Dumper de offsets GameFacade_TypeInfo e GameVarDef_TypeInfo para Free Fire v7a/v8a

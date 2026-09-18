@@ -1028,6 +1028,23 @@ namespace Silent
                 continue;
             }
 
+            /*
+             * ====================================================================
+             * ANTI "BALA PRA TRAS" — o ponto de mira tem que estar NA
+             * FRENTE da camera (clipW > 0 na projecao com a matrix local
+             * de 33ms). Voce girou e o alvo em cache ficou atras de voce
+             * = o write para, em vez de mandar a bala pro lugar de onde
+             * o alvo saiu. Zero read na ponte (so conta matricial) e
+             * NAO usa FOV: recoil arrastando a mira nao bloqueia o
+             * spray — so direcao impossivel (atras da camera) bloqueia.
+             * ====================================================================
+             */
+            if ( W2S::World2Screen( cachedMatrix, aimHead ).Z <= 0.0f )
+            {
+                Sleep(2);
+                continue;
+            }
+
             Vector3 dir;
 
             dir.X = aimHead.X - origin.X;

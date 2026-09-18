@@ -122,6 +122,7 @@ namespace Cheat {
                 wInt(ofs, "Forca", g_Globals.Silent.Forca);
                 wInt(ofs, "HitChance", g_Globals.Silent.HitChance);
                 wBool(ofs, "VisibleCheck", g_Globals.Silent.VisibleCheck);
+                wBool(ofs, "VisibleCheckFov", g_Globals.Silent.VisibleCheckFov);
                 wBool(ofs, "IgnoreKnocked", g_Globals.Silent.IgnoreKnocked);
                 wBool(ofs, "IgnoreBots", g_Globals.Silent.IgnoreBots);
                 wBool(ofs, "ShowFov", g_Globals.Misc.Screen.ShowSilentFov);
@@ -266,6 +267,7 @@ namespace Cheat {
             gInt("Silent", "Forca", g_Globals.Silent.Forca);
             gInt("Silent", "HitChance", g_Globals.Silent.HitChance);
             gBool("Silent", "VisibleCheck", g_Globals.Silent.VisibleCheck);
+            gBool("Silent", "VisibleCheckFov", g_Globals.Silent.VisibleCheckFov);
             gBool("Silent", "IgnoreKnocked", g_Globals.Silent.IgnoreKnocked);
             gBool("Silent", "IgnoreBots", g_Globals.Silent.IgnoreBots);
             gBool("Silent", "ShowFov", g_Globals.Misc.Screen.ShowSilentFov);

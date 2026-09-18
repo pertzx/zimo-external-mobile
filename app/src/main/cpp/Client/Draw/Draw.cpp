@@ -824,6 +824,7 @@ void Data::ReadLoop( )
                                 uintptr_t umaData = 0, hCur = 0, hMax = 0, weaponPtr = 0;
                                 int pose = 0, hpCur = 0, hpMax = 0, weaponId = -1, nameLen = 0;
                                 uint8_t isTeam = 0;
+                                uint8_t meshVisible = 1;   /* UmaAvatarSimple::IsVisible */
                                 // head collider chain
                                 uintptr_t hcTfc = 0, hcLoc = 0, hcH1 = 0, hcH2 = 0, hcH3 = 0;
                                 Vector3 headPos = Vector3::Zero( );
@@ -961,6 +962,15 @@ void Data::ReadLoop( )
                                         wave.push_back({ e.weaponPtr + Offsets::ReplicationEntity::Value, 4, &e.weaponId });
                                 if (e.umaData != 0)
                                         wave.push_back({ e.umaData + Offsets::UMAData::isTeammate, 1, &e.isTeam });
+
+                                /*
+                                 * ONDA 5b: visibilidade REAL do mesh — 1
+                                 * byte na mesma onda (custo zero extra de
+                                 * roundtrip). Offset 0 (v8a TODO) = nao le,
+                                 * meshVisible fica 1 (nao filtra).
+                                 */
+                                if (e.avatar != 0 && Offsets::UmaAvatarSimple::IsVisible != 0)
+                                        wave.push_back({ e.avatar + Offsets::UmaAvatarSimple::IsVisible, 1, &e.meshVisible });
                         }
                         RunWave(wave);
 
@@ -1279,6 +1289,16 @@ void Data::ReadLoop( )
                                 pd.HealthPercent = HealthPercent;
                                 pd.IsKnocked = IsKnocked;
                                 pd.IsTeammate = (e.isTeam != 0);
+                                /*
+                                 * VISIBILIDADE REAL (mesh): o jogo seta
+                                 * IsVisible no avatar quando o modelo esta
+                                 * efetivamente renderizado (nao oculto).
+                                 * Offset zero (v8a) = sinal indisponivel,
+                                 * true = nao filtra ninguem.
+                                 */
+                                pd.IsVisible =
+                                        ( Offsets::UmaAvatarSimple::IsVisible == 0 ) ? true :
+                                        ( e.meshVisible != 0 );
                                 /*
                                  * BOT — fonte unica de verdade pro aimbot/silent:
                                  * flag IsClientBot (onda 2, batch) OU o nome caiu
@@ -2117,6 +2137,84 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 }
         }
 
+        /*
+         * ====================================================================
+         * 2 HELPERS DE VISIBILIDADE (cada modo usa o SEU)
+         * ====================================================================
+         * 1) IsOracleVisible - oraculo do auto-lock do jogo (m_AimAssist /
+         *    m_TargetHeuristic): o jogo confirma por RAYCAST que existe
+         *    inimigo visivel PERTO DA MIRA. E o visible check do aimbot
+         *    NORMAL (legit) e do toggle classico do silent: "so funciona
+         *    se eu estiver mirando no player e se ele ta visivel".
+         *
+         * 2) IsRealVisible - visibilidade REAL por entidade, SEM depender
+         *    de mirar: mesh do inimigo renderizado (IsVisible do avatar -
+         *    o jogo oculta o mesh quando o personagem nao esta na tela)
+         *    E cabeca projetada na frente da camera. E o visible check do
+         *    RAGE e do novo toggle "FOV (Real)" do silent: "visivel de
+         *    verdade, nao so quando estou mirando nele".
+         * ====================================================================
+         */
+        auto IsOracleVisible = [ ]( bool oracleAny ) -> bool
+        {
+                return oracleAny;
+        };
+
+        auto IsRealVisible = [ ]( const PlayerData& q ) -> bool
+        {
+                const bool headOnScreen =
+                        ( q.HeadScreen.X != 0.0f ||
+                          q.HeadScreen.Y != 0.0f ||
+                          q.HeadScreen.Z != 0.0f );
+
+                return q.IsVisible && headOnScreen;
+        };
+
+        /*
+         * [VISCHK2] telemetria da visibilidade REAL (5s): "inimigos=N
+         * real=M" com inimigo na tela e M=0 => offset
+         * UmaAvatarSimple::IsVisible defasado (me manda o logcat). Com
+         * M>0 o toggle FOV (Real) funciona. meshOff=1 = perfil sem o
+         * offset (v8a) e o filtro fica desligado por seguranca.
+         */
+        {
+                static LONGLONG s_NextVisChk2Ms = 0;
+
+                const LONGLONG visChk2Now = GetTickCount64( );
+
+                if ( ( g_Globals.Silent.VisibleCheckFov ||
+                       ( g_Globals.AimBot.VisibleCheck && AimCfg.aimtype == 1 ) ) &&
+                     visChk2Now >= s_NextVisChk2Ms &&
+                     !snapshot.empty( ) )
+                {
+                        s_NextVisChk2Ms = visChk2Now + 5000;
+
+                        int enemies = 0;
+                        int realVis = 0;
+
+                        for ( const auto& q : snapshot )
+                        {
+                                if ( q.IsTeammate ) continue;
+
+                                enemies++;
+
+                                const bool headOnScreen =
+                                        ( q.HeadScreen.X != 0.0f ||
+                                          q.HeadScreen.Y != 0.0f ||
+                                          q.HeadScreen.Z != 0.0f );
+
+                                if ( q.IsVisible && headOnScreen )
+                                        realVis++;
+                        }
+
+                        DiagLog(
+                            "[VISCHK2] inimigos=%d real=%d meshOff=%d",
+                            enemies,
+                            realVis,
+                            Offsets::UmaAvatarSimple::IsVisible == 0 ? 1 : 0 );
+                }
+        }
+
         // ==================== Aimbot/Silent target selection ====================
         // Desacoplado do loop de render: roda mesmo com "ESP Player" (master do
         // Visuals.ESP) desligado, porque silent, boneswap, magnet e rage dependem
@@ -2148,12 +2246,39 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                         if ( aimCandidate )
                         {
-                                enemiesvisible = true;
-
-                                if ( ( g_Globals.AimBot.VisibleCheck || g_Globals.Silent.VisibleCheck ) && !gameAnyVisible )
+                                if ( AimCfg.aimtype == 1 )
                                 {
-                                        enemiesvisible = false;
-                                        aimCandidate = false;
+                                        /*
+                                         * AIMBOT RAGE - visibilidade REAL por
+                                         * entidade (helper IsRealVisible): o
+                                         * mesh do inimigo esta renderizado e a
+                                         * cabeca na frente da camera = visivel
+                                         * de verdade, SEM depender de mirar
+                                         * nele. O cone estreito do auto-lock
+                                         * NAO participa mais do rage.
+                                         */
+                                        if ( g_Globals.AimBot.VisibleCheck &&
+                                             !IsRealVisible( p ) )
+                                                aimCandidate = false;
+                                }
+                                else
+                                {
+                                        /*
+                                         * AIMBOT NORMAL (legit) - oraculo do
+                                         * auto-lock (helper IsOracleVisible):
+                                         * "so mira se estou apontando pro
+                                         * player e o jogo confirma que ele ta
+                                         * visivel". Comportamento original
+                                         * mantido.
+                                         */
+                                        enemiesvisible = true;
+
+                                        if ( ( g_Globals.AimBot.VisibleCheck || g_Globals.Silent.VisibleCheck ) &&
+                                             !IsOracleVisible( gameAnyVisible ) )
+                                        {
+                                                enemiesvisible = false;
+                                                aimCandidate = false;
+                                        }
                                 }
                         }
 
@@ -2200,12 +2325,28 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                                 if ( silentCrosshairDistSq < silentFovSq )
                                 {
                                         /*
-                                        * FIX FINAL "visible check do silent": o silent agora le a MESMA
-                                        * VARIAVEL que o gate do rage le (enemiesvisible — global unica
-                                        * deste arquivo, default true). O gameAnyVisible piscava frame a
-                                        * frame (cone estreito do aim-assist) e derrubava o candidato.
-                                        */
-                                        if ( g_Globals.Silent.VisibleCheck && !enemiesvisible )
+                                         * 2 VISIBLE CHECKS INDEPENDENTES do
+                                         * silent (podem ficar ligados juntos):
+                                         *
+                                         * 1) "Visible Check" (oraculo): o jogo
+                                         *    confirma raycast perto da mira —
+                                         *    o "mirando + visivel" do aimbot
+                                         *    legit. O keep-alive do bloco 1c
+                                         *    segura o alvo quando o oraculo
+                                         *    pisca no meio do spray.
+                                         *
+                                         * 2) "Visible Check FOV (Real)": visi-
+                                         *    bilidade REAL por entidade — mesh
+                                         *    renderizado + cabeca na frente da
+                                         *    camera. NAO precisa mirar nele
+                                         *    (o "verdadeiro" do rage antigo).
+                                         */
+                                        if ( g_Globals.Silent.VisibleCheck &&
+                                             !IsOracleVisible( gameAnyVisible ) )
+                                                continue;
+
+                                        if ( g_Globals.Silent.VisibleCheckFov &&
+                                             !IsRealVisible( p ) )
                                                 continue;
 
                                         const float gameDist =
@@ -2659,7 +2800,50 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
         if ( silentTargetNow == 0 && s_SilentKeepAliveTarget != 0 )
         {
-                const LONGLONG silKeepMs = s_SilFireCache ? 3000 : 1200;
+                /*
+                 * REVALIDACAO do keep-alive (fix "bala vai pra tras" e
+                 * "mira na posicao errada"): o alvo em cache so estende
+                 * pra 3000ms ATIRANDO se ele AINDA existe e esta na
+                 * frente da camera/dentro do FOV no snapshot fresco.
+                 * Girou 180 graus = o alvo antigo cai na hora. Morreu =
+                 * cai na hora. Snapshot engasgado (falha transitória de
+                 * leitura) = keep-alive vale, o silent nao morre.
+                 */
+                bool seenNow = false;
+                bool stillValid = false;
+
+                for ( const auto& q : snapshot )
+                {
+                        if ( q.Entity != s_SilentKeepAliveTarget )
+                                continue;
+
+                        seenNow = true;
+
+                        const bool kaHeadOnScreen =
+                                ( q.HeadScreen.X != 0.0f ||
+                                  q.HeadScreen.Y != 0.0f ||
+                                  q.HeadScreen.Z != 0.0f );
+
+                        if ( kaHeadOnScreen )
+                        {
+                                const float kdx = q.HeadScreen.X - centerX;
+                                const float kdy = q.HeadScreen.Y - centerY;
+
+                                if ( kdx * kdx + kdy * kdy < silentFovSq )
+                                        stillValid = true;
+                        }
+
+                        break;
+                }
+
+                LONGLONG silKeepMs = 1200;
+
+                if ( s_SilFireCache && ( !snapshotFresh || ( seenNow && stillValid ) ) )
+                        silKeepMs = 3000;   /* atirando + alvo ok (ou snapshot engasgado) */
+                else if ( snapshotFresh && seenNow && !stillValid )
+                        silKeepMs = 300;    /* na sua frente mas fora do FOV: solta rapido */
+                else if ( snapshotFresh && !seenNow )
+                        silKeepMs = 0;      /* saiu do snapshot fresco: morreu/despawnou */
 
                 if ( ( LONGLONG )GetTickCount64( ) - s_SilentKeepAliveTickMs < silKeepMs )
                         silentTargetNow = s_SilentKeepAliveTarget;
@@ -2680,7 +2864,14 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         CurrentMatrix = ViewMatrix;
                 }
 
-                if ( AimCfg.Enabled && AimCfg.aimtype == 1 && ( !g_Globals.AimBot.VisibleCheck || ( g_Globals.AimBot.VisibleCheck && enemiesvisible ) ) )
+                /*
+                 * Gate externo do RAGE simplificado: a visibilidade REAL
+                 * por entidade ja vale na SELECAO (IsRealVisible) — o
+                 * ClosestEntity so existe se o inimigo esta visivel de
+                 * verdade. O oraculo estreito (enemiesvisible) NAO
+                 * participa mais do rage.
+                 */
+                if ( AimCfg.Enabled && AimCfg.aimtype == 1 )
                 {
                         static bool s_AimFloodRunning = false;
 

@@ -1298,6 +1298,18 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         Custom::Checkbox(XorStr("Visible Check"), &g_Globals.Silent.VisibleCheck);
 
+                                                        /*
+                                                         * Visibilidade REAL por entidade
+                                                         * (mesh renderizado + cabeca na
+                                                         * frente da camera). Nao depende de
+                                                         * mirar no alvo — e o "verdadeiro"
+                                                         * que o rage usava. Se o offset do
+                                                         * mesh (UmaAvatarSimple::IsVisible)
+                                                         * nao existir no perfil (v8a), o
+                                                         * filtro fica inerte.
+                                                         */
+                                                        Custom::Checkbox(XorStr("Visible Check FOV (Real)"), &g_Globals.Silent.VisibleCheckFov);
+
                                                         Custom::Checkbox(XorStr("Ignore Bots"), &g_Globals.Silent.IgnoreBots);
 
                                                         Custom::Checkbox(XorStr("Ignore Knocked"), &g_Globals.Silent.IgnoreKnocked);

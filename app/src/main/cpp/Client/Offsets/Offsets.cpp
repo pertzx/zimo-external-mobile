@@ -638,160 +638,160 @@ void Offsets::GameConfig()
  */
 void Offsets::FFTHV8A() // 64-bit
 {
-        AccessClass = 0x0; // TODO(v8a): preencha
+        AccessClass = 0x5C; 
 
         // GameVarDef
-        GameVarDef::GameVarDef_TypeInfo = 0x0; // TODO(v8a)
-        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x0; // TODO(v8a)
-        GameVarDef::EnableAccelerationOnFalling = 0x0; // TODO(v8a)
-        GameVarDef::EnableLowFallingSwapWeapon = 0x0; // TODO(v8a)
-        GameVarDef::RotationSensitivityMin = 0x0; // TODO(v8a)
-        GameVarDef::RotationSensitivityMax = 0x0; // TODO(v8a)
-        GameVarDef::AimRotationSensitivityMin = 0x0; // TODO(v8a)
-        GameVarDef::AimRotationSensitivityMax = 0x0; // TODO(v8a)
+        GameVarDef::GameVarDef_TypeInfo = 0xfb108b30; // TODO: update manualy
+        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x708; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::EnableAccelerationOnFalling = 0x2BA6; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::EnableLowFallingSwapWeapon = 0x2EE1; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::RotationSensitivityMin = 0x1068; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::RotationSensitivityMax = 0x106C; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::AimRotationSensitivityMin = 0x1070; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::AimRotationSensitivityMax = 0x1074; // FOUND v8a (direct in 'GameVarDef')
 
         // GameFacade
-        GameFacade::GameFacade_TypeInfo = 0x0; // TODO(v8a)
-        GameFacade::CurrentMatchGame = 0x0; // TODO(v8a)
+        GameFacade::GameFacade_TypeInfo = 0x0; // TODO: update manualy
+        GameFacade::CurrentMatchGame = 0x8; // FOUND v8a (direct in 'GameFacade')
 
         // MatchGame
-        MatchGame::m_Match = 0x0; // TODO(v8a)
-        MatchGame::m_CameraControllerManager = 0x0; // TODO(v8a)
+        MatchGame::m_Match = 0x90; // FOUND v8a (direct in 'MatchGame')
+        MatchGame::m_CameraControllerManager = 0xD8; // FOUND v8a (direct in 'MatchGame')
 
         // Match
-        Match::m_State = 0x0; // TODO(v8a)
-        Match::m_LocalPlayer = 0x0; // TODO(v8a)
-        Match::m_LocalObserver = 0x0; // TODO(v8a)
-        Match::m_AttackableEntities = 0x0; // TODO(v8a)
+        Match::m_State = 0xCC; // FOUND v8a (manual: EMKJHAJNPDH.MAOHIOEAMEA @ 0x8c v7a -> 0xcc v8a)
+        Match::m_LocalPlayer = 0xD8; // FOUND v8a (manual: EMKJHAJNPDH.PDBGEOANOEP @ 0x94 v7a -> 0xd8 v8a)
+        Match::m_LocalObserver = 0x100; // FOUND v8a (manual: EMKJHAJNPDH.MPMAGJDHNBI @ 0xb4 v7a -> 0x100 v8a)
+        Match::m_AttackableEntities = 0x200; // FOUND v8a (manual: EMKJHAJNPDH.HCLFEIEFKHP @ 0x140 v7a -> 0x200 v8a)
 
         // Camera
-        CameraControllerManager::m_Camera = 0x0; // TODO(v8a)
-        Camera::m_CachedPtr = 0x0; // TODO(v8a)
-        Camera::ViewMatrix = 0x0; // TODO(v8a)
+        CameraControllerManager::m_Camera = 0x20; // FOUND v8a (via v7a dump field 'BAGLCCLIOEK' @ 0x10 in 'CameraControllerManager')
+        Camera::m_CachedPtr = 0x10; // FOUND v8a (via v7a dump field 'onPostRender' @ 0x8 in 'Camera')
+        Camera::ViewMatrix = 0x128; // FOUND v8a (manual: UNITY 64-bit worldToCameraMatrix property (estimativa). MANUAL verificar no Ghidra/IDA.)
 
         // Observer
-        Observer::m_TargetPlayer = 0x0; // TODO(v8a)
+        Observer::m_TargetPlayer = 0x30; // FOUND v8a (manual: PHLHIEGPMMK.JAGIFDNJJFD @ 0x28 v7a -> 0x30 v8a)
 
         // Player / PlayerNetwork
-        Player::IsClientBot = 0x0; // TODO(v8a)
-        Player::IsFemale = 0x0; // TODO(v8a)
-		Player::IsFiring = 0x0; // TODO(v8a)
-		Player::UGCStartFiring = 0x0; // TODO(v8a)
-        Player::IsPrepareAttack = 0x0; // TODO(v8a)
-        Player::m_IsCurFrameFowardLockToAimRot = 0x0; // TODO(v8a)
-        Player::m_WaitForForceSync = 0x0; // TODO(v8a)
-        Player::m_TransformType = 0x0; // TODO(v8a)
-        Player::m_AimRotation = 0x0; // TODO(v8a)
-        Player::m_AuxAimRotation = 0x0; // TODO(v8a)
-        Player::m_AimAssist = 0x0; // TODO(v8a)
-        Player::m_EAimAssit = 0x0; // TODO(v8a)
-        Player::m_AimAssistOnSighting = 0x0; // TODO(v8a)
-        Player::m_LastAimingInfoFromWeapon = 0x0; // TODO(v8a)
-        Player::MainCameraTransform = 0x0; // TODO(v8a)
-        Player::m_SwapWeaponTime = 0x0; // TODO(v8a)
-        Player::m_Attributes = 0x0; // TODO(v8a)
-        Player::m_AvatarManager = 0x0; // TODO(v8a)
-        Player::m_InventoryManager = 0x0; // TODO(v8a)
-        Player::m_UserControl = 0x0; // TODO(v8a)
-        Player::m_HeadCollider = 0x0; // TODO(v8a)
-        Player::m_fireColliders = 0x0; // TODO(v8a)
-        Player::HeadNode = 0x0; // TODO(v8a)
-        Player::m_HipNode = 0x0; // TODO(v8a)
-        Player::m_BloodEffectNode = 0x0; // TODO(v8a)
-        Player::m_RootNode = 0x0; // TODO(v8a)
-        Player::m_BoneRootNode = 0x0; // TODO(v8a)
-        Player::m_WeaponMountNode = 0x0; // TODO(v8a)
-        Player::m_LeftWeaponNode = 0x0; // TODO(v8a)
-        Player::m_FlightNode = 0x0; // TODO(v8a)
-        Player::m_RightArmNode = 0x0; // TODO(v8a)
-        Player::m_LeftArmNode = 0x0; // TODO(v8a)
-        Player::m_RightForeArmNode = 0x0; // TODO(v8a)
-        Player::m_LeftForeArmNode = 0x0; // TODO(v8a)
-        Player::m_RightHandNode = 0x0; // TODO(v8a)
-        Player::m_LeftHandNode = 0x0; // TODO(v8a)
-        Player::m_RightAnkleNode = 0x0; // TODO(v8a)
-        Player::m_LeftAnkleNode = 0x0; // TODO(v8a)
-        Player::m_RightToeNode = 0x0; // TODO(v8a)
-        Player::m_LeftToeNode = 0x0; // TODO(v8a)
+        Player::IsClientBot = 0x438; // FOUND v8a (direct in 'Player')
+        Player::IsFemale = 0xB8C; // FOUND v8a (via v7a dump field '<DABCKMCKKOO>k__BackingField' @ 0x7D8 in 'Player')
+		Player::IsFiring = 0x7D0; // FOUND v8a (via v7a dump field '<NNFKGNCILNK>k__BackingField' @ 0x540 in 'Player')
+		Player::UGCStartFiring = 0x1F1; // FOUND v8a (direct in 'Player')
+        Player::IsPrepareAttack = 0x7D0; // FOUND v8a (via v7a dump field '<NNFKGNCILNK>k__BackingField' @ 0x540 in 'Player')
+        Player::m_IsCurFrameFowardLockToAimRot = 0x2D8; // FOUND v8a (via v7a dump field 'JFIGCLAAMMO' @ 0x1D4 in 'Player')
+        Player::m_WaitForForceSync = 0x798; // FOUND v8a (via v7a dump field 'OFEBBCHKOAJ' @ 0x520 in 'Player')
+        Player::m_TransformType = 0x11C4; // FOUND v8a (via v7a dump field 'JONOLCHJCJH' @ 0xC4C in 'Player')
+        Player::m_AimRotation = 0x5AC; // FOUND v8a (via v7a dump field '<MDCADLIAJIH>k__BackingField' @ 0x400 in 'Player')
+        Player::m_AuxAimRotation = 0x5BC; // FOUND v8a (via v7a dump field '<MPNEBFFFAMP>k__BackingField' @ 0x410 in 'Player')
+        Player::m_AimAssist = 0x5D0; // FOUND v8a (direct in 'Player')
+        Player::m_EAimAssit = 0x5F8; // FOUND v8a (via v7a dump field 'FGEAKHHPKCC' @ 0x438 in 'Player')
+        Player::m_AimAssistOnSighting = 0x600; // FOUND v8a (via v7a dump field 'BJPAKMNJHKM' @ 0x43C in 'Player')
+        Player::m_LastAimingInfoFromWeapon = 0xDC8; // FOUND v8a (via v7a dump field 'AKFLHNOIHED' @ 0x978 in 'Player')
+        Player::MainCameraTransform = 0x380; // FOUND v8a (direct in 'Player')
+        Player::m_SwapWeaponTime = 0x794; // FOUND v8a (via v7a dump field 'KDNABNMDIPA' @ 0x51C in 'Player')
+        Player::m_Attributes = 0x700; // FOUND v8a (via v7a dump field 'KDJHNBAECLM' @ 0x4BC in 'Player')
+        Player::m_AvatarManager = 0x708; // FOUND v8a (via v7a dump field 'KPMDIPJINJO' @ 0x4C0 in 'Player')
+        Player::m_InventoryManager = 0x6D8; // FOUND v8a (via v7a dump field 'LPEALCPGJBL' @ 0x4A8 in 'Player')
+        Player::m_UserControl = 0x468; // FOUND v8a (via v7a dump field 'ODIGILJGPAK' @ 0x304 in 'Player')
+        Player::m_HeadCollider = 0x6D0; // FOUND v8a (via v7a dump field 'NFDNMIOPILM' @ 0x4A4 in 'Player')
+        Player::m_fireColliders = 0xAD8; // FOUND v8a (via v7a dump field 'CGMPIMANBNC' @ 0x760 in 'Player')
+        Player::HeadNode = 0x638; // FOUND v8a (via v7a dump field 'PEMOFNFCLFB' @ 0x458 in 'Player')
+        Player::m_HipNode = 0x640; // FOUND v8a (via v7a dump field 'DIDHPFKMJJE' @ 0x45C in 'Player')
+        Player::m_BloodEffectNode = 0x648; // FOUND v8a (via v7a dump field 'KAKOKIHEPCF' @ 0x460 in 'Player')
+        Player::m_RootNode = 0x660; // FOUND v8a (via v7a dump field 'KNFKIDHJCCO' @ 0x46C in 'Player')
+        Player::m_BoneRootNode = 0x668; // FOUND v8a (via v7a dump field 'HNFBCFKKCJP' @ 0x470 in 'Player')
+        Player::m_WeaponMountNode = 0x630; // FOUND v8a (via v7a dump field 'GOLAIKOPNJK' @ 0x454 in 'Player')
+        Player::m_LeftWeaponNode = 0x690; // FOUND v8a (via v7a dump field 'OEHAGFIGILO' @ 0x484 in 'Player')
+        Player::m_FlightNode = 0x658; // FOUND v8a (via v7a dump field 'CLOEKEADCHD' @ 0x468 in 'Player')
+        Player::m_RightArmNode = 0x6A8; // FOUND v8a (via v7a dump field 'OEJFBHIIBBG' @ 0x490 in 'Player')
+        Player::m_LeftArmNode = 0x6A0; // FOUND v8a (via v7a dump field 'NBHOEOOCIIG' @ 0x48C in 'Player')
+        Player::m_RightForeArmNode = 0x6B8; // FOUND v8a (via v7a dump field 'PNPBBNDANEM' @ 0x498 in 'Player')
+        Player::m_LeftForeArmNode = 0x6C8; // FOUND v8a (via v7a dump field 'KNBJLEHOPIL' @ 0x4A0 in 'Player')
+        Player::m_RightHandNode = 0x6B0; // FOUND v8a (via v7a dump field 'DIHJDDNIJHP' @ 0x494 in 'Player')
+        Player::m_LeftHandNode = 0x6C0; // FOUND v8a (via v7a dump field 'KMIANNCLNOJ' @ 0x49C in 'Player')
+        Player::m_RightAnkleNode = 0x678; // FOUND v8a (via v7a dump field 'BIPBNNIFCNO' @ 0x478 in 'Player')
+        Player::m_LeftAnkleNode = 0x670; // FOUND v8a (via v7a dump field 'BOHFCEHMJBD' @ 0x474 in 'Player')
+        Player::m_RightToeNode = 0x688; // FOUND v8a (via v7a dump field 'INHGPBHOKPF' @ 0x480 in 'Player')
+        Player::m_LeftToeNode = 0x680; // FOUND v8a (via v7a dump field 'JLLMBADGKJP' @ 0x47C in 'Player')
 
         // PlayerNetwork
-        PlayerNetwork::m_ShadowState = 0x0; // TODO(v8a)
-        PlayerNetwork::m_Profile = 0x0; // TODO(v8a)
+        PlayerNetwork::m_ShadowState = 0x2278; // FOUND v8a (direct in 'PlayerNetwork')
+        PlayerNetwork::m_Profile = 0x22A0; // FOUND v8a (via v7a dump field 'KAKEEBABBIP' @ 0x18CC in 'PlayerNetwork')
 
         // Shadow
-        ShadowState::TargetPhysXPose = 0x0; // TODO(v8a)
+        ShadowState::TargetPhysXPose = 0x80; // FOUND v8a (manual: LJBAALIHDEE.BGDKLEHDFJO @ 0x78 v7a -> 0x80 v8a)
 
         // PlayerAttributes
-        PlayerAttributes::m_EatSpeedScale = 0x0; // TODO(v8a)
-        PlayerAttributes::m_FireIntervalScale = 0x0; // TODO(v8a)
+        PlayerAttributes::m_EatSpeedScale = 0x9C; // FOUND v8a (via v7a dump field 'PNLLLKKNBOG' @ 0x60 in 'PlayerAttributes')
+        PlayerAttributes::m_FireIntervalScale = 0x208; // FOUND v8a (via v7a dump field 'BONAJJEOPNF' @ 0x18C in 'PlayerAttributes')
 
         // AimAssistAutoLock
-        AimAssistAutoLock::m_TargetHeuristic = 0x0; // TODO(v8a)
-        AimAssistAutoLock::m_Entity = 0x0; // TODO(v8a)
+        AimAssistAutoLock::m_TargetHeuristic = 0x10; // FOUND v8a (manual: KBCJOEFJEFJ.KOLIMPJEBPC @ 0x8 v7a -> 0x10 v8a)
+        AimAssistAutoLock::m_Entity = 0x18; // FOUND v8a (manual: KLNCOMCJJGK.LDNBCNLCIGP @ 0xc v7a -> 0x18 v8a (nested in m_TargetHeuristic.TargetInfo))
 
         // UserControlHandler
-        UserControlHandler::m_AxisData = 0x0; // TODO(v8a)
-        UserControlHandler::m_FingerInDashArea = 0x0; // TODO(v8a)
-        UserControlHandler::m_IsTouched = 0x0; // TODO(v8a)
-        UserControlHandler::m_LockFingerInDashArea = 0x0; // TODO(v8a)
-        UserControlHandler::m_DashByMovingJoystick = 0x0; // TODO(v8a)
+        UserControlHandler::m_AxisData = 0x68; // FOUND v8a (direct in 'UserControlHandler')
+        UserControlHandler::m_FingerInDashArea = 0x90; // FOUND v8a (direct in 'UserControlHandler')
+        UserControlHandler::m_IsTouched = 0x4B; // FOUND v8a (manual: UserControlAxisData.m_IsTouched @ 0x37 v7a -> 0x4b v8a)
+        UserControlHandler::m_LockFingerInDashArea = 0x94; // FOUND v8a (direct in 'UserControlHandler')
+        UserControlHandler::m_DashByMovingJoystick = 0x9C; // FOUND v8a (via v7a dump field '<DashByMovingJoystick>k__BackingField' @ 0x58 in 'UserControlHandler')
 
         // AimAssistOnSighting
-        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x0; // TODO(v8a)
+        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x80; // FOUND v8a (manual: EMFEPBOHGOJ.NAKKFIIIGNO @ 0x44 v7a -> 0x80 v8a)
 
         // HitObjectInfo
-        HitObjectInfo::RayDir = 0x0; // TODO(v8a)
-        HitObjectInfo::StartPosition = 0x0; // TODO(v8a)
+        HitObjectInfo::RayDir = 0x40; // FOUND v8a (manual: GMPGMPFNMFP.IKDEGKIICJP @ 0x2c v7a -> 0x40 v8a)
+        HitObjectInfo::StartPosition = 0x4C; // FOUND v8a (manual: GMPGMPFNMFP.LMAEGPEAECO @ 0x38 v7a -> 0x4c v8a)
 
         // InventoryManager
-        InventoryManager::m_itemOnHand = 0x0; // TODO(v8a)
+        InventoryManager::m_itemOnHand = 0xA0; // FOUND v8a (manual: OMELKCOGCBK.CHAFOMFBKEG @ 0x54 v7a -> 0xa0 v8a)
 
         // Avatar
-        AvatarManager::m_Avatar = 0x0; // TODO(v8a)
-        UMAAvatarBase::umaData = 0x0; // TODO(v8a)
-        UmaAvatarSimple::IsVisible = 0x0; // TODO(v8a)
+        AvatarManager::m_Avatar = 0x138; // FOUND v8a (via v7a dump field 'GIAMMAADHFN' @ 0xA8 in 'AvatarManager')
+        UMAAvatarBase::umaData = 0x28; // FOUND v8a (direct in 'UMAAvatarBase')
+        UmaAvatarSimple::IsVisible = 0x101; // FOUND v8a (direct in 'UmaAvatarSimple')
 
         // UMAData
-        UMAData::skeleton = 0x0; // TODO(v8a)
-        UMAData::isLocalPlayer = 0x0; // TODO(v8a)
-        UMAData::isTeammate = 0x0; // TODO(v8a)
+        UMAData::skeleton = 0x138; // FOUND v8a (direct in 'UMAData')
+        UMAData::isLocalPlayer = 0x80; // FOUND v8a (direct in 'UMAData')
+        UMAData::isTeammate = 0x81; // FOUND v8a (direct in 'UMAData')
 
         // UMASkeleton
-        UMASkeleton::boneHashDataLookup = 0x0; // TODO(v8a)
-        UMASkeleton::boneNameHash = 0x0; // TODO(v8a)
-        UMASkeleton::boneTransform = 0x0; // TODO(v8a)
+        UMASkeleton::boneHashDataLookup = 0x28; // FOUND v8a (direct in 'UMASkeleton')
+        UMASkeleton::boneNameHash = 0x10; // FOUND v8a (via v7a dump field 'updating' @ 0x8 in 'UMASkeleton')
+        UMASkeleton::boneTransform = 0x18; // FOUND v8a (via v7a dump field '<rootBoneHash>k__BackingField' @ 0x10 in 'UMASkeleton')
 
         // Replication
-        ReplicationEntity::m_PRIDataPool = 0x0; // TODO(v8a)
-        ReplicationEntity::m_Datas = 0x0; // TODO(v8a)
-        ReplicationEntity::HealthCurrentPtr = 0x0; // TODO(v8a)
-        ReplicationEntity::HealthMaxPtr = 0x0; // TODO(v8a)
-        ReplicationEntity::WeaponPtr = 0x0; // TODO(v8a)
-        ReplicationEntity::EpPtr = 0x0; // TODO(v8a)
-        ReplicationEntity::Value = 0x0; // TODO(v8a)
+        ReplicationEntity::m_PRIDataPool = 0x70; // FOUND v8a (manual: ReplicationEntity.m_PRIDataPool @ 0x48 v7a -> 0x70 v8a)
+        ReplicationEntity::m_Datas = 0x10; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Datas @ 0x8 v7a -> 0x10 v8a)
+        ReplicationEntity::HealthCurrentPtr = 0x20; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int8Handlers @ 0x10 v7a -> 0x20 v8a)
+        ReplicationEntity::HealthMaxPtr = 0x28; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_UInt8Handlers @ 0x14 v7a -> 0x28 v8a)
+        ReplicationEntity::WeaponPtr = 0x40; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int32Handlers @ 0x20 v7a -> 0x40 v8a)
+        ReplicationEntity::EpPtr = 0x50; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int64Handlers @ 0x28 v7a -> 0x50 v8a)
+        ReplicationEntity::Value = 0x18; // FOUND v8a (manual: ReplicationDataUnsafe.Value @ 0xc v7a -> 0x18 v8a)
 
         // Profile
-        BaseProfileInfo::AccountID = 0x0; // TODO(v8a)
-        BaseProfileInfo::Level = 0x0; // TODO(v8a)
-        BaseProfileInfo::NickName = 0x0; // TODO(v8a)
+        BaseProfileInfo::AccountID = 0x10; // FOUND v8a (direct in 'BaseProfileInfo')
+        BaseProfileInfo::Level = 0x20; // FOUND v8a (direct in 'BaseProfileInfo')
+        BaseProfileInfo::NickName = 0x28; // FOUND v8a (direct in 'BaseProfileInfo')
 
         // Weapon
-        Weapon::FireComponent = 0x0; // TODO(v8a)
-        Weapon::m_WeaponData = 0x0; // TODO(v8a)
-        Weapon::m_WeaponParams = 0x0; // TODO(v8a)
-        Weapon::m_FireDuration = 0x0; // TODO(v8a)
-        Weapon::m_IsSighting = 0x0; // TODO(v8a)
-        Weapon::tangentTheta = 0x0; // TODO(v8a)
-        Weapon::IntWeaponType = 0x0; // TODO(v8a)
+        Weapon::FireComponent = 0x80; // FOUND v8a (manual: FDAEPHMIEPC.<FLCGCBLDMLK>k__BackingField @ 0x58 v7a -> 0x80 v8a)
+        Weapon::m_WeaponData = 0x98; // FOUND v8a (manual: FDAEPHMIEPC.DJMMOHAJFPB @ 0x64 v7a -> 0x98 v8a)
+        Weapon::m_WeaponParams = 0xA8; // FOUND v8a (manual: FDAEPHMIEPC.JJMOJGHDLIF @ 0x6c v7a -> 0xa8 v8a)
+        Weapon::m_FireDuration = 0x5F0; // FOUND v8a (manual: FDAEPHMIEPC.NAGGOHBGHKK @ 0x4bc v7a -> 0x5f0 v8a)
+        Weapon::m_IsSighting = 0x7C0; // FOUND v8a (manual: FDAEPHMIEPC.PBJJMLOOLGH @ 0x5e4 v7a -> 0x7c0 v8a)
+        Weapon::tangentTheta = 0x18; // FOUND v8a (manual: BNFFFLEJGMA.HKNJLOBGIDP @ 0xc v7a -> 0x18 v8a (WeaponFireComponent subclass))
+        Weapon::IntWeaponType = 0xC8; // FOUND v8a (manual: AGACNOCEEFP.EJKCLOFONLG @ 0xb8 v7a -> 0xc8 v8a (WeaponData class))
 
         // WeaponParams
-        WeaponParams::FullDamageDistance = 0x0; // TODO(v8a)
-        WeaponParams::PrefireDelay = 0x0; // TODO(v8a)
-        WeaponParams::Range = 0x0; // TODO(v8a)
+        WeaponParams::FullDamageDistance = 0x50; // FOUND v8a (manual: EDDCGAGJBLO.LDMJIJODACB @ 0x48 v7a -> 0x50 v8a)
+        WeaponParams::PrefireDelay = 0x150; // FOUND v8a (manual: EDDCGAGJBLO.HCPMOLBCKIM @ 0x144 v7a -> 0x150 v8a)
+        WeaponParams::Range = 0x4C; // FOUND v8a (manual: EDDCGAGJBLO.JOLEGACBIKJ @ 0x44 v7a -> 0x4c v8a)
 
         // PlayerTransformNode
-        PlayerTransformNode::Transform = 0x0; // TODO(v8a)
-        PlayerTransformNode::m_CachedTransform = 0x0; // TODO(v8a)
+        PlayerTransformNode::Transform = 0x10; // FOUND v8a (manual: TransformNode.<transform>k__BackingField @ 0x8 v7a -> 0x10 v8a)
+        PlayerTransformNode::m_CachedTransform = 0x58; // FOUND v8a (manual: Entity.m_CachedTransform @ 0x38 v7a -> 0x58 v8a)
 
         // get_position_Injected (fixed — so mudam se a Unity mudar)
         GetPosWorld::transObj = 0x10; // fixed v8a
@@ -814,7 +814,7 @@ void Offsets::FFTHV7A75() // v75 32-bit
 	AccessClass = 0x5C; // TODO: update manually
 
 	// GameVarDef
-	GameVarDef::GameVarDef_TypeInfo = 0xABFF414; // TODO: update manually
+	GameVarDef::GameVarDef_TypeInfo = 0xa5bc398; // TODO: update manually
 	GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x674;
 	GameVarDef::EnableAccelerationOnFalling = 0x27CA;
 	GameVarDef::EnableLowFallingSwapWeapon = 0x2AE5;
@@ -824,7 +824,7 @@ void Offsets::FFTHV7A75() // v75 32-bit
 	GameVarDef::AimRotationSensitivityMax = 0xF18;
 
 	// GameFacade
-	GameFacade::GameFacade_TypeInfo = 0xac01850; // TODO: update manually
+	GameFacade::GameFacade_TypeInfo = 0xa5bc344; // TODO: update manually
 	GameFacade::CurrentMatchGame = 0x4;
 
 	// MatchGame
@@ -1001,7 +1001,7 @@ void Offsets::FFTHV7A76() // v76 32-bit
 	AccessClass = 0x5C; // TODO: update manually
 
 	// GameVarDef
-	GameVarDef::GameVarDef_TypeInfo = 0xABFF734; // TODO: update manually
+	GameVarDef::GameVarDef_TypeInfo = 0xa5bc398; // TODO: update manually
 	GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x674;
 	GameVarDef::EnableAccelerationOnFalling = 0x27CA;
 	GameVarDef::EnableLowFallingSwapWeapon = 0x2AE5;
@@ -1011,7 +1011,7 @@ void Offsets::FFTHV7A76() // v76 32-bit
 	GameVarDef::AimRotationSensitivityMax = 0xF18;
 
 	// GameFacade
-	GameFacade::GameFacade_TypeInfo = 0xac01850; // TODO: update manually
+	GameFacade::GameFacade_TypeInfo = 0xa5bc344; // TODO: update manually
 	GameFacade::CurrentMatchGame = 0x4;
 
 	// MatchGame
