@@ -1051,7 +1051,8 @@ void Data::ReadLoop( )
                          * qual etapa esta comendo os players.
                          */
                         int entOk = 0, entLocal = 0, entClasse = 0, entAvatar = 0;
-                        int entTeam = 0, entPri = 0, entHp = 0, entPos = 0;
+                        int entTeam = 0, entPri = 0, entHp = 0;
+                        int entPosHead = 0, entPosFeet = 0;
                         int entNulo = 0;                                    // ← ADICIONE
                         bool sampleLogged = false;
 
@@ -1214,11 +1215,20 @@ void Data::ReadLoop( )
                                 if (e.klass == 0 || e.klassNamePtr == 0) { entClasse++; continue; }
 
                                 // Amostra da 1a entidade valida (mesmo proposito do log antigo)
+                                // (V8.5) ANTES o nome era CONSTANTE (GetPlayerTypeName
+                                // (PLAYER_NETWORK)) — o log mentia ("classe=PlayerNetwork"
+                                // para qualquer coisa). Agora le o nome REAL da classe:
+                                // Il2CppClass::name = C string em klassNamePtr (klass+0x8).
                                 if (!sampleLogged)
                                 {
                                         sampleLogged = true;
+
+                                        char kname[40] = { 0 };
+                                        if (e.klassNamePtr != 0)
+                                                g_FreeFireMemory.Read( e.klassNamePtr, kname, sizeof( kname ) - 1 );
+
                                         DiagLog("[ENTITY] amostra ent=0x%lX classe=%s",
-                                                (unsigned long)e.Entity, Data::GetPlayerTypeName(PLAYER_NETWORK));
+                                                (unsigned long)e.Entity, kname[0] ? kname : "?");
                                 }
 
                                 seenThisFrame.insert(e.Entity);
@@ -1295,8 +1305,85 @@ void Data::ReadLoop( )
                                 std::vector<EntWork> keep;
                                 keep.reserve(ents.size());
 
+                                /*
+                                 * (V8.5) AUDITORIA DO FUNIL — 1 amostra por frame:
+                                 *  - [FUNIL] avatarFAIL: 1a entidade que MORRE no
+                                 *    avatar, com o nome REAL da classe. Se NAO for
+                                 *    "Player*" = entidade nao-player (veiculo/loot/
+                                 *    airdrop) = bucket esperado, nao e bug.
+                                 *  - [FUNIL] ok: 1a entidade que PASSA do avatar.
+                                 *    Mostra o nome da classe do PRI pool
+                                 *    ("PRIDataPool" = union inline @0x10 v7a,
+                                 *    "PRIDataPoolUnsafe" = Void* @0xC v7a) e o
+                                 *    dump cru de 16 bytes do objeto de HP — fecha
+                                 *    a questao do variant do pool sem chutar.
+                                 */
+                                bool avSample = false, okSample = false;
+
                                 for (auto& e : ents)
                                 {
+                                        if (!avSample &&
+                                                (e.avatarMgr == 0 || e.avatar == 0 || e.umaData == 0))
+                                        {
+                                                avSample = true;
+
+                                                char kn[40] = { 0 };
+                                                if (e.klassNamePtr != 0)
+                                                        g_FreeFireMemory.Read( e.klassNamePtr, kn, sizeof( kn ) - 1 );
+
+                                                DiagLog("[FUNIL] avatarFAIL ent=0x%lX classe=%s avMgr=0x%lX ava=0x%lX uma=0x%lX",
+                                                        (unsigned long)e.Entity, kn[0] ? kn : "?",
+                                                        (unsigned long)e.avatarMgr,
+                                                        (unsigned long)e.avatar, (unsigned long)e.umaData);
+                                        }
+
+                                        if (!okSample &&
+                                                e.avatarMgr != 0 && e.avatar != 0 && e.umaData != 0)
+                                        {
+                                                okSample = true;
+
+                                                char kn[40] = { 0 }, pn[40] = { 0 };
+                                                if (e.klassNamePtr != 0)
+                                                        g_FreeFireMemory.Read( e.klassNamePtr, kn, sizeof( kn ) - 1 );
+
+                                                // classe do PRI pool (klass = 1o campo do objeto)
+                                                uintptr_t poolKlass = 0;
+                                                if (e.priPool != 0)
+                                                        poolKlass = N32
+                                                                ? g_FreeFireMemory.Read<uint32_t>( e.priPool )
+                                                                : g_FreeFireMemory.Read<uint64_t>( e.priPool );
+
+                                                if (poolKlass != 0)
+                                                {
+                                                        uintptr_t poolNamePtr = N32
+                                                                ? g_FreeFireMemory.Read<uint32_t>( poolKlass + 0x8 )
+                                                                : g_FreeFireMemory.Read<uint64_t>( poolKlass + 0x10 );
+
+                                                        if (poolNamePtr != 0)
+                                                                g_FreeFireMemory.Read( poolNamePtr, pn, sizeof( pn ) - 1 );
+                                                }
+
+                                                // dump cru do objeto de HP (bytes 0x8..0x17):
+                                                // v7a safe = GroupID@0x8 | pad@0xC | union@0x10
+                                                // v7a unsafe = GroupID@0x8 | Void* Value@0xC
+                                                uint8_t hRaw[16] = { 0 };
+                                                if (e.hCur != 0)
+                                                        g_FreeFireMemory.Read( e.hCur + 0x8, hRaw, sizeof( hRaw ) );
+
+                                                DiagLog("[FUNIL] ok ent=0x%lX classe=%s pool=%s pri=0x%lX datas=0x%lX hCur=0x%lX hRaw=%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x hp=%d/%d team=%u vis=%u tf=0x%lX head=0x%lX fire=0x%lX",
+                                                        (unsigned long)e.Entity, kn[0] ? kn : "?",
+                                                        pn[0] ? pn : "?",
+                                                        (unsigned long)e.priPool, (unsigned long)e.datas,
+                                                        (unsigned long)e.hCur,
+                                                        hRaw[0], hRaw[1], hRaw[2], hRaw[3],
+                                                        hRaw[4], hRaw[5], hRaw[6], hRaw[7],
+                                                        hRaw[8], hRaw[9], hRaw[10], hRaw[11],
+                                                        hRaw[12], hRaw[13], hRaw[14], hRaw[15],
+                                                        e.hpCur, e.hpMax, e.isTeam, e.meshVisible,
+                                                        (unsigned long)e.cachedTF,
+                                                        (unsigned long)e.headNode, (unsigned long)e.fireCol);
+                                        }
+
                                         if (e.avatarMgr == 0 || e.avatar == 0 || e.umaData == 0) { entAvatar++; continue; }
 
                                         bool IsTeam = (e.isTeam != 0);
@@ -1561,10 +1648,69 @@ void Data::ReadLoop( )
                         }
 
                         // ---------- montagem (mesma semantica do loop antigo) ----------
+                        /*
+                         * (V8.4) FALLBACK DE REFERENCIA + DIAGNOSTICO POSFAIL.
+                         *
+                         * O log de campo mostrou lista=106 ok=0 com TODAS as
+                         * entidades vivas finais morrendo em pos (falha 12/12 =
+                         * sistematica, nao variância de dado). Como o walker em
+                         * onda (batch) e fiel a referência (Transform::GetPosition
+                         * / GetHeadPosition, mesmos offsets), falha sistematica
+                         * so tem duas explicacoes: (a) bug sutil no caminho de
+                         * ONDA (batch), ou (b) algum elo da cadeia lendo 0 para
+                         * TODAS as entidades (offset daquele elo errado p/ esta
+                         * build).
+                         *
+                         * Contra (a): refaz a posicao pelo caminho de referencia
+                         * INDIVIDUAL (o mesmo que le a camera, que funciona).
+                         * Contra (b): [POSFAIL] despeja TODOS os elos das duas
+                         * cadeias da 1a entidade que falhou (rate-limit 5s) —
+                         * o elo que estiver 0x0 pra todas as entidades e o
+                         * culpado. Nenhum offset e alterado aqui.
+                         *
+                         * Custo: so entidades que chegaram vivas no fim do funil
+                         * (as ~12), so quando o batch falhou, cache de blocos
+                         * absorvendo repeticoes.
+                         */
+                        const EntWork* posFailSample = nullptr;
+
                         for (auto& e : ents)
                         {
-                                if (e.headPos == Vector3::Zero( )) { entPos++; continue; }
-                                if (e.feetPos == Vector3::Zero( )) { entPos++; continue; }
+                                if (e.headPos == Vector3::Zero( ))
+                                {
+                                        Vector3 refHead = Transform::GetHeadPosition( e.Entity, N32 );
+
+                                        if ( refHead != Vector3::Zero( ) )
+                                                e.headPos = refHead;
+                                }
+
+                                if (e.feetPos == Vector3::Zero( ))
+                                {
+                                        Vector3 refFeet = Transform::GetPosition( e.Entity, N32 );
+
+                                        if ( refFeet != Vector3::Zero( ) )
+                                                e.feetPos = refFeet;
+                                }
+
+                                if (e.headPos == Vector3::Zero( ))
+                                {
+                                        entPosHead++;
+
+                                        if ( !posFailSample )
+                                                posFailSample = &e;
+
+                                        continue;
+                                }
+
+                                if (e.feetPos == Vector3::Zero( ))
+                                {
+                                        entPosFeet++;
+
+                                        if ( !posFailSample )
+                                                posFailSample = &e;
+
+                                        continue;
+                                }
 
                                 bool IsKnocked = (e.shadow != 0 && e.pose == 8);
                                 int CurrentHealth = e.hpCur;
@@ -1635,15 +1781,46 @@ void Data::ReadLoop( )
                                 entOk++;
                         }
 
+                        // (V8.4) [POSFAIL]: despejo completo dos elos das duas cadeias
+                        // da 1a entidade que falhou (apos o fallback de referencia).
+                        // O elo que aparecer 0x0 em TODOS os frames e o elo quebrado.
+                        static LONGLONG s_LastPosFailLog = 0;
+
+                        if ( posFailSample &&
+                                GetTickCount64( ) - s_LastPosFailLog > 5000 )
+                        {
+                                s_LastPosFailLog = GetTickCount64( );
+
+                                const WalkSt& fw = posFailSample->feetWalk;
+                                const WalkSt& hw = posFailSample->headWalk;
+
+                                DiagLog( "[POSFAIL] ent=0x%lX | feet: tf=0x%lX act=%d transObj=0x%lX matObj=0x%lX matList=0x%lX matIdx=0x%lX idx=%d ok=%d it=%d acc=(%.0f,%.0f,%.0f) | head: fireCol=0x%lX hTfc=0x%lX hLoc=0x%lX h1=0x%lX h2=0x%lX h3=0x%lX headPos=(%.0f,%.0f,%.0f) headTf2=0x%lX hwAct=%d hwOk=%d",
+                                        (unsigned long)posFailSample->Entity,
+                                        (unsigned long)fw.tf, (int)fw.active,
+                                        (unsigned long)fw.transObj, (unsigned long)fw.matObj,
+                                        (unsigned long)fw.matList, (unsigned long)fw.matIdx,
+                                        (int)fw.idx, (int)fw.ok, fw.iters,
+                                        fw.acc.X, fw.acc.Y, fw.acc.Z,
+                                        (unsigned long)posFailSample->fireCol,
+                                        (unsigned long)posFailSample->hcTfc,
+                                        (unsigned long)posFailSample->hcLoc,
+                                        (unsigned long)posFailSample->hcH1,
+                                        (unsigned long)posFailSample->hcH2,
+                                        (unsigned long)posFailSample->hcH3,
+                                        posFailSample->headPos.X, posFailSample->headPos.Y, posFailSample->headPos.Z,
+                                        (unsigned long)posFailSample->headTf2,
+                                        (int)hw.active, (int)hw.ok );
+                        }
+
                         // Resumo de descarte (rate-limit 5s). Se o ESP nao aparece e a
                         // cadeia esta OK, ESTE log mostra qual filtro esta comendo tudo.
                         static LONGLONG s_LastEntSummary = 0;
                         if ( GetTickCount64( ) - s_LastEntSummary > 5000 )
                         {
                                 s_LastEntSummary = GetTickCount64( );
-                                DiagLog( "[ENTITY] lista=%d ok=%d nulo=%d | descartados: local=%d classe=%d avatar=%d team=%d hp=%d pos=%d",
+                                DiagLog( "[ENTITY] lista=%d ok=%d nulo=%d | descartados: local=%d classe=%d avatar=%d team=%d pri=%d hp=%d posH=%d posF=%d",
                                         dictCount, entOk, entNulo, entLocal, entClasse, entAvatar,
-                                        entTeam, entHp, entPos );
+                                        entTeam, entPri, entHp, entPosHead, entPosFeet );
                         }
 
                         // Heartbeat de sucesso da busca inicial: prova que a cadeia

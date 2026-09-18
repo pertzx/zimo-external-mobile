@@ -638,160 +638,173 @@ void Offsets::GameConfig()
  */
 void Offsets::FFTHV8A() // 64-bit
 {
-        AccessClass = 0xB8; 
+        AccessClass = 0xB8; // MANUAL (mantido) — fora da dump
 
         // GameVarDef
-        GameVarDef::GameVarDef_TypeInfo = 0xac1e810; // TODO: update manualy
-        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x708; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::EnableAccelerationOnFalling = 0x2BA6; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::EnableLowFallingSwapWeapon = 0x2EE1; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::RotationSensitivityMin = 0x1068; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::RotationSensitivityMax = 0x106C; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::AimRotationSensitivityMin = 0x1070; // FOUND v8a (direct in 'GameVarDef')
-        GameVarDef::AimRotationSensitivityMax = 0x1074; // FOUND v8a (direct in 'GameVarDef')
+        GameVarDef::GameVarDef_TypeInfo = 0xac1e810; // MANUAL (mantido) — typeinfo fora da dump
+        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x7d0; // dump novo
+        GameVarDef::EnableAccelerationOnFalling = 0x2cdf; // dump novo
+        GameVarDef::EnableLowFallingSwapWeapon = 0x3055; // dump novo
+        GameVarDef::RotationSensitivityMin = 0x1140; // dump novo
+        GameVarDef::RotationSensitivityMax = 0x1144; // dump novo
+        GameVarDef::AimRotationSensitivityMin = 0x1148; // dump novo
+        GameVarDef::AimRotationSensitivityMax = 0x114c; // dump novo
 
         // GameFacade
-        GameFacade::GameFacade_TypeInfo = 0xac1e768; // TODO: update manualy
-        GameFacade::CurrentMatchGame = 0x8; // FOUND v8a (direct in 'GameFacade')
+        GameFacade::GameFacade_TypeInfo = 0xac1e768; // MANUAL (mantido) — typeinfo fora da dump
+        GameFacade::CurrentMatchGame = 0x8; // dump novo
 
         // MatchGame
-        MatchGame::m_Match = 0x90; // FOUND v8a (direct in 'MatchGame')
-        MatchGame::m_CameraControllerManager = 0xD8; // FOUND v8a (direct in 'MatchGame')
+        MatchGame::m_Match = 0x90; // dump novo
+        MatchGame::m_CameraControllerManager = 0xd8; // dump novo
 
         // Match
-        Match::m_State = 0xCC; // FOUND v8a (manual: EMKJHAJNPDH.MAOHIOEAMEA @ 0x8c v7a -> 0xcc v8a)
-        Match::m_LocalPlayer = 0xD8; // FOUND v8a (manual: EMKJHAJNPDH.PDBGEOANOEP @ 0x94 v7a -> 0xd8 v8a)
-        Match::m_LocalObserver = 0x100; // FOUND v8a (manual: EMKJHAJNPDH.MPMAGJDHNBI @ 0xb4 v7a -> 0x100 v8a)
-        Match::m_AttackableEntities = 0x200; // FOUND v8a (manual: EMKJHAJNPDH.HCLFEIEFKHP @ 0x140 v7a -> 0x200 v8a)
+        Match::m_State = 0xcc; // dump novo
+        Match::m_LocalPlayer = 0xd8; // dump novo
+        Match::m_LocalObserver = 0x100; // dump novo
+        Match::m_AttackableEntities = 0x200; // dump novo
 
         // Camera
-        CameraControllerManager::m_Camera = 0x20; // FOUND v8a (via v7a dump field 'BAGLCCLIOEK' @ 0x10 in 'CameraControllerManager')
-        Camera::m_CachedPtr = 0x10; // FOUND v8a (via v7a dump field 'onPostRender' @ 0x8 in 'Camera')
-        Camera::ViewMatrix = 0x128; // FOUND v8a (manual: UNITY 64-bit worldToCameraMatrix property (estimativa). MANUAL verificar no Ghidra/IDA.)
+        CameraControllerManager::m_Camera = 0x20; // dump novo
+        Camera::m_CachedPtr = 0x10; // dump novo
+        Camera::ViewMatrix = 0x128; // MANUAL (mantido) — interno da Unity (estimativa)
 
         // Observer
-        Observer::m_TargetPlayer = 0x30; // FOUND v8a (manual: PHLHIEGPMMK.JAGIFDNJJFD @ 0x28 v7a -> 0x30 v8a)
+        Observer::m_TargetPlayer = 0x30; // dump novo
 
         // Player / PlayerNetwork
-        Player::IsClientBot = 0x438; // FOUND v8a (direct in 'Player')
-        Player::IsFemale = 0xB8C; // FOUND v8a (via v7a dump field '<DABCKMCKKOO>k__BackingField' @ 0x7D8 in 'Player')
-		Player::IsFiring = 0x7D0; // FOUND v8a (via v7a dump field '<NNFKGNCILNK>k__BackingField' @ 0x540 in 'Player')
-		Player::UGCStartFiring = 0x1F1; // FOUND v8a (direct in 'Player')
-        Player::IsPrepareAttack = 0x7D0; // FOUND v8a (via v7a dump field '<NNFKGNCILNK>k__BackingField' @ 0x540 in 'Player')
-        Player::m_IsCurFrameFowardLockToAimRot = 0x2D8; // FOUND v8a (via v7a dump field 'JFIGCLAAMMO' @ 0x1D4 in 'Player')
-        Player::m_WaitForForceSync = 0x798; // FOUND v8a (via v7a dump field 'OFEBBCHKOAJ' @ 0x520 in 'Player')
-        Player::m_TransformType = 0x11C4; // FOUND v8a (via v7a dump field 'JONOLCHJCJH' @ 0xC4C in 'Player')
-        Player::m_AimRotation = 0x5AC; // FOUND v8a (via v7a dump field '<MDCADLIAJIH>k__BackingField' @ 0x400 in 'Player')
-        Player::m_AuxAimRotation = 0x5BC; // FOUND v8a (via v7a dump field '<MPNEBFFFAMP>k__BackingField' @ 0x410 in 'Player')
-        Player::m_AimAssist = 0x5D0; // FOUND v8a (direct in 'Player')
-        Player::m_EAimAssit = 0x5F8; // FOUND v8a (via v7a dump field 'FGEAKHHPKCC' @ 0x438 in 'Player')
-        Player::m_AimAssistOnSighting = 0x600; // FOUND v8a (via v7a dump field 'BJPAKMNJHKM' @ 0x43C in 'Player')
-        Player::m_LastAimingInfoFromWeapon = 0xDC8; // FOUND v8a (via v7a dump field 'AKFLHNOIHED' @ 0x978 in 'Player')
-        Player::MainCameraTransform = 0x380; // FOUND v8a (direct in 'Player')
-        Player::m_SwapWeaponTime = 0x794; // FOUND v8a (via v7a dump field 'KDNABNMDIPA' @ 0x51C in 'Player')
-        Player::m_Attributes = 0x700; // FOUND v8a (via v7a dump field 'KDJHNBAECLM' @ 0x4BC in 'Player')
-        Player::m_AvatarManager = 0x708; // FOUND v8a (via v7a dump field 'KPMDIPJINJO' @ 0x4C0 in 'Player')
-        Player::m_InventoryManager = 0x6D8; // FOUND v8a (via v7a dump field 'LPEALCPGJBL' @ 0x4A8 in 'Player')
-        Player::m_UserControl = 0x468; // FOUND v8a (via v7a dump field 'ODIGILJGPAK' @ 0x304 in 'Player')
-        Player::m_HeadCollider = 0x6D0; // FOUND v8a (via v7a dump field 'NFDNMIOPILM' @ 0x4A4 in 'Player')
-        Player::m_fireColliders = 0xAD8; // FOUND v8a (via v7a dump field 'CGMPIMANBNC' @ 0x760 in 'Player')
-        Player::HeadNode = 0x638; // FOUND v8a (via v7a dump field 'PEMOFNFCLFB' @ 0x458 in 'Player')
-        Player::m_HipNode = 0x640; // FOUND v8a (via v7a dump field 'DIDHPFKMJJE' @ 0x45C in 'Player')
-        Player::m_BloodEffectNode = 0x648; // FOUND v8a (via v7a dump field 'KAKOKIHEPCF' @ 0x460 in 'Player')
-        Player::m_RootNode = 0x660; // FOUND v8a (via v7a dump field 'KNFKIDHJCCO' @ 0x46C in 'Player')
-        Player::m_BoneRootNode = 0x668; // FOUND v8a (via v7a dump field 'HNFBCFKKCJP' @ 0x470 in 'Player')
-        Player::m_WeaponMountNode = 0x630; // FOUND v8a (via v7a dump field 'GOLAIKOPNJK' @ 0x454 in 'Player')
-        Player::m_LeftWeaponNode = 0x690; // FOUND v8a (via v7a dump field 'OEHAGFIGILO' @ 0x484 in 'Player')
-        Player::m_FlightNode = 0x658; // FOUND v8a (via v7a dump field 'CLOEKEADCHD' @ 0x468 in 'Player')
-        Player::m_RightArmNode = 0x6A8; // FOUND v8a (via v7a dump field 'OEJFBHIIBBG' @ 0x490 in 'Player')
-        Player::m_LeftArmNode = 0x6A0; // FOUND v8a (via v7a dump field 'NBHOEOOCIIG' @ 0x48C in 'Player')
-        Player::m_RightForeArmNode = 0x6B8; // FOUND v8a (via v7a dump field 'PNPBBNDANEM' @ 0x498 in 'Player')
-        Player::m_LeftForeArmNode = 0x6C8; // FOUND v8a (via v7a dump field 'KNBJLEHOPIL' @ 0x4A0 in 'Player')
-        Player::m_RightHandNode = 0x6B0; // FOUND v8a (via v7a dump field 'DIHJDDNIJHP' @ 0x494 in 'Player')
-        Player::m_LeftHandNode = 0x6C0; // FOUND v8a (via v7a dump field 'KMIANNCLNOJ' @ 0x49C in 'Player')
-        Player::m_RightAnkleNode = 0x678; // FOUND v8a (via v7a dump field 'BIPBNNIFCNO' @ 0x478 in 'Player')
-        Player::m_LeftAnkleNode = 0x670; // FOUND v8a (via v7a dump field 'BOHFCEHMJBD' @ 0x474 in 'Player')
-        Player::m_RightToeNode = 0x688; // FOUND v8a (via v7a dump field 'INHGPBHOKPF' @ 0x480 in 'Player')
-        Player::m_LeftToeNode = 0x680; // FOUND v8a (via v7a dump field 'JLLMBADGKJP' @ 0x47C in 'Player')
+        // General
+        Player::IsClientBot = 0x4a0; // dump novo
+        Player::IsFemale = 0xc14; // dump novo
+        Player::IsFiring = 0x848; // dump novo
+        Player::UGCStartFiring = 0x259; // dump novo
+        Player::IsPrepareAttack = 0x848; // dump novo = IsFiring
+        Player::m_IsCurFrameFowardLockToAimRot = 0x340; // dump novo
+        Player::m_WaitForForceSync = 0x80c; // dump novo
+        Player::m_TransformType = 0x127c; // dump novo
 
-        // PlayerNetwork
-        PlayerNetwork::m_ShadowState = 0x2278; // FOUND v8a (direct in 'PlayerNetwork')
-        PlayerNetwork::m_Profile = 0x22A0; // FOUND v8a (via v7a dump field 'KAKEEBABBIP' @ 0x18CC in 'PlayerNetwork')
+        // Aim
+        Player::m_AimRotation = 0x614; // dump novo
+        Player::m_AuxAimRotation = 0x628; // dump novo
+        Player::m_AimAssist = 0x638; // dump novo
+        Player::m_EAimAssit = 0x660; // dump novo
+        Player::m_AimAssistOnSighting = 0x668; // dump novo
+        Player::m_LastAimingInfoFromWeapon = 0xe50; // dump novo
 
-        // Shadow
-        ShadowState::TargetPhysXPose = 0x80; // FOUND v8a (manual: LJBAALIHDEE.BGDKLEHDFJO @ 0x78 v7a -> 0x80 v8a)
+        // Transform / Camera
+        Player::MainCameraTransform = 0x3e8; // dump novo
+        Player::m_SwapWeaponTime = 0x804; // dump novo
 
-        // PlayerAttributes
-        PlayerAttributes::m_EatSpeedScale = 0x9C; // FOUND v8a (via v7a dump field 'PNLLLKKNBOG' @ 0x60 in 'PlayerAttributes')
-        PlayerAttributes::m_FireIntervalScale = 0x208; // FOUND v8a (via v7a dump field 'BONAJJEOPNF' @ 0x18C in 'PlayerAttributes')
-
-        // AimAssistAutoLock
-        AimAssistAutoLock::m_TargetHeuristic = 0x10; // FOUND v8a (manual: KBCJOEFJEFJ.KOLIMPJEBPC @ 0x8 v7a -> 0x10 v8a)
-        AimAssistAutoLock::m_Entity = 0x18; // FOUND v8a (manual: KLNCOMCJJGK.LDNBCNLCIGP @ 0xc v7a -> 0x18 v8a (nested in m_TargetHeuristic.TargetInfo))
+        // Managers
+        Player::m_Attributes = 0x768; // dump novo
+        Player::m_AvatarManager = 0x770; // dump novo
+        Player::m_InventoryManager = 0x740; // dump novo
 
         // UserControlHandler
-        UserControlHandler::m_AxisData = 0x68; // FOUND v8a (direct in 'UserControlHandler')
-        UserControlHandler::m_FingerInDashArea = 0x90; // FOUND v8a (direct in 'UserControlHandler')
-        UserControlHandler::m_IsTouched = 0x4B; // FOUND v8a (manual: UserControlAxisData.m_IsTouched @ 0x37 v7a -> 0x4b v8a)
-        UserControlHandler::m_LockFingerInDashArea = 0x94; // FOUND v8a (direct in 'UserControlHandler')
-        UserControlHandler::m_DashByMovingJoystick = 0x9C; // FOUND v8a (via v7a dump field '<DashByMovingJoystick>k__BackingField' @ 0x58 in 'UserControlHandler')
+        Player::m_UserControl = 0x4d0; // dump novo
+
+        // Colliders
+        Player::m_HeadCollider = 0x738; // dump novo
+        Player::m_fireColliders = 0xb58; // dump novo
+
+        // Bone Nodes
+        Player::HeadNode = 0x6a0; // dump novo
+        Player::m_HipNode = 0x6a8; // dump novo
+        Player::m_BloodEffectNode = 0x6b0; // dump novo
+        Player::m_RootNode = 0x6c8; // dump novo
+        Player::m_BoneRootNode = 0x6d0; // dump novo
+        Player::m_WeaponMountNode = 0x698; // dump novo
+        Player::m_LeftWeaponNode = 0x6f8; // dump novo
+        Player::m_FlightNode = 0x6c0; // dump novo
+        Player::m_RightArmNode = 0x710; // dump novo
+        Player::m_LeftArmNode = 0x708; // dump novo
+        Player::m_RightForeArmNode = 0x720; // dump novo
+        Player::m_LeftForeArmNode = 0x730; // dump novo
+        Player::m_RightHandNode = 0x718; // dump novo
+        Player::m_LeftHandNode = 0x728; // dump novo
+        Player::m_RightAnkleNode = 0x6e0; // dump novo
+        Player::m_LeftAnkleNode = 0x6d8; // dump novo
+        Player::m_RightToeNode = 0x6f0; // dump novo
+        Player::m_LeftToeNode = 0x6e8; // dump novo
+
+        // PlayerNetwork
+        PlayerNetwork::m_ShadowState = 0x24a8; // dump novo
+        PlayerNetwork::m_Profile = 0x24d0; // dump novo
+
+        // Shadow
+        ShadowState::TargetPhysXPose = 0x80; // dump novo
+
+        // PlayerAttributes
+        PlayerAttributes::m_EatSpeedScale = 0xd4; // dump novo
+        PlayerAttributes::m_FireIntervalScale = 0x258; // dump novo
+
+        // AimAssistAutoLock
+        AimAssistAutoLock::m_TargetHeuristic = 0x10; // dump novo
+        AimAssistAutoLock::m_Entity = 0x18; // dump novo
+
+        // UserControlHandler
+        UserControlHandler::m_AxisData = 0x68; // dump novo
+        UserControlHandler::m_FingerInDashArea = 0x90; // dump novo
+        UserControlHandler::m_IsTouched = 0x4b; // dump novo
+        UserControlHandler::m_LockFingerInDashArea = 0x94; // dump novo
+        UserControlHandler::m_DashByMovingJoystick = 0x9c; // dump novo
 
         // AimAssistOnSighting
-        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x80; // FOUND v8a (manual: EMFEPBOHGOJ.NAKKFIIIGNO @ 0x44 v7a -> 0x80 v8a)
+        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x80; // dump novo
 
         // HitObjectInfo
-        HitObjectInfo::RayDir = 0x40; // FOUND v8a (manual: GMPGMPFNMFP.IKDEGKIICJP @ 0x2c v7a -> 0x40 v8a)
-        HitObjectInfo::StartPosition = 0x4C; // FOUND v8a (manual: GMPGMPFNMFP.LMAEGPEAECO @ 0x38 v7a -> 0x4c v8a)
+        HitObjectInfo::RayDir = 0x40; // dump novo
+        HitObjectInfo::StartPosition = 0x4c; // dump novo
 
         // InventoryManager
-        InventoryManager::m_itemOnHand = 0xA0; // FOUND v8a (manual: OMELKCOGCBK.CHAFOMFBKEG @ 0x54 v7a -> 0xa0 v8a)
+        InventoryManager::m_itemOnHand = 0xa0; // dump novo
 
         // Avatar
-        AvatarManager::m_Avatar = 0x138; // FOUND v8a (via v7a dump field 'GIAMMAADHFN' @ 0xA8 in 'AvatarManager')
-        UMAAvatarBase::umaData = 0x28; // FOUND v8a (direct in 'UMAAvatarBase')
-        UmaAvatarSimple::IsVisible = 0x101; // FOUND v8a (direct in 'UmaAvatarSimple')
+        AvatarManager::m_Avatar = 0x138; // dump novo
+        UMAAvatarBase::umaData = 0x28; // dump novo
+        UmaAvatarSimple::IsVisible = 0x101; // dump novo
 
         // UMAData
-        UMAData::skeleton = 0x138; // FOUND v8a (direct in 'UMAData')
-        UMAData::isLocalPlayer = 0x80; // FOUND v8a (direct in 'UMAData')
-        UMAData::isTeammate = 0x81; // FOUND v8a (direct in 'UMAData')
+        UMAData::skeleton = 0x138; // dump novo
+        UMAData::isLocalPlayer = 0x80; // dump novo
+        UMAData::isTeammate = 0x81; // dump novo
 
         // UMASkeleton
-        UMASkeleton::boneHashDataLookup = 0x28; // FOUND v8a (direct in 'UMASkeleton')
-        UMASkeleton::boneNameHash = 0x10; // FOUND v8a (via v7a dump field 'updating' @ 0x8 in 'UMASkeleton')
-        UMASkeleton::boneTransform = 0x18; // FOUND v8a (via v7a dump field '<rootBoneHash>k__BackingField' @ 0x10 in 'UMASkeleton')
+        UMASkeleton::boneHashDataLookup = 0x28; // dump novo
+        UMASkeleton::boneNameHash = 0x10; // dump novo — (BoneData)
+        UMASkeleton::boneTransform = 0x18; // dump novo — (BoneData)
 
         // Replication
-        ReplicationEntity::m_PRIDataPool = 0x70; // FOUND v8a (manual: ReplicationEntity.m_PRIDataPool @ 0x48 v7a -> 0x70 v8a)
-        ReplicationEntity::m_Datas = 0x10; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Datas @ 0x8 v7a -> 0x10 v8a)
-        ReplicationEntity::HealthCurrentPtr = 0x20; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int8Handlers @ 0x10 v7a -> 0x20 v8a)
-        ReplicationEntity::HealthMaxPtr = 0x28; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_UInt8Handlers @ 0x14 v7a -> 0x28 v8a)
-        ReplicationEntity::WeaponPtr = 0x40; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int32Handlers @ 0x20 v7a -> 0x40 v8a)
-        ReplicationEntity::EpPtr = 0x50; // FOUND v8a (manual: ReplicationDataPoolUnsafe.m_Int64Handlers @ 0x28 v7a -> 0x50 v8a)
-        ReplicationEntity::Value = 0x18; // FOUND v8a (manual: ReplicationDataUnsafe.Value @ 0xc v7a -> 0x18 v8a)
+        ReplicationEntity::m_PRIDataPool = 0x70; // dump novo
+        ReplicationEntity::m_Datas = 0x10; // dump novo
+        ReplicationEntity::HealthCurrentPtr = 0x20; // dump novo
+        ReplicationEntity::HealthMaxPtr = 0x28; // dump novo
+        ReplicationEntity::WeaponPtr = 0x40; // dump novo
+        ReplicationEntity::EpPtr = 0x50; // dump novo
+        ReplicationEntity::Value = 0x18; // MANUAL (mantido) — 64-bit
 
         // Profile
-        BaseProfileInfo::AccountID = 0x10; // FOUND v8a (direct in 'BaseProfileInfo')
-        BaseProfileInfo::Level = 0x20; // FOUND v8a (direct in 'BaseProfileInfo')
-        BaseProfileInfo::NickName = 0x28; // FOUND v8a (direct in 'BaseProfileInfo')
+        BaseProfileInfo::AccountID = 0x10; // dump novo
+        BaseProfileInfo::Level = 0x20; // dump novo
+        BaseProfileInfo::NickName = 0x28; // dump novo
 
         // Weapon
-        Weapon::FireComponent = 0x80; // FOUND v8a (manual: FDAEPHMIEPC.<FLCGCBLDMLK>k__BackingField @ 0x58 v7a -> 0x80 v8a)
-        Weapon::m_WeaponData = 0x98; // FOUND v8a (manual: FDAEPHMIEPC.DJMMOHAJFPB @ 0x64 v7a -> 0x98 v8a)
-        Weapon::m_WeaponParams = 0xA8; // FOUND v8a (manual: FDAEPHMIEPC.JJMOJGHDLIF @ 0x6c v7a -> 0xa8 v8a)
-        Weapon::m_FireDuration = 0x5F0; // FOUND v8a (manual: FDAEPHMIEPC.NAGGOHBGHKK @ 0x4bc v7a -> 0x5f0 v8a)
-        Weapon::m_IsSighting = 0x7C0; // FOUND v8a (manual: FDAEPHMIEPC.PBJJMLOOLGH @ 0x5e4 v7a -> 0x7c0 v8a)
-        Weapon::tangentTheta = 0x18; // FOUND v8a (manual: BNFFFLEJGMA.HKNJLOBGIDP @ 0xc v7a -> 0x18 v8a (WeaponFireComponent subclass))
-        Weapon::IntWeaponType = 0xC8; // FOUND v8a (manual: AGACNOCEEFP.EJKCLOFONLG @ 0xb8 v7a -> 0xc8 v8a (WeaponData class))
+        Weapon::FireComponent = 0x80; // dump novo
+        Weapon::m_WeaponData = 0x98; // dump novo
+        Weapon::m_WeaponParams = 0xa8; // dump novo
+        Weapon::m_FireDuration = 0x644; // dump novo
+        Weapon::m_IsSighting = 0x8a0; // dump novo
+        Weapon::tangentTheta = 0x18; // dump novo
+        Weapon::IntWeaponType = 0xc8; // dump novo
 
         // WeaponParams
-        WeaponParams::FullDamageDistance = 0x50; // FOUND v8a (manual: EDDCGAGJBLO.LDMJIJODACB @ 0x48 v7a -> 0x50 v8a)
-        WeaponParams::PrefireDelay = 0x150; // FOUND v8a (manual: EDDCGAGJBLO.HCPMOLBCKIM @ 0x144 v7a -> 0x150 v8a)
-        WeaponParams::Range = 0x4C; // FOUND v8a (manual: EDDCGAGJBLO.JOLEGACBIKJ @ 0x44 v7a -> 0x4c v8a)
+        WeaponParams::FullDamageDistance = 0x50; // dump novo
+        WeaponParams::PrefireDelay = 0x150; // dump novo
+        WeaponParams::Range = 0x4c; // dump novo
 
         // PlayerTransformNode
-        PlayerTransformNode::Transform = 0x10; // FOUND v8a (manual: TransformNode.<transform>k__BackingField @ 0x8 v7a -> 0x10 v8a)
-        PlayerTransformNode::m_CachedTransform = 0x58; // FOUND v8a (manual: Entity.m_CachedTransform @ 0x38 v7a -> 0x58 v8a)
+        PlayerTransformNode::Transform = 0x10; // dump novo
+        PlayerTransformNode::m_CachedTransform = 0x58; // dump novo
 
         // get_position_Injected (fixed — so mudam se a Unity mudar)
         GetPosWorld::transObj = 0x10; // fixed v8a
@@ -879,7 +892,7 @@ void Offsets::FFTHV7A75() // v75 32-bit
 	// Colliders
 	Player::m_HeadCollider = 0x4A4;
 	Player::m_fireColliders = 0x760;
-	//Player::LockedAimingCollider = 0x54;
+	// Player::LockedAimingCollider = 0x54;
 
 	// Bone Nodes
 	Player::HeadNode = 0x458;
@@ -998,187 +1011,174 @@ void Offsets::FFTHV7A75() // v75 32-bit
 
 void Offsets::FFTHV7A76() // v76 32-bit
 {
-	AccessClass = 0x5C; // TODO: update manually
+        AccessClass = 0x5C; // MANUAL (mantido) — fora da dump
 
-	// GameVarDef
-	GameVarDef::GameVarDef_TypeInfo = 0xa5bc398; // TODO: update manually
-	GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x674;
-	GameVarDef::EnableAccelerationOnFalling = 0x27CA;
-	GameVarDef::EnableLowFallingSwapWeapon = 0x2AE5;
-	GameVarDef::RotationSensitivityMin = 0xF0C;
-	GameVarDef::RotationSensitivityMax = 0xF10;
-	GameVarDef::AimRotationSensitivityMin = 0xF14;
-	GameVarDef::AimRotationSensitivityMax = 0xF18;
+        // GameVarDef
+        GameVarDef::GameVarDef_TypeInfo = 0xa5bc398; // MANUAL (mantido) — typeinfo fora da dump
+        GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x72c; // dump novo
+        GameVarDef::EnableAccelerationOnFalling = 0x28f3; // dump novo
+        GameVarDef::EnableLowFallingSwapWeapon = 0x2c3d; // dump novo
+        GameVarDef::RotationSensitivityMin = 0xfd4; // dump novo
+        GameVarDef::RotationSensitivityMax = 0xfd8; // dump novo
+        GameVarDef::AimRotationSensitivityMin = 0xfdc; // dump novo
+        GameVarDef::AimRotationSensitivityMax = 0xfe0; // dump novo
 
-	// GameFacade
-	GameFacade::GameFacade_TypeInfo = 0xa5bc344; // TODO: update manually
-	GameFacade::CurrentMatchGame = 0x4;
+        // GameFacade
+        GameFacade::GameFacade_TypeInfo = 0xa5bc344; // MANUAL (mantido) — typeinfo fora da dump
+        GameFacade::CurrentMatchGame = 0x4; // dump novo
 
-	// MatchGame
-	MatchGame::m_Match = 0x50;
-	MatchGame::m_CameraControllerManager = 0x74;
+        // MatchGame
+        MatchGame::m_Match = 0x50; // dump novo
+        MatchGame::m_CameraControllerManager = 0x74; // dump novo
 
-	// Match
-	Match::m_State = 0x8C;
-	Match::m_LocalPlayer = 0x94;
-	Match::m_LocalObserver = 0xB4;
-	Match::m_AttackableEntities = 0x140;
+        // Match
+        Match::m_State = 0x8c; // dump novo
+        Match::m_LocalPlayer = 0x94; // dump novo
+        Match::m_LocalObserver = 0xb4; // dump novo
+        Match::m_AttackableEntities = 0x140; // dump novo
 
-	// Camera
-	CameraControllerManager::m_Camera = 0x10;
-	Camera::m_CachedPtr = 0x8;
-	Camera::ViewMatrix = 0xE8; // V7A: 0xE8 | FF MAX: 0xE4
+        // Camera
+        CameraControllerManager::m_Camera = 0x10; // dump novo
+        Camera::m_CachedPtr = 0x8; // dump novo
+        Camera::ViewMatrix = 0xE8; // MANUAL (mantido) — interno da Unity
 
-	// Observer
-	Observer::m_TargetPlayer = 0x28;
+        // Observer
+        Observer::m_TargetPlayer = 0x28; // dump novo
 
-	// Player / PlayerNetwork
-	// General
-	Player::IsClientBot = 0x2E4;
-	Player::IsFemale = 0x7D8;
-	Player::IsFiring = 0x540;
-	Player::UGCStartFiring = 0x13d;
-	Player::IsPrepareAttack = 0x540;
-	Player::m_IsCurFrameFowardLockToAimRot = 0x1D4;
-	Player::m_WaitForForceSync = 0x520;
-	Player::m_TransformType = 0xC4C;
+        // Player / PlayerNetwork
+        // General
+        Player::IsClientBot = 0x324; // dump novo
+        Player::IsFemale = 0x830; // dump novo
+        Player::IsFiring = 0x58c; // dump novo
+        Player::UGCStartFiring = 0x17d; // dump novo
+        Player::IsPrepareAttack = 0x58c; // dump novo = IsFiring
+        Player::m_IsCurFrameFowardLockToAimRot = 0x214; // dump novo
+        Player::m_WaitForForceSync = 0x56c; // dump novo
+        Player::m_TransformType = 0xcc8; // dump novo
+        Player::m_AimRotation = 0x440; // dump novo
+        Player::m_AuxAimRotation = 0x454; // dump novo
+        Player::m_AimAssist = 0x464; // dump novo
+        Player::m_EAimAssit = 0x47c; // dump novo
+        Player::m_AimAssistOnSighting = 0x480; // dump novo
+        Player::m_LastAimingInfoFromWeapon = 0x9d0; // dump novo
+        Player::MainCameraTransform = 0x28c; // dump novo
+        Player::m_SwapWeaponTime = 0x564; // dump novo
+        Player::m_Attributes = 0x500; // dump novo
+        Player::m_AvatarManager = 0x504; // dump novo
+        Player::m_InventoryManager = 0x4ec; // dump novo
+        Player::m_UserControl = 0x344; // dump novo
+        Player::m_HeadCollider = 0x4e8; // dump novo
+        Player::m_fireColliders = 0x7b4; // dump novo
+        Player::HeadNode = 0x49c; // dump novo
+        Player::m_HipNode = 0x4a0; // dump novo
+        Player::m_BloodEffectNode = 0x4a4; // dump novo
+        Player::m_RootNode = 0x4b0; // dump novo
+        Player::m_BoneRootNode = 0x4b4; // dump novo
+        Player::m_WeaponMountNode = 0x498; // dump novo
+        Player::m_LeftWeaponNode = 0x4c8; // dump novo
+        Player::m_FlightNode = 0x4ac; // dump novo
+        Player::m_RightArmNode = 0x4d4; // dump novo
+        Player::m_LeftArmNode = 0x4d0; // dump novo
+        Player::m_RightForeArmNode = 0x4dc; // dump novo
+        Player::m_LeftForeArmNode = 0x4e4; // dump novo
+        Player::m_RightHandNode = 0x4d8; // dump novo
+        Player::m_LeftHandNode = 0x4e0; // dump novo
+        Player::m_RightAnkleNode = 0x4bc; // dump novo
+        Player::m_LeftAnkleNode = 0x4b8; // dump novo
+        Player::m_RightToeNode = 0x4c4; // dump novo
+        Player::m_LeftToeNode = 0x4c0; // dump novo
 
-	// Aim
-	Player::m_AimRotation = 0x400;
-	Player::m_AuxAimRotation = 0x410;
-	Player::m_AimAssist = 0x420;
-	Player::m_EAimAssit = 0x438;
-	Player::m_AimAssistOnSighting = 0x43C;
-	Player::m_LastAimingInfoFromWeapon = 0x978;
+        // PlayerNetwork
+        PlayerNetwork::m_ShadowState = 0x1a60; // dump novo
+        PlayerNetwork::m_Profile = 0x1a74; // dump novo
 
-	// Transform / Camera
-	Player::MainCameraTransform = 0x24C;
-	Player::m_SwapWeaponTime = 0x51C;
+        // Shadow
+        ShadowState::TargetPhysXPose = 0x78; // dump novo
 
-	// Managers
-	Player::m_Attributes = 0x4BC;
-	Player::m_AvatarManager = 0x4C0;
-	Player::m_InventoryManager = 0x4A8;
+        // PlayerAttributes
+        PlayerAttributes::m_EatSpeedScale = 0x88; // dump novo
+        PlayerAttributes::m_FireIntervalScale = 0x1c4; // dump novo
 
-	// UserControlHandler
-	Player::m_UserControl = 0x304;
+        // AimAssistAutoLock
+        AimAssistAutoLock::m_TargetHeuristic = 0x8; // dump novo
+        AimAssistAutoLock::m_Entity = 0xc; // dump novo
 
-	// Colliders
-	Player::m_HeadCollider = 0x4A4;
-	Player::m_fireColliders = 0x760;
-	//Player::LockedAimingCollider = 0x54;
+        // UserControlHandler
+        UserControlHandler::m_AxisData = 0x34; // dump novo
+        UserControlHandler::m_FingerInDashArea = 0x4c; // dump novo
+        UserControlHandler::m_IsTouched = 0x37; // dump novo
+        UserControlHandler::m_LockFingerInDashArea = 0x50; // dump novo
+        UserControlHandler::m_DashByMovingJoystick = 0x58; // dump novo
 
-	// Bone Nodes
-	Player::HeadNode = 0x458;
-	Player::m_HipNode = 0x45C;
-	Player::m_BloodEffectNode = 0x460;
-	Player::m_RootNode = 0x46C;
-	Player::m_BoneRootNode = 0x470;
-	Player::m_WeaponMountNode = 0x454;
-	Player::m_LeftWeaponNode = 0x484;
-	Player::m_FlightNode = 0x468;
-	Player::m_RightArmNode = 0x490;
-	Player::m_LeftArmNode = 0x48C;
-	Player::m_RightForeArmNode = 0x498;
-	Player::m_LeftForeArmNode = 0x4A0;
-	Player::m_RightHandNode = 0x494;
-	Player::m_LeftHandNode = 0x49C;
-	Player::m_RightAnkleNode = 0x478;
-	Player::m_LeftAnkleNode = 0x474;
-	Player::m_RightToeNode = 0x480;
-	Player::m_LeftToeNode = 0x47C;
+        // AimAssistOnSighting
+        AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x44; // dump novo
 
-	// PlayerNetwork
-	PlayerNetwork::m_ShadowState = 0x18B8;
-	PlayerNetwork::m_Profile = 0x18CC;
+        // HitObjectInfo
+        HitObjectInfo::RayDir = 0x2c; // dump novo
+        HitObjectInfo::StartPosition = 0x38; // dump novo
 
-	// Shadow
-	ShadowState::TargetPhysXPose = 0x78;
+        // InventoryManager
+        InventoryManager::m_itemOnHand = 0x54; // dump novo
 
-	// PlayerAttributes
-	PlayerAttributes::m_EatSpeedScale = 0x60;
-	PlayerAttributes::m_FireIntervalScale = 0x18C;
+        // Avatar
+        AvatarManager::m_Avatar = 0xa8; // dump novo
+        UMAAvatarBase::umaData = 0x14; // dump novo
+        UmaAvatarSimple::IsVisible = 0x95; // dump novo
 
-	// AimAssistAutoLock
-	AimAssistAutoLock::m_TargetHeuristic = 0xC;
-	AimAssistAutoLock::m_Entity = 0xC;
+        // UmaData
+        UMAData::skeleton = 0xcc; // dump novo
+        UMAData::isLocalPlayer = 0x58; // dump novo
+        UMAData::isTeammate = 0x59; // dump novo
 
-	// UserControlHandler
-	UserControlHandler::m_AxisData = 0x34;
-	UserControlHandler::m_FingerInDashArea = 0x4C;
-	UserControlHandler::m_IsTouched = 0x37;
-	UserControlHandler::m_LockFingerInDashArea = 0x50;
-	UserControlHandler::m_DashByMovingJoystick = 0x58;
+        // Skeleton
+        UMASkeleton::boneHashDataLookup = 0x18; // dump novo
+        UMASkeleton::boneNameHash = 0x8; // dump novo — (BoneData)
+        UMASkeleton::boneTransform = 0x10; // dump novo — (BoneData)
 
-	// AimAssistOnSighting
-	AimAssistOnSighting::m_fAimAssistCurrentLerpTime = 0x44;
+        // Replication
+        ReplicationEntity::m_PRIDataPool = 0x48; // dump novo
+        ReplicationEntity::m_Datas = 0x8; // dump novo
+        ReplicationEntity::HealthCurrentPtr = 0x10; // dump novo
+        ReplicationEntity::HealthMaxPtr = 0x14; // dump novo
+        ReplicationEntity::WeaponPtr = 0x20; // dump novo
+        ReplicationEntity::EpPtr = 0x28; // dump novo
+        ReplicationEntity::Value = 0x10; // MANUAL (mantido) — validado em campo na V8.2
 
-	// HitObjectInfo
-	HitObjectInfo::RayDir = 0x2C;
-	HitObjectInfo::StartPosition = 0x38;
+        // Profile
+        BaseProfileInfo::AccountID = 0x8; // dump novo
+        BaseProfileInfo::Level = 0x14; // dump novo
+        BaseProfileInfo::NickName = 0x18; // dump novo
 
-	// InventoryManager
-	InventoryManager::m_itemOnHand = 0x54;
+        // Weapon
+        Weapon::FireComponent = 0x58; // dump novo
+        Weapon::m_WeaponData = 0x64; // dump novo
+        Weapon::m_WeaponParams = 0x6c; // dump novo
+        Weapon::m_FireDuration = 0x500; // dump novo
+        Weapon::m_IsSighting = 0x670; // dump novo
+        Weapon::tangentTheta = 0xc; // dump novo
+        Weapon::IntWeaponType = 0xb8; // dump novo
 
-	// Avatar
-	AvatarManager::m_Avatar = 0xA8;
-	UMAAvatarBase::umaData = 0x14;
-	UmaAvatarSimple::IsVisible = 0x95;
+        // WeaponParams
+        WeaponParams::FullDamageDistance = 0x48; // dump novo
+        WeaponParams::PrefireDelay = 0x144; // dump novo
+        WeaponParams::Range = 0x44; // dump novo
 
-	// UmaData
-	UMAData::skeleton = 0xCC;
-	UMAData::isLocalPlayer = 0x58;
-	UMAData::isTeammate = 0x59;
+        // PlayerTransformNode
+        PlayerTransformNode::Transform = 0x8; // dump novo
+        PlayerTransformNode::m_CachedTransform = 0x38; // dump novo
 
-	// Skeleton
-	UMASkeleton::boneHashDataLookup = 0x18;
-	UMASkeleton::boneNameHash = 0x8;
-	UMASkeleton::boneTransform = 0x10;
+        // get_position_Injected (fixed — so mudam se a Unity mudar)
+        GetPosWorld::transObj = 0x8; // fixed
+        GetPosWorld::matrix = 0x20; // fixed
+        GetPosWorld::index = 0x24; // fixed
+        GetPosWorld::matrix_list = 0x18; // fixed
+        GetPosWorld::matrix_indices = 0x1C; // fixed
 
-	// Replication
-	ReplicationEntity::m_PRIDataPool = 0x48;
-	ReplicationEntity::m_Datas = 0x8;
-	ReplicationEntity::HealthCurrentPtr = 0x10;
-	ReplicationEntity::HealthMaxPtr = 0x14;
-	ReplicationEntity::WeaponPtr = 0x20;
-	ReplicationEntity::EpPtr = 0x28;
-	ReplicationEntity::Value = 0x10;
-
-	// Profile
-	BaseProfileInfo::AccountID = 0x8;
-	BaseProfileInfo::Level = 0x14;
-	BaseProfileInfo::NickName = 0x18;
-
-	// Weapon
-	Weapon::FireComponent = 0x58;
-	Weapon::m_WeaponData = 0x64;
-	Weapon::m_WeaponParams = 0x6C;
-	Weapon::m_FireDuration = 0x4BC;
-	Weapon::m_IsSighting = 0x5E4;
-	Weapon::tangentTheta = 0xC;
-	Weapon::IntWeaponType = 0xB8;
-
-	// WeaponParams
-	WeaponParams::FullDamageDistance = 0x48;
-	WeaponParams::PrefireDelay = 0x144;
-	WeaponParams::Range = 0x44;
-
-	// PlayerTransformNode
-	PlayerTransformNode::Transform = 0x8;
-	PlayerTransformNode::m_CachedTransform = 0x38;
-
-	// get_position_Injected
-	GetPosWorld::transObj = 0x8; // fixed (may change if Unity updates)
-	GetPosWorld::matrix = 0x20; // fixed (may change if Unity updates)
-	GetPosWorld::index = 0x24; // fixed (may change if Unity updates)
-	GetPosWorld::matrix_list = 0x18; // fixed (may change if Unity updates)
-	GetPosWorld::matrix_indices = 0x1C; // fixed (may change if Unity updates)
-
-	// GetHeadPosition
-	GetPosWorld::HeadColliderMale = 0x38; // fixed (may change if Unity updates)
-	GetPosWorld::HeadColliderFemale = 0x3C; // fixed (may change if Unity updates)
-	GetPosWorld::ColliderTransform = 0x8; // fixed (may change if Unity updates)
-	GetPosWorld::BoundsCenter_1 = 0x28; // fixed (may change if Unity updates)
-	GetPosWorld::BoundsCenter_2 = 0x14; // fixed (may change if Unity updates)
-	GetPosWorld::BoundsCenter_3 = 0x60; // fixed (may change if Unity updates)
+        // GetHeadPosition (fixed — so mudam se a Unity mudar)
+        GetPosWorld::HeadColliderMale = 0x38; // fixed
+        GetPosWorld::HeadColliderFemale = 0x3C; // fixed
+        GetPosWorld::ColliderTransform = 0x8; // fixed
+        GetPosWorld::BoundsCenter_1 = 0x28; // fixed
+        GetPosWorld::BoundsCenter_2 = 0x14; // fixed
+        GetPosWorld::BoundsCenter_3 = 0x60; // fixed
 }
