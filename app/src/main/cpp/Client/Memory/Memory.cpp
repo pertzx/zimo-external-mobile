@@ -78,7 +78,7 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-18-RWFIX-V7";
+        "StormMemory-2026-09-19-RWLOCK-V8.3";
 
     /*
      * Prioridade de acesso:

@@ -239,3 +239,15 @@
 4563	5440	8114615002079368	C:/zimo-external-mobile/app/src/main/assets/bin/armeabi-v7a/stormdaemon	1d400caf5c3502c8
 5	128	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
 9	189	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+10	326	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+26	8465	8114634277647619	CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o	4fe5e8ea3e34b720
+8469	10457	8114634296404443	C:/zimo-external-mobile/app/src/main/assets/bin/armeabi-v7a/stormdaemon	1d400caf5c3502c8
+5	113	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+6	120	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+28	326	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86
+295	7498	8114649269944433	CMakeFiles/client.dir/Client/Memory/Memory.cpp.o	b1db09f69481ba17
+322	8464	8114649280356697	CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o	4fe5e8ea3e34b720
+8465	9858	8114649293920102	C:/zimo-external-mobile/app/src/main/assets/bin/armeabi-v7a/stormdaemon	1d400caf5c3502c8
+34	19004	8114649385480809	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	72a5221632be300d
+19005	23023	8114649423522758	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/armeabi-v7a/libclient.so	447489ab51395ce7
+9	152	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/armeabi-v7a/CMakeFiles/cmake.verify_globs	1c4c67a40c385c86

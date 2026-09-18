@@ -4,6 +4,22 @@
 // (RWSYSCALL-V8 — substitui a versao da Task 17/PONTEFIX-V5)
 // (V8.1 — re-adiciona GetLastErrno()/GetRetryCount() usados pelo
 //  daemon_main do RWFIX-V7; grava errno tambem nas falhas de ESCRITA)
+// (V8.2 — GUARDA DE ESCRITA: recusa write fora de regiao gravavel do
+//  alvo via /proc/<pid>/maps com TTL 250 ms. /proc/pid/mem IGNORA a
+//  protecao de pagina — escrita em endereco garbage (exploit disparado
+//  com dado parcial) corrompia o jogo: crash ao chegar na entitylist)
+// (V8.3 — WRITELOCK: com V8.2 o jogo AINDA crashava ao ENTRAR na partida
+//  (watermark aparecia, count de players presa em 0). Causa: o guard so
+//  bloqueia endereco NAO-gravavel — garbage que cai em rw-p VALIDA (heap
+//  do jogo reutilizado na transicao lobby->partida) PASSA e corrompe
+//  objeto vivo. E o cliente tem writer a cada frame: AtributarArma
+//  escrevia 1.0f SEM toggle e SEM check; MoreDamage/FireDelay/Aimlock
+//  escreviam todo frame quando ligados; AimLock2x sem null-check.
+//  AGORA: KILL-SWITCH no chokepoint — STORM_WRITES_ENABLED=0 (padrao)
+//  faz TODO WriteMem virar no-op ABSORVIDO (retorna true, wrKilled++),
+//  nenhuma syscall de escrita acontece. ESP nao precisa de ESCRITA.
+//  Re-habilitar: -DSTORM_WRITES_ENABLED=1 (ou SetWritesEnabled(true)).
+//  Com 1, a guarda V8.2 continua ativa.)
 //
 // ARQUITETURA (o que continua valendo):
 //   - Leitura : __NR_pread64  em /proc/<pid>/mem (fd aberto e fechado na hora)
@@ -91,6 +107,8 @@
 
 #include <atomic>
 #include <mutex>
+#include <string>
+#include <vector>
 
 namespace StormRW
 {
@@ -610,6 +628,10 @@ namespace StormRW
         uint64_t vmFbWrites;   /* escritas salvas pelo process_vm_writev   */
         uint64_t negCreated;   /* entradas negativas criadas               */
         uint64_t openFails;    /* openat de /proc/pid/mem falhou           */
+        uint64_t wrRefused;    /* (V8.2) escritas recusadas pelo guard     */
+        uint64_t mapsFails;    /* (V8.2) leituras de /proc/pid/maps falhas */
+        uint64_t wrKilled;     /* (V8.3) escritas absorvidas pelo lock     */
+        uint32_t writesOn;     /* (V8.3) canal de escrita habilitado?      */
         uint32_t lastReadErrno;/* ultimo errno de falha definitiva de RW   */
         uint32_t lastReadStage;/* 0=nada 1=bloco 2=exato 3=vm 4=open       */
     };
@@ -635,6 +657,26 @@ namespace StormRW
         std::atomic<uint64_t> vmFbWrites{ 0 };
         std::atomic<uint64_t> negCreated{ 0 };
         std::atomic<uint64_t> openFails{ 0 };
+
+        /* (V8.2) guarda de escrita */
+        std::atomic<uint64_t> wrRefused{ 0 };
+        std::atomic<uint64_t> mapsFails{ 0 };
+
+        /*
+         * (V8.3) WRITELOCK: padrao = DESLIGADO (0). Compile-time
+         * STORM_WRITES_ENABLED=1 levanta o default; SetWritesEnabled()
+         * muda em runtime. Padrao desligado = nenhuma syscall de escrita
+         * acontece — impossivel corromper o jogo enquanto o ESP/diagnostico
+         * esta em foco (ESP e read-only).
+         */
+        std::atomic<uint32_t> writesEnabled{
+#ifdef STORM_WRITES_ENABLED
+            STORM_WRITES_ENABLED ? 1u : 0u
+#else
+            0u
+#endif
+        };
+        std::atomic<uint64_t> wrKilled{ 0 };
         std::atomic<uint32_t> lastReadErrno{ 0 };
         std::atomic<uint32_t> lastReadStage{ 0 };
     };
@@ -727,10 +769,38 @@ namespace StormRW
         st.vmFbWrites = s.vmFbWrites.load();
         st.negCreated = s.negCreated.load();
         st.openFails = s.openFails.load();
+        st.wrRefused = s.wrRefused.load();
+        st.mapsFails = s.mapsFails.load();
+        st.wrKilled = s.wrKilled.load();
+        st.writesOn = s.writesEnabled.load();
         st.lastReadErrno = s.lastReadErrno.load();
         st.lastReadStage = s.lastReadStage.load();
 
         return st;
+    }
+
+    /*
+     * (V8.3) WRITELOCK — controle do canal de escrita.
+     *   false (default): WriteMem e no-op absorvido (retorna true e conta
+     *     wrKilled) — nenhuma syscall de escrita, impossivel corromper o
+     *     alvo. Fase de diagnostico ESP/count nao precisa de escrita.
+     *   true: escrita real volta (e a guarda V8.2 continua valendo).
+     */
+    inline void
+    SetWritesEnabled(bool on)
+    {
+        C().writesEnabled.store(
+            on ? 1u : 0u,
+            std::memory_order_relaxed
+        );
+    }
+
+    inline bool
+    AreWritesEnabled()
+    {
+        return C().writesEnabled.load(
+            std::memory_order_relaxed
+        ) != 0;
     }
 
     /*
@@ -758,6 +828,273 @@ namespace StormRW
         return C().retries.load(
             std::memory_order_relaxed
         );
+    }
+
+    // ========================================================================
+    // (V8.2) GUARDA DE ESCRITA — /proc/<pid>/maps
+    // ========================================================================
+    /*
+     * A leitura (pread64) e PASSIVA: nunca crasha o alvo. A ESCRITA e a
+     * unica via de corrupcao — e /proc/pid/mem IGNORA a protecao de
+     * pagina (escreve ate em r-xp, como ptrace POKE). Com a cadeia
+     * resolvendo alvos "as vezes", um exploit pode disparar com endereco
+     * garbage (LocalPlayer/entidade lido parcial) e corromper o jogo:
+     * crash "quando chega na entitylist".
+     *
+     * REGRA: so deixa escrever se [addr, addr+size) cair INTEIRO dentro
+     * de UMA regiao gravavel (perm 'w') e nao-bloqueada ([stack], [vdso],
+     * [vvar], [vsyscall]). Fora disso: RECUSA (errno EACCES na
+     * telemetria — aparece como [WRITE] FALHOU errno=13).
+     *
+     * Fail-open: se o maps nao puder ser lido, mantem o comportamento
+     * anterior (deixa escrever) e registra em mapsFails.
+     * Custo: parse com cache TTL de 250 ms por pid (escrita e rara
+     * perto da leitura).
+     */
+
+    struct MapRange
+    {
+        uint64_t start;
+        uint64_t end;      /* exclusivo                        */
+        bool writable;
+        bool blocked;      /* [stack]/[vdso]/[vvar]/[vsyscall] */
+    };
+
+    inline uint64_t
+    ParseHex(
+        const char*& p
+    )
+    {
+        uint64_t v = 0;
+
+        for (;;)
+        {
+            const char c = *p;
+
+            if (c >= '0' && c <= '9')
+                v = v * 16ULL + (uint64_t)(c - '0');
+            else if (c >= 'a' && c <= 'f')
+                v = v * 16ULL + (uint64_t)(c - 'a' + 10);
+            else if (c >= 'A' && c <= 'F')
+                v = v * 16ULL + (uint64_t)(c - 'A' + 10);
+            else
+                break;
+
+            p++;
+        }
+
+        return v;
+    }
+
+    inline bool
+    LoadMaps(
+        pid_t pid,
+        std::vector<MapRange>& out
+    )
+    {
+        out.clear();
+
+        char path[64];
+
+        std::snprintf(
+            path,
+            sizeof(path),
+            "/proc/%d/maps",
+            static_cast<int>(pid)
+        );
+
+        const int fd = static_cast<int>(
+            ::syscall(
+                static_cast<long>(__NR_openat),
+                static_cast<int>(AT_FDCWD),
+                path,
+                O_RDONLY | O_CLOEXEC,
+                0UL
+            ));
+
+        if (fd < 0)
+            return false;
+
+        std::string text;
+        char buf[16384];
+        bool ok = true;
+
+        for (;;)
+        {
+            const ssize_t n = static_cast<ssize_t>(
+                ::syscall(
+                    static_cast<long>(__NR_read),
+                    fd,
+                    buf,
+                    sizeof(buf)
+                ));
+
+            if (n < 0)
+            {
+                if (errno == EINTR)
+                    continue;
+
+                ok = false;
+                break;
+            }
+
+            if (n == 0)
+                break;
+
+            text.append(buf, static_cast<size_t>(n));
+        }
+
+        SysClose(fd);
+
+        if (!ok)
+            return false;
+
+        static const char* const kBlocked[] = {
+            "[stack]", "[vdso]", "[vvar]", "[vsyscall]"
+        };
+
+        size_t pos = 0;
+
+        while (pos < text.size())
+        {
+            size_t eol = text.find('\n', pos);
+
+            if (eol == std::string::npos)
+                eol = text.size();
+
+            const char* p = text.c_str() + pos;
+            const char* lineEnd = text.c_str() + eol;
+
+            pos = eol + 1;
+
+            MapRange r{};
+
+            r.start = ParseHex(p);
+
+            if (p < lineEnd && *p == '-')
+            {
+                p++;
+                r.end = ParseHex(p);
+            }
+            else
+            {
+                continue;
+            }
+
+            if (r.end <= r.start)
+                continue;
+
+            while (p < lineEnd && (*p == ' ' || *p == '\t'))
+                p++;
+
+            if (p + 1 < lineEnd)
+                r.writable = (p[1] == 'w');
+
+            /* caminho = apos perms/offset/dev/inode (4 campos) */
+            const char* q = p;
+
+            for (int f = 0; f < 4 && q < lineEnd; )
+            {
+                if (*q == ' ' || *q == '\t')
+                {
+                    q++;
+                    continue;
+                }
+
+                while (q < lineEnd && *q != ' ' && *q != '\t')
+                    q++;
+
+                f++;
+            }
+
+            while (q < lineEnd && (*q == ' ' || *q == '\t'))
+                q++;
+
+            if (q < lineEnd && *q == '[')
+            {
+                for (const char* b : kBlocked)
+                {
+                    const size_t bl = std::strlen(b);
+
+                    if (static_cast<size_t>(lineEnd - q) >= bl &&
+                        std::memcmp(q, b, bl) == 0)
+                    {
+                        r.blocked = true;
+                        break;
+                    }
+                }
+            }
+
+            out.push_back(r);
+        }
+
+        return true;
+    }
+
+    struct MapsCache
+    {
+        std::mutex mtx;
+        pid_t pid = 0;
+        long long expiryMs = 0;
+        bool valid = false;
+        std::vector<MapRange> ranges;
+    };
+
+    inline MapsCache&
+    MC()
+    {
+        static MapsCache c;
+        return c;
+    }
+
+    /*
+     * true  = pode escrever (regiao gravavel; ou maps ilegivel =
+     *         fail-open, comportamento anterior)
+     * false = RECUSADO — a syscall de escrita NAO deve ser feita.
+     */
+    inline bool
+    AddrWritable(
+        pid_t pid,
+        uint64_t address,
+        size_t size
+    )
+    {
+        if (pid <= 0 || address == 0 || size == 0)
+            return false;
+
+        MapsCache& mc = MC();
+        const long long now = NowMs();
+
+        std::lock_guard<std::mutex> lk(mc.mtx);
+
+        if (!mc.valid || mc.pid != pid || now >= mc.expiryMs)
+        {
+            mc.valid = LoadMaps(pid, mc.ranges);
+            mc.pid = pid;
+            mc.expiryMs = now + 250;
+
+            if (!mc.valid)
+            {
+                mc.ranges.clear();
+
+                C().mapsFails.fetch_add(1);
+            }
+        }
+
+        if (!mc.valid)
+            return true;  /* fail-open: sem maps nao ha como julgar */
+
+        for (const MapRange& r : mc.ranges)
+        {
+            if (address >= r.start &&
+                address < r.end &&
+                size <= r.end - address)
+            {
+                return r.writable && !r.blocked;
+            }
+        }
+
+        return false;  /* fora de qualquer mapeamento: recusa */
     }
 
     // ========================================================================
@@ -1298,6 +1635,43 @@ namespace StormRW
 
         if (pid <= 0 || address == 0 || !buffer || size == 0)
             return false;
+
+        /*
+         * (V8.3) WRITELOCK — primeiro checkpoint do WriteMem. Com o canal
+         * desligado (padrao), a escrita e ABSORVIDA: incrementa wrKilled e
+         * retorna true (sucesso simulado, para o cliente nao entrar em
+         * ciclo de reconexao/erro). NENHUMA syscall de escrita acontece.
+         *
+         * Por que absorver com true e nao recusar com false: o Silent trata
+         * write false como ponte caida (fecha socket, reconecta, dorme) —
+         * recusar geraria churn de rede a cada frame. Absorvido, o cliente
+         * segue normal e o [STATS] mostra wrKilled crescendo = volume real
+         * de escritas que o jogo deixou de receber.
+         */
+        if (C().writesEnabled.load(std::memory_order_relaxed) == 0)
+        {
+            C().wrKilled.fetch_add(1, std::memory_order_relaxed);
+
+            return true;
+        }
+
+        /*
+         * (V8.2) GUARDA: recusa escrita fora de regiao gravavel do alvo.
+         * errno EACCES fica na telemetria — [WRITE] FALHOU errno=13 no
+         * log do daemon = endereco recusado pelo guard (garbage / regiao
+         * nao-gravavel), NAO e falha da syscall.
+         */
+        if (!AddrWritable(pid, address, size))
+        {
+            s.wrRefused.fetch_add(1);
+
+            s.lastReadErrno.store(
+                (uint32_t)EACCES,
+                std::memory_order_relaxed
+            );
+
+            return false;
+        }
 
         const int fd =
             SysOpenMem(pid, true);

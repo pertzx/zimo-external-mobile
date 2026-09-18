@@ -271,3 +271,15 @@
 5450	6536	8114614941736428	C:/zimo-external-mobile/app/src/main/assets/bin/arm64-v8a/stormdaemon	8597aa9d2036be58
 4	372	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
 6	418	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+9	221	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+54	7694	8114634154271058	CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o	e5bb809be4e963f8
+7699	10059	8114634180532391	C:/zimo-external-mobile/app/src/main/assets/bin/arm64-v8a/stormdaemon	8597aa9d2036be58
+6	478	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+7	295	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+27	383	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08
+489	10274	8114648913251889	CMakeFiles/client.dir/Client/Memory/Memory.cpp.o	4af837585ea92904
+705	10948	8114648918850983	CMakeFiles/daemon.dir/Daemon/daemon_main.cpp.o	e5bb809be4e963f8
+10948	13438	8114648944723651	C:/zimo-external-mobile/app/src/main/assets/bin/arm64-v8a/stormdaemon	8597aa9d2036be58
+113	31997	8114649130566429	CMakeFiles/client.dir/Client/Draw/Draw.cpp.o	906ac4c7783db770
+31999	36968	8114649176696103	C:/zimo-external-mobile/app/build/intermediates/cxx/Debug/2ka4sv6u/obj/arm64-v8a/libclient.so	266d11512d21fcda
+7	405	0	C:/zimo-external-mobile/app/.cxx/Debug/2ka4sv6u/arm64-v8a/CMakeFiles/cmake.verify_globs	27f58e4e345ccb08

@@ -2343,14 +2343,44 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                         int level = g_Globals.Misc.Exploits.LocalPlayer.AtributarArmaLevel;
                         if (level < 0 || level > 3) level = 0;
                         
-                        g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, fireIntervalLevels[level]);
+                        /*
+                         * (V8.3) So escreve se o valor atual difere do alvo:
+                         * corta o write de "todo frame" para "so na mudanca".
+                         */
+                        const uintptr_t fireIntervalAddr =
+                                PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale;
+
+                        if ( g_FreeFireMemory.Read<float>( fireIntervalAddr ) != fireIntervalLevels[level] )
+                                g_FreeFireMemory.Write<float>( fireIntervalAddr, fireIntervalLevels[level] );
                 }
         }
         else
         {
-                if (PlayerAttributes != 0)
+                /*
+                 * (V8.3) FIX DO CRASH DE ENTRADA NA PARTIDA: o else antigo
+                 * escrevia 1.0f TODO FRAME assim que PlayerAttributes != 0,
+                 * MESMO com o exploit DESLIGADO. Na transicao lobby->partida
+                 * a cadeia resolve LocalPlayer "as vezes" parcial/garbage;
+                 * PlayerAttributes lixo != 0 recebia write float em endereco
+                 * errado a cada frame -> heap do jogo corrompida -> crash
+                 * exatamente ao entrar na partida. Padrao correto (igual
+                 * BugarPixel/Precision): restaura UMA vez na transicao do
+                 * toggle, e so se o valor atual diferir de 1.0f.
+                 */
+                static bool lastAtributarArmaState = false;
+
+                if ( lastAtributarArmaState )
                 {
-                        g_FreeFireMemory.Write<float>(PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale, 1.0f);
+                        lastAtributarArmaState = false;
+
+                        if ( PlayerAttributes != 0 )
+                        {
+                                const uintptr_t fireIntervalAddr =
+                                        PlayerAttributes + Offsets::PlayerAttributes::m_FireIntervalScale;
+
+                                if ( g_FreeFireMemory.Read<float>( fireIntervalAddr ) != 1.0f )
+                                        g_FreeFireMemory.Write<float>( fireIntervalAddr, 1.0f );
+                        }
                 }
         }
         
@@ -3599,21 +3629,27 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
         }
 
         // --- MoreDamage ---
-        if ( g_Globals.Misc.Exploits.LocalPlayer.MoreDamage )
+        if ( g_Globals.Misc.Exploits.LocalPlayer.MoreDamage && WeaponParams != 0 )
         {
-                g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::FullDamageDistance, 400.0f );
+                /* (V8.3) null-check + so escreve se diferir (antes: todo frame). */
+                if ( g_FreeFireMemory.Read<float>( WeaponParams + Offsets::WeaponParams::FullDamageDistance ) != 400.0f )
+                        g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::FullDamageDistance, 400.0f );
         }
 
         // --- FireDelay ---
-        if ( g_Globals.Misc.Exploits.LocalPlayer.FireDelay )
+        if ( g_Globals.Misc.Exploits.LocalPlayer.FireDelay && WeaponParams != 0 )
         {
-                g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::PrefireDelay, 0.0f );
+                /* (V8.3) null-check + so escreve se diferir (antes: todo frame). */
+                if ( g_FreeFireMemory.Read<float>( WeaponParams + Offsets::WeaponParams::PrefireDelay ) != 0.0f )
+                        g_FreeFireMemory.Write<float>( WeaponParams + Offsets::WeaponParams::PrefireDelay, 0.0f );
         }
 
         // --- Aimlock ---
-        if ( g_Globals.Misc.Exploits.LocalPlayer.Aimlock )
+        if ( g_Globals.Misc.Exploits.LocalPlayer.Aimlock && m_itemOnHand != 0 )
         {
-                g_FreeFireMemory.Write<float>( m_itemOnHand + Offsets::Weapon::m_FireDuration, -3.0f );
+                /* (V8.3) null-check + so escreve se diferir (antes: todo frame). */
+                if ( g_FreeFireMemory.Read<float>( m_itemOnHand + Offsets::Weapon::m_FireDuration ) != -3.0f )
+                        g_FreeFireMemory.Write<float>( m_itemOnHand + Offsets::Weapon::m_FireDuration, -3.0f );
         }
 
         // --- AimLock2x ---
@@ -3623,7 +3659,10 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 if ( isSighting )
                 {
                         uintptr_t aimassist = ReadPtr( localPlayer + Offsets::Player::m_AimAssistOnSighting );
-                        g_FreeFireMemory.Write<float>( aimassist + Offsets::AimAssistOnSighting::m_fAimAssistCurrentLerpTime, 0.0f );
+
+                        /* (V8.3) faltava null-check: aimassist garbage recebia write todo frame. */
+                        if ( aimassist != 0 )
+                                g_FreeFireMemory.Write<float>( aimassist + Offsets::AimAssistOnSighting::m_fAimAssistCurrentLerpTime, 0.0f );
                 }
         }
 
