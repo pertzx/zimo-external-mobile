@@ -41,6 +41,13 @@ namespace BridgeClient
     bool IsConnected();
 
     /*
+     * Texto do ÚLTIMO erro de connect ("" quando conectado). Usado pelo
+     * Memory pra explicar a causa raiz da "PONTE INDISPONIVEL" na tag
+     * StormMemory (o filtro de log do usuário não captura StormBridge).
+     */
+    const char* LastConnectError();
+
+    /*
      * Envia um pedido completo e devolve a resposta.
      * Internamente reconecta UMA vez em caso de falha (daemon reiniciou).
      */

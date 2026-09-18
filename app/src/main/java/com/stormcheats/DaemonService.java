@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -23,10 +24,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ============================================================================
- * DaemonService - GERENCIADOR DO DAEMON-PONTE (root) — STEALTH
+ * DaemonService - GERENCIADOR DO DAEMON-PONTE (root) — STEALTH + DIAGNÓSTICO
  * ============================================================================
  *
- * STEALTH (anti-ban):
+ * STEALTH (anti-ban) — mantido:
  *  - Nada de nomes fixos conhecidos ("stormdaemon", "stormbridge.sock",
  *    "stormbridge.log"). Tudo vive num diretorio oculto com token RANDOMICO
  *    por instalacao: /data/local/tmp/.sysa_<tok>/  (o ponto na frente esconde
@@ -42,6 +43,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *  - O daemon se disfarcA de "appstats" (comm/cmdline) la dentro dele.
  *  - Na primeira execucao desta versao, os rastros da versao antiga
  *    (stormdaemon, stormbridge.*, libc++_shared.so solto) sao apagados.
+ *
+ * DIAGNOSTICO (NOVO — motivo desta versao):
+ *  - A versao anterior engolia TODOS os erros (catch Throwable ignored).
+ *    Resultado: se o root nao estava concedido, se o asset nao existia, se o
+ *    daemon morria no boot ou o SELinux bloqueava o connect, o app ficava
+ *    MUDO e o usuario so via "[INIT] FALHA / restart async" do lado do jogo.
+ *  - Agora CADA etapa loga o resultado com o tag StormDaemonMgr (logcat do
+ *    PROPRIO app — o jogo nao consegue ler logcat de outro UID, entao nao
+ *    vaza nada pra ele).
+ *  - Root negado -> retry automatico a cada 10s (basta conceder no Magisk
+ *    com o app aberto, sem reinstalar).
+ *  - Daemon morre no boot -> a saida do processo root (erro do linker,
+ *    "CANNOT LINK EXECUTABLE", "not executable", etc) e capturada e logada.
+ *  - Daemon vivo mas socket mudo -> checa bind no /proc/net/unix e aplica
+ *    regras SELinux minimas via magiskpolicy (so permitem O PROPRIO app
+ *    conectar no socket) e repete o ping.
  * ============================================================================
  */
 public class DaemonService extends Service {
@@ -63,10 +80,17 @@ public class DaemonService extends Service {
     private String bridgeSocket;   // <remoteDir>/s
     private String bridgePidfile;  // <remoteDir>/p
 
+    // PLANO-B: socket DENTRO do dir privado do app (bypass total do
+    // /data/local/tmp + SELinux shell_data_file). Root pode criar aqui;
+    // o app conecta no PROPRIO dir (nunca bloqueado por policy).
+    private String appDirSocket;   // <filesDir>/b
+    private String appDirPidfile;  // <filesDir>/p
+
     private static final String PATH_FILE_NAME = "stormbridge.path";
 
     private static final String PREFS = "sys_prefs";
     private static final String PREF_TOKEN = "sys_token";
+    private static final String PREF_APPSOCK = "sys_appsock";
 
     private static final int BRIDGE_MAGIC = 0x53544F52; // "STOR"
 
@@ -80,9 +104,20 @@ public class DaemonService extends Service {
 
     private volatile boolean started = false;
 
+    private volatile boolean stopped = false;
+
+    /**
+     * true quando o ping da ponte ja respondeu pelo menos uma vez nesta
+     * rodada de startStormDaemon(). O instalador usa isso pra decidir se
+     * o resultado final e "[OK] PONTE PRONTA" ou "[5/5] FALHOU".
+     */
+    private volatile boolean bridgeReady = false;
+
     private volatile Process rootProcess;
 
     private Thread watchdogThread;
+
+    private Thread installerThread;
 
     // Backoff do watchdog: 3s, 5s, 10s, 15s, 20s, 20s...
     private long restartBackoffMs = 3000;
@@ -103,7 +138,11 @@ public class DaemonService extends Service {
         startForeground(2, buildNotification());
 
         if (installing.compareAndSet(false, true)) {
-            new Thread(this::installAndStart, "StormDaemonInstaller").start();
+            stopped = false;
+            installerThread = new Thread(this::installLoop, "StormDaemonInstaller");
+            installerThread.start();
+        } else {
+            Log.d(TAG, "instalacao ja em andamento - onStartCommand ignorado");
         }
 
         return START_STICKY;
@@ -111,7 +150,15 @@ public class DaemonService extends Service {
 
     @Override
     public void onDestroy() {
+        stopped = true;
+
         stopWatchdog();
+
+        Thread installer = installerThread;
+        if (installer != null) {
+            installer.interrupt();
+        }
+
         stopStormDaemon();
 
         installing.set(false);
@@ -178,6 +225,20 @@ public class DaemonService extends Service {
         bridgeSocket = remoteDir + "/s";
         bridgePidfile = remoteDir + "/p";
 
+        appDirSocket = new File(getFilesDir(), "b").getAbsolutePath();
+        appDirPidfile = new File(getFilesDir(), "p").getAbsolutePath();
+
+        // Sessao anterior precisou do PLANO-B (SELinux negando o
+        // /data/local/tmp): ja comeca nele, sem pagar 5s de tentativa
+        // remota pra descobrir o mesmo bloqueio de novo.
+        if (getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getBoolean(PREF_APPSOCK, false)) {
+            bridgeSocket = appDirSocket;
+            bridgePidfile = appDirPidfile;
+            Log.i(TAG, "[0/5] socket no dir PRIVADO do app (plano-B "
+                    + "persistido da sessao anterior): " + bridgeSocket);
+        }
+
         // Publica o path do socket pro client (libclient.so le daqui).
         // Arquivo PRIVADO do app — o jogo nao consegue ler.
         try (FileOutputStream fo = openFileOutput(PATH_FILE_NAME, MODE_PRIVATE)) {
@@ -188,43 +249,117 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 1) INSTALAÇÃO + INICIALIZAÇÃO
+    // LOOP DE INSTALAÇÃO (com diagnostico e retry)
     // ==================================================================
+    /*
+     * Fluxo por tentativa:
+     *   [1/5] root      -> su -c id (retry 10s enquanto negado)
+     *   [2/5] limpeza   -> mata daemon anterior + apaga rastros
+     *   [3/5] extracao  -> asset bin/<abi>/stormdaemon + lib/<abi>/libc++_shared.so
+     *   [4/5] instalacao-> copia pro dir oculto via su + verificacao de tamanho
+     *   [5/5] start     -> exec como root + ping (com auto-fix SELinux)
+     *   [OK ] ponte pronta
+     * Qualquer erro: loga o PASSO exato e o motivo, espera e tenta de novo.
+     */
 
-    private void installAndStart() {
-        try {
-            initPaths();
+    private void installLoop() {
+        initPaths();
 
-            if (!checkRoot()) {
-                installing.set(false);
+        Log.i(TAG, "[0/5] instalacao iniciada (dir oculto: " + remoteDir + ")");
+
+        boolean loggedRootHelp = false;
+
+        while (!stopped) {
+            try {
+                // ----------------------------------------------------------
+                // [1/5] ROOT
+                // ----------------------------------------------------------
+                if (!checkRoot()) {
+                    if (!loggedRootHelp) {
+                        Log.e(TAG, "[1/5] ROOT indisponivel - conceda Superuser "
+                                + "a este app no gerenciador root (Magisk/KernelSU). "
+                                + "Tentando a cada 10s (nao precisa reinstalar).");
+                        Log.e(TAG, "[1/5] which su: "
+                                + runAsRoot("command -v su || echo NAO_ENCONTRADO"));
+                        loggedRootHelp = true;
+                    }
+
+                    Thread.sleep(10000);
+                    continue;
+                }
+
+                Log.i(TAG, "[1/5] root OK (uid=0 confirmado)");
+
+                // ----------------------------------------------------------
+                // [2/5] LIMPEZA
+                // ----------------------------------------------------------
+                stopStormDaemon();
+                Log.i(TAG, "[2/5] daemon anterior parado + rastros apagados");
+
+                // ----------------------------------------------------------
+                // [3/5] EXTRACAO DO APK
+                // ----------------------------------------------------------
+                String abi = chooseAbi();
+                Log.i(TAG, "[3/5] ABI selecionada: " + abi);
+
+                File localDaemon = extractAsset("bin/" + abi + "/stormdaemon", "stormdaemon");
+                validateFile(localDaemon, "stormdaemon (" + abi + ")");
+
+                File localCppShared = extractNativeLibrary(abi, "libc++_shared.so");
+                validateFile(localCppShared, "libc++_shared.so");
+
+                Log.i(TAG, "[3/5] extraidos: stormdaemon=" + localDaemon.length()
+                        + " bytes | libc++_shared.so=" + localCppShared.length() + " bytes");
+
+                // ----------------------------------------------------------
+                // [4/5] INSTALACAO NO DIR OCULTO (via root)
+                // ----------------------------------------------------------
+                if (!installFiles(localDaemon, localCppShared)) {
+                    Log.e(TAG, "[4/5] instalacao em " + remoteDir
+                            + " FALHOU (su executou os comandos?) - tentando de novo em 15s");
+                    Thread.sleep(15000);
+                    continue;
+                }
+
+                Log.i(TAG, "[4/5] arquivos instalados e verificados em " + remoteDir);
+
+                // ----------------------------------------------------------
+                // [5/5] START + PING (com diagnostico profundo se falhar)
+                // ----------------------------------------------------------
+                startStormDaemon();
+
+                startWatchdog();
+                started = true;
+
+                if (bridgeReady) {
+                    Log.i(TAG, "[OK] PONTE PRONTA em " + bridgeSocket
+                            + " - daemon root ativo (daemon mudo, sem rastro)");
+                } else {
+                    Log.e(TAG, "[5/5] daemon NAO respondeu ao ping - veja as linhas "
+                            + "[5/5] acima para o motivo exato. Watchdog continua "
+                            + "tentando reviver em background.");
+                }
+
+                // Instalador concluido (sucesso ou nao): o watchdog assume.
                 return;
-            }
 
-            // Mata qualquer daemon anterior (novo e LEGADO da versao antiga)
-            // e apaga os rastros com nome fixo que a versao antiga deixou.
-            stopStormDaemon();
-
-            String abi = chooseAbi();
-
-            File localDaemon = extractAsset("bin/" + abi + "/stormdaemon", "stormdaemon");
-            validateFile(localDaemon, "stormdaemon (" + abi + ")");
-
-            File localCppShared = extractNativeLibrary(abi, "libc++_shared.so");
-            validateFile(localCppShared, "libc++_shared.so");
-
-            if (!installFiles(localDaemon, localCppShared)) {
-                installing.set(false);
+            } catch (InterruptedException ie) {
                 return;
+
+            } catch (Throwable e) {
+                String msg = e.getMessage();
+
+                Log.e(TAG, "[ERRO] instalacao parou: "
+                        + e.getClass().getSimpleName()
+                        + (msg == null || msg.isEmpty() ? "" : (": " + msg))
+                        + " - tentando de novo em 15s");
+
+                try {
+                    Thread.sleep(15000);
+                } catch (InterruptedException ignored) {
+                    return;
+                }
             }
-
-            startStormDaemon();
-            startWatchdog();
-
-            started = true;
-            installing.set(false);
-
-        } catch (Throwable e) {
-            installing.set(false);
         }
     }
 
@@ -243,9 +378,17 @@ public class DaemonService extends Service {
             String output = n > 0 ? new String(buffer, 0, n).trim() : "";
             int exitCode = process.waitFor();
 
-            return exitCode == 0 && output.contains("uid=0");
+            boolean ok = exitCode == 0 && output.contains("uid=0");
+
+            if (!ok) {
+                Log.w(TAG, "[1/5] su respondeu exit=" + exitCode + " out='"
+                        + output + "' (permissao negada?)");
+            }
+
+            return ok;
 
         } catch (Throwable e) {
+            Log.w(TAG, "[1/5] su nao executou: " + e.getClass().getSimpleName());
             return false;
         }
     }
@@ -377,7 +520,7 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 4) INSTALAÇÃO NO DIRETORIO OCULTO (via su)
+    // 4) INSTALAÇÃO NO DIRETORIO OCULTO (via su) — COM VERIFICAÇÃO REAL
     // ==================================================================
 
     private boolean installFiles(File localDaemon, File localCppShared) {
@@ -399,30 +542,59 @@ public class DaemonService extends Service {
                 " && chmod 0711 " + qDir +
                 " && chmod 0711 " + shellQuote(REMOTE_BASE);
 
-        runAsRoot(command);
+        String installOut = runAsRoot(command);
 
-        // Confirma tamanho instalado = tamanho extraído
+        if (!installOut.isEmpty()) {
+            Log.w(TAG, "[4/5] comando de instalacao devolveu: " + installOut);
+        }
+
+        // Confirma tamanho instalado = tamanho extraído (verificacao REAL:
+        // antes, stat vazio ou nao-numerico era tratado como sucesso).
         try {
             long expected = localDaemon.length();
             String check = runAsRoot("stat -c %s " + qDaemon);
 
-            if (!check.isEmpty()) {
-                long installed = Long.parseLong(check.trim());
-                if (installed != expected) {
-                    return false;
-                }
+            if (check.isEmpty()) {
+                Log.e(TAG, "[4/5] stat nao devolveu nada - o su executou? "
+                        + "binario instalado em " + remoteDaemon + "?");
+                return false;
             }
+
+            long installed = Long.parseLong(check.trim());
+
+            if (installed != expected) {
+                Log.e(TAG, "[4/5] tamanho divergente: instalado=" + installed
+                        + " esperado=" + expected + " (copia pela su falhou)");
+                return false;
+            }
+        } catch (NumberFormatException nfe) {
+            Log.e(TAG, "[4/5] stat devolveu lixo: '"
+                    + runAsRoot("stat -c %s " + qDaemon) + "' (ambiente root estranho)");
+            return false;
         } catch (Throwable ignored) {
         }
+
+        // Telemetria do ambiente (ajuda a diagnosticar SEM interagir com o jogo)
+        String listing = runAsRoot("ls -l " + qDir);
+
+        if (!listing.isEmpty()) {
+            Log.i(TAG, "[4/5] dir oculto: " + listing.replace('\n', ' '));
+        }
+
+        String se = runAsRoot("getenforce");
+
+        Log.i(TAG, "[4/5] SELinux: " + (se.isEmpty() ? "desconhecido" : se));
 
         return true;
     }
 
     // ==================================================================
-    // 5) INICIAR O DAEMON COMO ROOT (mudo: sem --log, sem --verbose)
+    // 5) INICIAR O DAEMON COMO ROOT (mudo) + DIAGNOSTICO PROFUNDO
     // ==================================================================
 
     private void startStormDaemon() {
+        bridgeReady = false;
+
         try {
             String command =
                     "export LD_LIBRARY_PATH=" + shellQuote(remoteDir) +
@@ -436,19 +608,137 @@ public class DaemonService extends Service {
 
             final Process process = rootProcess;
 
-            // Consumo a saida sem logar (o daemon e mudo; so drenamos o pipe)
+            // Consome a saida SEM logar enquanto vivo; se o processo terminar,
+            // a cauda (erro de linker, "not executable", crash) e logada.
             new Thread(() -> drainProcessOutput(process), "StormDaemonLog").start();
 
             // Aguarda o socket responder (até 5s)
             for (int i = 0; i < 25; i++) {
                 if (pingBridge()) {
+                    bridgeReady = true;
+                    Log.i(TAG, "[5/5] ping OK (" + (i * 200) + "ms)");
                     return;
                 }
 
                 Thread.sleep(200);
             }
 
-        } catch (Throwable ignored) {
+            // --------------------------------------------------------------
+            // PING FALHOU — diagnóstico profundo
+            // --------------------------------------------------------------
+            boolean alive = true;
+            int exitCode = -1;
+
+            try {
+                exitCode = process.exitValue();
+                alive = false;
+            } catch (IllegalThreadStateException stillRunning) {
+                // vivo
+            }
+
+            if (!alive) {
+                Log.e(TAG, "[5/5] daemon MORREU no boot (exit=" + exitCode
+                        + "). Causas comuns: binario de outra ABI, libc++_shared.so "
+                        + "nao carregou, SELinux bloqueou o exec. A saida do processo "
+                        + "(se houver) aparece na linha '[daemon] saida'.");
+            } else {
+                Log.e(TAG, "[5/5] daemon VIVO mas socket nao responde "
+                        + "(bind falhou ou connect do app bloqueado)");
+            }
+
+            // O socket esta bound? (via root, /proc/net/unix e confiavel)
+            String bound = runAsRoot(
+                    "grep -F " + shellQuote(bridgeSocket) + " /proc/net/unix | head -n 1");
+
+            Log.e(TAG, "[5/5] socket no /proc/net/unix: "
+                    + (bound.isEmpty() ? "NAO BOUND (daemon nao conseguiu criar o socket)"
+                                       : "bound OK (" + bound.trim() + ")"));
+
+            // Auto-fix SELinux: regras minimas que so permitem O PROPRIO app
+            // conectar no socket da ponte. Nada mais e liberado.
+            if (alive) {
+                String mp = runAsRoot("command -v magiskpolicy || echo NAO_ENCONTRADO");
+
+                if (!mp.isEmpty() && !mp.contains("NAO_ENCONTRADO")) {
+                    // CORRECAO DA CAUSA RAIZ: as regras antigas valiam SO
+                    // para o dominio "untrusted_app". Apps com targetSdk
+                    // antigo, clones ou ROMs exotas caem em variantes
+                    // (untrusted_app_27/30/32...) e a regra NAO batia -
+                    // o SELinux continuava negando e a ponte ficava
+                    // INDISPONIVEL. Agora detectamos o dominio REAL deste
+                    // app via /proc/self/attr/current e aplicamos pra ele
+                    // + todas as variantes historicas (idempotente).
+                    String domain = getOwnSelinuxDomain();
+
+                    Log.w(TAG, "[5/5] dominio SELinux do app: "
+                            + (domain.isEmpty() ? "desconhecido" : domain));
+
+                    java.util.LinkedHashSet<String> doms = new java.util.LinkedHashSet<>();
+                    doms.add("untrusted_app");
+                    doms.add("untrusted_app_25");
+                    doms.add("untrusted_app_27");
+                    doms.add("untrusted_app_30");
+                    doms.add("untrusted_app_32");
+                    doms.add("untrusted_app_34");
+                    if (!domain.isEmpty()) doms.add(domain);
+
+                    StringBuilder rb = new StringBuilder("magiskpolicy --live");
+
+                    for (String d : doms) {
+                        rb.append(" 'allow ").append(d)
+                                .append(" shell_data_file:dir search'")
+                                .append(" 'allow ").append(d)
+                                .append(" shell_data_file:sock_file { open write }'")
+                                .append(" 'allow ").append(d)
+                                .append(" shell_data_file:file { open read getattr }'")
+                                .append(" 'allow ").append(d)
+                                .append(" magisk:unix_stream_socket connectto'");
+                    }
+
+                    Log.w(TAG, "[5/5] aplicando regras SELinux via magiskpolicy ("
+                            + doms.size() + " dominios x 4 regras)...");
+
+                    String rules = runAsRoot(rb.toString());
+
+                    Log.w(TAG, "[5/5] magiskpolicy: "
+                            + (rules.isEmpty() ? "regras aplicadas" : rules));
+
+                    for (int i = 0; i < 10; i++) {
+                        if (pingBridge()) {
+                            bridgeReady = true;
+                            Log.i(TAG, "[5/5] ping OK apos regras SELinux (era o SELinux bloqueando)");
+                            return;
+                        }
+
+                        Thread.sleep(200);
+                    }
+
+                    Log.e(TAG, "[5/5] ainda sem resposta apos regras SELinux. "
+                            + "Ativando PLANO-B (socket no dir privado do app)...");
+                } else {
+                    Log.e(TAG, "[5/5] magiskpolicy nao encontrado - seguindo para "
+                            + "o PLANO-B (socket no dir privado do app)...");
+                }
+
+                // ----------------------------------------------------------
+                // PLANO-B: daemon VIVO mas o app nao alcanca o socket em
+                // /data/local/tmp (SELinux negando shell_data_file mesmo
+                // com magiskpolicy — KernelSU, policy travada, ROM exotica).
+                // Migramos o socket pro dir PRIVADO do app: o daemon root
+                // cria la e o app conecta no proprio dir — SELinux NUNCA
+                // nega app_data_file do proprio uid.
+                // ----------------------------------------------------------
+                if (!bridgeReady) {
+                    tryAppDirSocketFallback();
+                }
+            }
+
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+
+        } catch (Throwable e) {
+            Log.e(TAG, "[5/5] startStormDaemon erro: " + e.getClass().getSimpleName()
+                    + (e.getMessage() == null ? "" : (": " + e.getMessage())));
         }
     }
 
@@ -507,6 +797,9 @@ public class DaemonService extends Service {
     }
 
     private void onDaemonDead(String reason) {
+        Log.w(TAG, "[watchdog] daemon morreu (" + reason
+                + ") - reiniciando em " + restartBackoffMs + "ms");
+
         try {
             Thread.sleep(restartBackoffMs);
         } catch (InterruptedException e) {
@@ -523,7 +816,13 @@ public class DaemonService extends Service {
             rootProcess = null;
         }
 
+        if (stopped) {
+            return;
+        }
+
         if (!checkRoot()) {
+            Log.e(TAG, "[watchdog] root perdido/negado - daemon nao sera "
+                    + "reiniciado ate o su voltar a funcionar");
             return;
         }
 
@@ -534,6 +833,127 @@ public class DaemonService extends Service {
             } catch (Throwable ignored) {
             }
         }, "StormDaemonRestart").start();
+    }
+
+    // ==================================================================
+    // 5b) PLANO-B: SOCKET NO DIRETORIO PRIVADO DO APP
+    // ==================================================================
+    /*
+     * Sintoma: daemon root VIVO (bind OK em /data/local/tmp) mas o app
+     * nao consegue connect (SELinux negando shell_data_file mesmo apos
+     * magiskpolicy — KernelSU, policy travada, ROM exotica...).
+     *
+     * Solucao: reiniciar o daemon com --socket apontando pra DENTRO do
+     * dir privado do app (<filesDir>/b). O daemon (root) cria o socket
+     * la com chmod 666; o app conecta no PROPRIO diretorio — isso o
+     * SELinux NUNCA nega (app_data_file do proprio uid). O caminho novo
+     * e publicado no files/stormbridge.path e o client C++ re-le ao
+     * falhar o connect (InvalidateResolvedSocketPath no BridgeClient).
+     */
+
+    private boolean tryAppDirSocketFallback() {
+        Log.w(TAG, "[PLAN-B] migrando socket pro dir PRIVADO do app "
+                + "(bypass do /data/local/tmp + SELinux)...");
+
+        stopStormDaemon();
+
+        bridgeSocket = appDirSocket;
+        bridgePidfile = appDirPidfile;
+
+        // Publica o novo caminho pro client C++ (ele re-le o arquivo
+        // de path no proximo connect que falhar)
+        try (FileOutputStream fo = openFileOutput(PATH_FILE_NAME, MODE_PRIVATE)) {
+            fo.write(bridgeSocket.getBytes("UTF-8"));
+            fo.flush();
+        } catch (Throwable e) {
+            Log.e(TAG, "[PLAN-B] falha gravando " + PATH_FILE_NAME + ": " + e);
+            return false;
+        }
+
+        try {
+            String command =
+                    "export LD_LIBRARY_PATH=" + shellQuote(remoteDir) +
+                    " && exec " + shellQuote(remoteDaemon) +
+                    " --socket " + shellQuote(bridgeSocket) +
+                    " --pidfile " + shellQuote(bridgePidfile);
+
+            rootProcess = new ProcessBuilder("su", "-c", command)
+                    .redirectErrorStream(true)
+                    .start();
+
+            final Process process = rootProcess;
+
+            new Thread(() -> drainProcessOutput(process), "StormDaemonLogB").start();
+
+            for (int i = 0; i < 25; i++) {
+                if (pingBridge()) {
+                    bridgeReady = true;
+
+                    // Persiste: proximos boots ja comecam no dir privado
+                    // (sem pagar a tentativa remota de novo)
+                    getSharedPreferences(PREFS, MODE_PRIVATE)
+                            .edit().putBoolean(PREF_APPSOCK, true).apply();
+
+                    Log.i(TAG, "[PLAN-B] PONTE PRONTA no dir privado do app: "
+                            + bridgeSocket + " (persistido)");
+                    return true;
+                }
+
+                Thread.sleep(200);
+            }
+
+            boolean aliveB = true;
+            try {
+                process.exitValue();
+                aliveB = false;
+            } catch (IllegalThreadStateException ignored) {
+            }
+
+            String boundB = runAsRoot(
+                    "grep -F " + shellQuote(bridgeSocket) + " /proc/net/unix | head -n 1");
+
+            Log.e(TAG, "[PLAN-B] falhou: alive=" + aliveB
+                    + " socket bound=" + (boundB.isEmpty() ? "NAO" : "SIM")
+                    + " (watchdog continua tentando; veja '[daemon] saida' acima)");
+            return false;
+
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (Throwable e) {
+            Log.e(TAG, "[PLAN-B] erro: " + e.getClass().getSimpleName()
+                    + (e.getMessage() == null ? "" : (": " + e.getMessage())));
+            return false;
+        }
+    }
+
+    // ==================================================================
+    // 5c) DOMINIO SELINUX DESTE APP (/proc/self/attr/current)
+    // ==================================================================
+    /*
+     * Le o contexto SELinux do PROPRIO processo (o app sempre pode ler
+     * o seu) e extrai o dominio:
+     *   "u:r:untrusted_app_27:s0:c512,c768" -> "untrusted_app_27"
+     * As regras do magiskpolicy passam a valer pro dominio REAL em vez
+     * de chutar "untrusted_app" (que nao bate nas variantes).
+     */
+    private String getOwnSelinuxDomain() {
+        java.io.FileInputStream fis = null;
+        try {
+            fis = new java.io.FileInputStream("/proc/self/attr/current");
+            byte[] buf = new byte[128];
+            int n = fis.read(buf);
+            if (n <= 0) return "";
+            String ctx = new String(buf, 0, n, "UTF-8").trim();
+            int z = ctx.indexOf('\0');
+            if (z >= 0) ctx = ctx.substring(0, z);
+            String[] parts = ctx.split(":");
+            return parts.length >= 3 ? parts[2] : "";
+        } catch (Throwable e) {
+            return "";
+        } finally {
+            try { if (fis != null) fis.close(); } catch (Throwable ignored) {}
+        }
     }
 
     // ==================================================================
@@ -643,20 +1063,38 @@ public class DaemonService extends Service {
     }
 
     // ==================================================================
-    // 9) DRENO DA SAÍDA DO PROCESSO ROOT (sem logar nada)
+    // 9) DRENO DA SAÍDA DO PROCESSO ROOT (captura o erro de boot)
     // ==================================================================
+    /*
+     * Enquanto o daemon vive, a saida dele e vazia (ele e mudo e loga so no
+     * logd com --verbose, que producao nao usa). Quando o daemon MORRE NO
+     * BOOT, o dynamic linker imprime no stdout/stderr do processo:
+     *   "CANNOT LINK EXECUTABLE ... library ... not found"
+     *   "not executable" / "Permission denied"
+     * Essa cauda e capturada e logada UMA vez, quando o stream fecha.
+     */
 
     private void drainProcessOutput(Process process) {
+        ByteArrayOutputStream tail = new ByteArrayOutputStream(2048);
+
         try {
             InputStream input = process.getInputStream();
             byte[] buffer = new byte[4096];
 
-            //noinspection StatementWithEmptyBody
-            while (input.read(buffer) > 0) {
-                // drena e descarta
+            int n;
+            while ((n = input.read(buffer)) > 0) {
+                if (tail.size() < 4096) {
+                    tail.write(buffer, 0, n);
+                }
             }
 
         } catch (Throwable ignored) {
+        }
+
+        String out = tail.toString().trim();
+
+        if (!out.isEmpty()) {
+            Log.e(TAG, "[daemon] saida do processo root (erro de linker/crash): " + out);
         }
     }
 

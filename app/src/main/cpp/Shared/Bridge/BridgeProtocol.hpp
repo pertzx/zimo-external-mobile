@@ -11,7 +11,7 @@
  * O daemon é SOMENTE UMA PONTE de READ/WRITE. Ele não conhece offsets,
  * não conhece o jogo, não guarda config: ele recebe pedidos
  * (pid, endereço, tamanho, dados) e executa no alvo com privilégio root
- * via process_vm_readv/process_vm_writev com fallback para /proc/pid/mem.
+ * via syscall direta (__NR_pread64/__NR_pwrite64) + cache de leitura.
  *
  * Transporte: AF_UNIX SOCK_STREAM no caminho
  *     /data/local/tmp/stormbridge.sock

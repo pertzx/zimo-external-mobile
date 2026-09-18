@@ -67,14 +67,14 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-13-BRIDGE-V1";
+        "StormMemory-2026-09-18-PONTEFIX-V3";
 
     /*
      * Prioridade de acesso:
      *
      *  1. PONTE  -> daemon root em /data/local/tmp/stormdaemon
-     *                (process_vm_readv/writev com fallback /proc/pid/mem,
-     *                 executado COM privilegio root pelo daemon)
+     *                (syscall direta __NR_pread64/__NR_pwrite64 em
+     *                 /proc/<pid>/mem + cache de leitura, COM root)
      *  2. VM     -> process_vm_readv/writev direto do processo do app
      *                (so funciona se o app tiver privilegio, ex: emulador
      *                 rodando como root; no aparelho normal da EPERM)
@@ -1508,9 +1508,23 @@ bool Memory::Initialize()
     LOGI("[INIT] ========================================");
     LOGI("[INIT] Memory::Initialize()");
     LOGI("[INIT] Backend=%s", MEMORY_BACKEND_VERSION);
+
+    const bool ponteOk = BridgeClient::EnsureConnected();
+
     LOGI("[INIT] Ponte=%s em %s",
-         BridgeClient::EnsureConnected() ? "CONECTADA" : "INDISPONIVEL (fallback local)",
+         ponteOk ? "CONECTADA" : "INDISPONIVEL (fallback local)",
          BridgeClient::GetSocketPath());
+
+    if (!ponteOk)
+    {
+        /*
+         * Causa raiz do connect (errno + dica), guardada pelo
+         * BridgeClient no momento da falha. Aparece na tag StormMemory,
+         * que o filtro de log do usuario ja captura.
+         */
+        LOGW("[INIT] motivo do connect: %s",
+             BridgeClient::LastConnectError());
+    }
 
     LOGI("[INIT] Procurando processo do Free Fire...");
 
@@ -1526,6 +1540,30 @@ bool Memory::Initialize()
     if (pid <= 0)
     {
         LOGE("[INIT] FALHA: PID nao encontrado");
+
+        /*
+         * ============================================================
+         * DIAGNOSTICO DA CAUSA RAIZ (fica na tag StormMemory, dentro
+         * do filtro de log do usuario):
+         * sem root, a busca local NUNCA le /proc/<pid>/cmdline nem
+         * /proc/<pid>/maps de outro UID - por isso "Nenhum processo
+         * alvo". O unico caminho possivel e a PONTE (daemon root via
+         * su). Se ela esta fora, o motivo real esta no erro de connect
+         * abaixo; o gerenciador Java (StormDaemonMgr) sobe o daemon e
+         * aplica o plano-B sozinho.
+         * ============================================================
+         */
+        static int s_InitFailCount = 0;
+
+        if ((++s_InitFailCount % 5) == 1)
+        {
+            LOGW("[DIAG] busca local SEM ROOT nunca acha o jogo (o app nao "
+                 "pode ler /proc do FF). O unico caminho e a PONTE (daemon "
+                 "root). Motivo atual do connect: %s. Para ver o gerenciador: "
+                 "adb logcat -s StormDaemonMgr",
+                 BridgeClient::LastConnectError());
+        }
+
         s_LastInitError = "jogo nao encontrado (FF aberto? daemon rodando?)";
         return false;
     }

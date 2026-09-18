@@ -638,10 +638,10 @@ void Offsets::GameConfig()
  */
 void Offsets::FFTHV8A() // 64-bit
 {
-        AccessClass = 0x5C; 
+        AccessClass = 0x0; 
 
         // GameVarDef
-        GameVarDef::GameVarDef_TypeInfo = 0xfb108b30; // TODO: update manualy
+        GameVarDef::GameVarDef_TypeInfo = 0xac1e810; // TODO: update manualy
         GameVarDef::ShootTraceAdjustmentDistanceThreshold = 0x708; // FOUND v8a (direct in 'GameVarDef')
         GameVarDef::EnableAccelerationOnFalling = 0x2BA6; // FOUND v8a (direct in 'GameVarDef')
         GameVarDef::EnableLowFallingSwapWeapon = 0x2EE1; // FOUND v8a (direct in 'GameVarDef')
@@ -651,7 +651,7 @@ void Offsets::FFTHV8A() // 64-bit
         GameVarDef::AimRotationSensitivityMax = 0x1074; // FOUND v8a (direct in 'GameVarDef')
 
         // GameFacade
-        GameFacade::GameFacade_TypeInfo = 0x0; // TODO: update manualy
+        GameFacade::GameFacade_TypeInfo = 0xac1e768; // TODO: update manualy
         GameFacade::CurrentMatchGame = 0x8; // FOUND v8a (direct in 'GameFacade')
 
         // MatchGame

@@ -12,6 +12,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 
@@ -25,6 +27,18 @@
 
 #define LOGE(...) \
     __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+/*
+ * ESPELHO DO ERRO DE CONNECT NA TAG StormMemory:
+ * o filtro de log do usuario so mostra StormMemory/StormDiag - a causa
+ * real da "PONTE INDISPONIVEL" (errno do connect) vivia na tag
+ * StormBridge e nunca aparecia. O espelho abaixo (rate-limit 5s) garante
+ * que o motivo apareca no filtro que o usuario ja usa.
+ */
+#define LOG_TAG_DIAG "StormMemory"
+
+#define LOGW_DIAG(...) \
+    __android_log_print(ANDROID_LOG_WARN, LOG_TAG_DIAG, __VA_ARGS__)
 
 namespace
 {
@@ -80,6 +94,54 @@ namespace
      */
     static std::atomic<long long> g_NextConnectAttemptMs{ 0 };
     static constexpr long long CONNECT_RETRY_INTERVAL_MS = 750;
+
+    /*
+     * Ultimo erro de connect em texto humano (+ dica de causa raiz).
+     * Exposto via BridgeClient::LastConnectError() e impresso nas linhas
+     * [INIT] Ponte=... do Memory (tag StormMemory). Sucesso limpa.
+     */
+    static char g_LastConnectErr[192] =
+        "(nenhuma tentativa de connect ainda)";
+
+    static std::atomic<long long> g_NextDiagLogMs{ 0 };
+
+    void SetConnectErr(const char* fmt, ...)
+    {
+        va_list ap;
+
+        va_start(ap, fmt);
+        vsnprintf(g_LastConnectErr, sizeof(g_LastConnectErr), fmt, ap);
+        va_end(ap);
+    }
+
+    /*
+     * Traduz o errno do connect() pra CAUSA RAIZ provavel:
+     *   ENOENT         -> socket nao existe   = daemon root nao subiu/morreu no boot
+     *   ECONNREFUSED   -> socket existe, ninguem escuta = daemon stale (morreu depois do bind)
+     *   EACCES / EPERM -> SELinux bloqueando o acesso do app ao /data/local/tmp
+     *   outros         -> dica generica apontando pro gerenciador (StormDaemonMgr)
+     */
+    const char* ConnectHintForErrno(int e)
+    {
+        switch (e)
+        {
+            case ENOENT:
+                return "socket NAO EXISTE = daemon root nao subiu (root negado? erro de linker?) - veja: logcat -s StormDaemonMgr";
+
+            case ECONNREFUSED:
+                return "socket existe mas ninguem ESCUTA = daemon morreu depois do bind (stale) - watchdog deve recriar";
+
+            case EACCES:
+            case EPERM:
+                return "acesso NEGADO = SELinux bloqueando o app no /data/local/tmp (o gerenciador aplica regras + plano-B)";
+
+            case ETIMEDOUT:
+                return "timeout no connect = daemon travado";
+
+            default:
+                return "veja o gerenciador: logcat -s StormDaemonMgr";
+        }
+    }
 
     /*
      * ====================================================================
@@ -387,6 +449,11 @@ namespace
 
         if (fd < 0)
         {
+            SetConnectErr(
+                "socket() falhou: %s",
+                strerror(errno)
+            );
+
             LOGE(
                 "socket() falhou: %s",
                 strerror(errno)
@@ -412,13 +479,43 @@ namespace
                 sizeof(addr)
             ) < 0)
         {
+            const int savedErrno =
+                errno;
+
             close(fd);
+
+            /*
+             * Guarda a causa raiz (visivel nas linhas [INIT] do Memory,
+             * tag StormMemory - o filtro que o usuario usa) e espelha a
+             * linha completa na mesma tag a cada 5s.
+             */
+            SetConnectErr(
+                "%s - %s",
+                strerror(savedErrno),
+                ConnectHintForErrno(savedErrno)
+            );
 
             LOGW(
                 "connect(%s) falhou: %s (daemon rodando?)",
                 path,
-                strerror(errno)
+                strerror(savedErrno)
             );
+
+            const long long agoraDiagMs =
+                NowMs();
+
+            if (agoraDiagMs >= g_NextDiagLogMs.load())
+            {
+                g_NextDiagLogMs =
+                    agoraDiagMs + 5000;
+
+                LOGW_DIAG(
+                    "[PONTE] connect(%s) falhou: %s - %s",
+                    path,
+                    strerror(savedErrno),
+                    ConnectHintForErrno(savedErrno)
+                );
+            }
 
             InvalidateResolvedSocketPath();
 
@@ -447,6 +544,8 @@ namespace
         );
 
         g_Socket = fd;
+
+        SetConnectErr("");
 
         LOGI(
             "conectado a ponte em %s",
@@ -621,6 +720,11 @@ bool IsConnected()
     std::lock_guard<std::mutex> lock(g_SocketMutex);
 
     return g_Socket >= 0;
+}
+
+const char* LastConnectError()
+{
+    return g_LastConnectErr;
 }
 
 bool Request(

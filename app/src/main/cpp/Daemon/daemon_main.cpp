@@ -24,6 +24,7 @@
  */
 
 #include <Shared/Bridge/BridgeProtocol.hpp>
+#include <Shared/Bridge/StormSysRW.hpp>
 
 #include <android/log.h>
 
@@ -183,18 +184,69 @@ namespace
 {
     /*
      * ============================================================================
-     * STEALTH (Task 12) — HIGIENE DE FD
+     * STEALTH (Task 17) — READ/WRITE 100% SYSCALL DIRETA + CACHE
      * ============================================================================
-     * ANTES: o daemon mantinha um fd de /proc/<pid>/mem ABERTO PRA SEMPRE
-     * (cache g_ProcMemFds). Um handle persistente apontando pro mem do jogo
-     * e uma assinatura classica: varredura de fd de QUALQUER processo root
-     * (via /proc) acha o handle na hora.
+     * Substitui o caminho antigo (process_vm_readv/writev + wrappers libc
+     * pread/pwrite) por syscalls de kernel DIRETAS, sem nenhum fallback:
      *
-     * AGORA: NENHUM fd fica aberto. O caminho principal e process_vm_readv/
-     * writev (NAO usa fd nenhum). O fallback pread/pwrite abre o mem, usa e
-     * FECHA na mesma chamada. Em momento algum existe handle exposto.
+     *     __NR_openat    -> abre /proc/<pid>/mem (abre-usa-fecha: nenhum
+     *                       handle persistente exposto no /proc)
+     *     __NR_pread64   -> leitura (com cache de blocos de 256 B, TTL 10 ms)
+     *     __NR_pwrite64  -> escrita (SEMPRE direta + invalidacao do cache)
+     *     __NR_close     -> fecha
+     *
+     * Motivacao anti-deteccao:
+     *   - o binario para de IMPORTAR process_vm_readv/process_vm_writev
+     *     (nomes que sao assinatura classica de cheat em PLT/GOT/simbolos);
+     *   - nenhuma wrapper de memoria da libc e chamada (nada pra hookar);
+     *   - o cache corta o VOLUME de syscalls: leitura repetida no mesmo
+     *     frame custa ZERO syscall (menos ruido, menos CPU);
+     *   - funciona em v7a e v8a: a ABI do syscall e a do PROPRIO daemon
+     *     (o split do offset 64-bit em 32-bit fica no StormSysRW.hpp).
+     *
+     * Os caminhos antigos ficam COMENTADOS no bloco #if 0 logo abaixo.
+     * NAO existe caminho alternativo: so a syscall direta roda.
      * ============================================================================
      */
+
+    /*
+     * PONTE READ: syscall direta __NR_pread64 + cache de blocos.
+     */
+    bool BridgeReadMem(
+        pid_t pid,
+        uint64_t address,
+        void* buffer,
+        size_t size
+    )
+    {
+        return StormRW::ReadMem(pid, address, buffer, size);
+    }
+
+    /*
+     * PONTE WRITE: syscall direta __NR_pwrite64 (nunca cacheada).
+     */
+    bool BridgeWriteMem(
+        pid_t pid,
+        uint64_t address,
+        const void* buffer,
+        size_t size
+    )
+    {
+        return StormRW::WriteMem(pid, address, buffer, size);
+    }
+
+    /*
+     * ============================================================================
+     * FALLBACKS ANTIGOS — DESATIVADOS (Task 17)
+     * ============================================================================
+     * O bloco #if 0 abaixo guarda INTENCIONALMENTE o codigo antigo
+     * (process_vm_readv/process_vm_writev + pread64/pwrite64 da libc).
+     * Ele NAO compila e NAO roda: nenhum fallback pode ser usado, a ponte
+     * e exclusivamente syscall direta via StormSysRW.hpp.
+     * ============================================================================
+     */
+#if 0
+
 
     /*
      * process_vm_readv - caminho principal (sem fd, sem rastro de handle).
@@ -446,6 +498,8 @@ namespace
 
         return FileWrite(pid, address, buffer, size);
     }
+
+#endif /* FALLBACKS ANTIGOS DESATIVADOS (Task 17) */
 
     /*
      * Lê um arquivo de texto inteiro (usado nos helpers de procfs).
@@ -1796,20 +1850,32 @@ int main(
                 if (reads != lastReads ||
                     writes != lastWrites)
                 {
+
+                    const StormRW::Stats rwStats = StormRW::GetStats();
                     LOGI(
-                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu",
+                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu ttl=%lldms",
                         (unsigned long long)reads,
                         (unsigned long long)(reads - lastReads),
                         (unsigned long long)writes,
                         (unsigned long long)(writes - lastWrites),
-                        (unsigned long long)g_TotalErrors.load()
+                        (unsigned long long)g_TotalErrors.load(),
+                        (unsigned long long)rwStats.hits,
+                        (unsigned long long)rwStats.negHits,
+                        (unsigned long long)rwStats.misses,
+                        (unsigned long long)rwStats.syscalls,
+                        StormRW::GetTtlMs()
                     );
 
                     FileLog(
-                        "stats reads=%llu writes=%llu erros=%llu",
+                        "stats reads=%llu writes=%llu erros=%llu | cache hit=%llu neg=%llu miss=%llu syscalls=%llu ttl=%lldms",
                         (unsigned long long)reads,
                         (unsigned long long)writes,
-                        (unsigned long long)g_TotalErrors.load()
+                        (unsigned long long)g_TotalErrors.load(),
+                        (unsigned long long)rwStats.hits,
+                        (unsigned long long)rwStats.negHits,
+                        (unsigned long long)rwStats.misses,
+                        (unsigned long long)rwStats.syscalls,
+                        StormRW::GetTtlMs()
                     );
 
                     lastReads = reads;
