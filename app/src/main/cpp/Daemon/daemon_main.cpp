@@ -1012,21 +1012,32 @@ namespace
 
                     if (readErr <= 16 || (readErr % 200) == 0)
                     {
+                        /*
+                         * (RWFIX-V7) errno REAL da ultima syscall de RW
+                         * (antes: strerror(errno) depois de mutex/memcpy
+                         * logava errno trocado). errno=0 = falha servida
+                         * pelo cache negativo (sem syscall nova).
+                         */
+                        const int rwErr =
+                            (int)StormRW::GetLastErrno();
+
                         LOGE(
-                            "[READ] pid=%u addr=0x%llX size=%u FALHOU (%s) erros=%llu",
+                            "[READ] pid=%u addr=0x%llX size=%u FALHOU (%s errno=%d) erros=%llu",
                             req.Pid,
                             (unsigned long long)req.Address,
                             req.Size,
-                            strerror(errno),
+                            strerror(rwErr),
+                            rwErr,
                             (unsigned long long)readErr
                         );
 
                         FileLog(
-                            "READ pid=%u addr=0x%llX size=%u ERRO (%s) erros=%llu",
+                            "READ pid=%u addr=0x%llX size=%u ERRO (errno=%d %s) erros=%llu",
                             req.Pid,
                             (unsigned long long)req.Address,
                             req.Size,
-                            strerror(errno),
+                            rwErr,
+                            strerror(rwErr),
                             (unsigned long long)readErr
                         );
                     }
@@ -1107,21 +1118,27 @@ namespace
 
                     if (writeErr <= 16 || (writeErr % 100) == 0)
                     {
+                        /* (RWFIX-V7) errno REAL da ultima syscall de RW */
+                        const int rwErr =
+                            (int)StormRW::GetLastErrno();
+
                         LOGE(
-                            "[WRITE] pid=%u addr=0x%llX size=%u FALHOU (%s) erros=%llu",
+                            "[WRITE] pid=%u addr=0x%llX size=%u FALHOU (%s errno=%d) erros=%llu",
                             req.Pid,
                             (unsigned long long)req.Address,
                             req.Size,
-                            strerror(errno),
+                            strerror(rwErr),
+                            rwErr,
                             (unsigned long long)writeErr
                         );
 
                         FileLog(
-                            "WRITE pid=%u addr=0x%llX size=%u ERRO (%s) erros=%llu",
+                            "WRITE pid=%u addr=0x%llX size=%u ERRO (errno=%d %s) erros=%llu",
                             req.Pid,
                             (unsigned long long)req.Address,
                             req.Size,
-                            strerror(errno),
+                            rwErr,
+                            strerror(rwErr),
                             (unsigned long long)writeErr
                         );
                     }
@@ -1853,7 +1870,7 @@ int main(
 
                     const StormRW::Stats rwStats = StormRW::GetStats();
                     LOGI(
-                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu ttl=%lldms",
+                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms",
                         (unsigned long long)reads,
                         (unsigned long long)(reads - lastReads),
                         (unsigned long long)writes,
@@ -1863,11 +1880,12 @@ int main(
                         (unsigned long long)rwStats.negHits,
                         (unsigned long long)rwStats.misses,
                         (unsigned long long)rwStats.syscalls,
+                        (unsigned long long)rwStats.retries,
                         StormRW::GetTtlMs()
                     );
 
                     FileLog(
-                        "stats reads=%llu writes=%llu erros=%llu | cache hit=%llu neg=%llu miss=%llu syscalls=%llu ttl=%lldms",
+                        "stats reads=%llu writes=%llu erros=%llu | cache hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms",
                         (unsigned long long)reads,
                         (unsigned long long)writes,
                         (unsigned long long)g_TotalErrors.load(),
@@ -1875,6 +1893,7 @@ int main(
                         (unsigned long long)rwStats.negHits,
                         (unsigned long long)rwStats.misses,
                         (unsigned long long)rwStats.syscalls,
+                        (unsigned long long)rwStats.retries,
                         StormRW::GetTtlMs()
                     );
 

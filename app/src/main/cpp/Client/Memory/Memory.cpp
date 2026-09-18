@@ -78,7 +78,7 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-18-PONTEFIX-V6";
+        "StormMemory-2026-09-18-RWFIX-V7";
 
     /*
      * Prioridade de acesso:
@@ -1120,6 +1120,28 @@ bool Memory::Read(
      * produção - o processo do app não tem permissão de ptrace no
      * jogo, o daemon tem.
      * ----------------------------------------------------------------
+     */
+    if (
+        BridgeClient::ReadMem(
+            static_cast<uint32_t>(s_TargetPid),
+            static_cast<uint64_t>(address),
+            outValue,
+            static_cast<uint32_t>(size)
+        )
+    )
+    {
+        g_BridgeReads++;
+
+        return true;
+    }
+
+    /*
+     * (RWFIX-V7) 1 retry IMEDIATO no cliente: a primeira tentativa pode
+     * cair dentro de uma falha transitoria da ponte (EAGAIN/EIO de um
+     * instante, cache negativo acabado de expirar). Sem isso, o Read<T>
+     * do chamador devolve T{} (zero) e a cadeia ve "LocalPlayer nulo"
+     * mesmo o dado existindo. O retry cobre o intervalo entre as
+     * retentativas internas do daemon.
      */
     if (
         BridgeClient::ReadMem(
