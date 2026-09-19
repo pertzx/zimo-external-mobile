@@ -150,6 +150,33 @@ namespace Cheat {
                 wBool(ofs, "NoFireDelay", g_Globals.Misc.Exploits.LocalPlayer.FireDelay);
                 ofs << "\n";
 
+                // ---------- [Misc.Mods] (V9 — portas do BR MOD) ----------
+                ofs << "[Misc.Mods]\n";
+                wBool(ofs, "SpeedLite", g_Globals.Misc.Mods.SpeedLite);
+                wInt(ofs, "SpeedLiteLevel", g_Globals.Misc.Mods.SpeedLiteLevel);
+                wInt(ofs, "SpeedLiteKey", g_Globals.Misc.Mods.SpeedLiteKey);
+                wBool(ofs, "TeleKill", g_Globals.Misc.Mods.TeleKill);
+                wFloat(ofs, "TeleKeepDist", g_Globals.Misc.Mods.TeleKeepDist);
+                wInt(ofs, "TeleKillKey", g_Globals.Misc.Mods.TeleKillKey);
+                wInt(ofs, "TeleportMarkKey", g_Globals.Misc.Mods.TeleportMarkKey);
+                wBool(ofs, "DownPlayer", g_Globals.Misc.Mods.DownPlayer);
+                wInt(ofs, "DownPlayerKey", g_Globals.Misc.Mods.DownPlayerKey);
+                wBool(ofs, "UpPlayer", g_Globals.Misc.Mods.UpPlayer);
+                wInt(ofs, "UpPlayerKey", g_Globals.Misc.Mods.UpPlayerKey);
+                wBool(ofs, "Fly", g_Globals.Misc.Mods.Fly);
+                wFloat(ofs, "FlySpeed", g_Globals.Misc.Mods.FlySpeed);
+                wInt(ofs, "FlyUpKey", g_Globals.Misc.Mods.FlyUpKey);
+                wInt(ofs, "FlyDownKey", g_Globals.Misc.Mods.FlyDownKey);
+                wBool(ofs, "VisionHack", g_Globals.Misc.Mods.VisionHack);
+                wFloat(ofs, "VisionFov", g_Globals.Misc.Mods.VisionFov);
+                wBool(ofs, "NoReload", g_Globals.Misc.Mods.NoReload);
+                ofs << "\n";
+
+                // ---------- [Misc.Skin] (V9) ----------
+                ofs << "[Misc.Skin]\n";
+                wInt(ofs, "Category", g_Globals.Misc.Skin.Category);
+                ofs << "\n";
+
 // ---------- [General] ----------
             ofs << "[General]\n";
             wInt(ofs, "MenuKey", g_Globals.General.MenuKey);
@@ -292,6 +319,29 @@ namespace Cheat {
             gBool("Misc.Exploits.LocalPlayer", "MaxDamage", g_Globals.Misc.Exploits.LocalPlayer.MoreDamage);
             gBool("Misc.Exploits.LocalPlayer", "SpinBot", g_Globals.Misc.Exploits.LocalPlayer.SpinBot);
             gBool("Misc.Exploits.LocalPlayer", "NoFireDelay", g_Globals.Misc.Exploits.LocalPlayer.FireDelay);
+
+            // ---------- Misc.Mods (V9) ----------
+            gBool("Misc.Mods", "SpeedLite", g_Globals.Misc.Mods.SpeedLite);
+            gInt("Misc.Mods", "SpeedLiteLevel", g_Globals.Misc.Mods.SpeedLiteLevel);
+            gInt("Misc.Mods", "SpeedLiteKey", g_Globals.Misc.Mods.SpeedLiteKey);
+            gBool("Misc.Mods", "TeleKill", g_Globals.Misc.Mods.TeleKill);
+            gFloat("Misc.Mods", "TeleKeepDist", g_Globals.Misc.Mods.TeleKeepDist);
+            gInt("Misc.Mods", "TeleKillKey", g_Globals.Misc.Mods.TeleKillKey);
+            gInt("Misc.Mods", "TeleportMarkKey", g_Globals.Misc.Mods.TeleportMarkKey);
+            gBool("Misc.Mods", "DownPlayer", g_Globals.Misc.Mods.DownPlayer);
+            gInt("Misc.Mods", "DownPlayerKey", g_Globals.Misc.Mods.DownPlayerKey);
+            gBool("Misc.Mods", "UpPlayer", g_Globals.Misc.Mods.UpPlayer);
+            gInt("Misc.Mods", "UpPlayerKey", g_Globals.Misc.Mods.UpPlayerKey);
+            gBool("Misc.Mods", "Fly", g_Globals.Misc.Mods.Fly);
+            gFloat("Misc.Mods", "FlySpeed", g_Globals.Misc.Mods.FlySpeed);
+            gInt("Misc.Mods", "FlyUpKey", g_Globals.Misc.Mods.FlyUpKey);
+            gInt("Misc.Mods", "FlyDownKey", g_Globals.Misc.Mods.FlyDownKey);
+            gBool("Misc.Mods", "VisionHack", g_Globals.Misc.Mods.VisionHack);
+            gFloat("Misc.Mods", "VisionFov", g_Globals.Misc.Mods.VisionFov);
+            gBool("Misc.Mods", "NoReload", g_Globals.Misc.Mods.NoReload);
+
+            // ---------- Misc.Skin (V9) ----------
+            gInt("Misc.Skin", "Category", g_Globals.Misc.Skin.Category);
 
             // ---------- General ----------
             gInt("General", "MenuKey", g_Globals.General.MenuKey);

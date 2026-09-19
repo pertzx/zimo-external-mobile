@@ -67,6 +67,7 @@ target_include_directories(client PRIVATE
     ${CPP_DIR}/Client/Math
     ${CPP_DIR}/Client/Memory
     ${CPP_DIR}/Client/Offsets
+    ${CPP_DIR}/Client/Skin
     ${CPP_DIR}/Client/Unity
     ${CPP_DIR}/Client/Utils
 

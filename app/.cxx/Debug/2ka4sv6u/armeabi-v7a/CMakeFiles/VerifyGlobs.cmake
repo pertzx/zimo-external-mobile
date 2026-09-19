@@ -26,6 +26,7 @@ set(OLD_GLOB
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Memory/Memory.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Offsets/Offsets.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/PanelApp.cpp"
+  "C:/zimo-external-mobile/app/src/main/cpp/Client/Skin/ClothChanger.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Unity/UTF/UTF8.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Unity/Unity.cpp"
   "C:/zimo-external-mobile/app/src/main/cpp/Client/Utils/AndroidUtils.cpp"

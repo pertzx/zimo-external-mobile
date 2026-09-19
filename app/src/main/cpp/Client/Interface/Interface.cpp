@@ -12,9 +12,13 @@
 #include <Memory/Memory.hpp>
 #include <Memory/BridgeClient.hpp>
 #include <Offsets/Offsets.hpp>
+#include <Skin/ClothChanger.hpp>
+#include <Skin/SkinItems.h>
 #include <PanelApp.hpp>
 #include <Interface/FloatingKeys.hpp>
 #include <cmath>
+#include <cstring>
+#include <cctype>
 #include <XorStr.hpp>
 
 // STUBS para Android (substituem funcionalidades PC-only)
@@ -179,10 +183,10 @@ void Interface::UpdateStyle()
 void DrawDock(ImDrawList* dl, ImVec2 windowPos, ImVec2 windowSize, int& currentTab, float alpha)
 {
         const float dockHeight = 62.0f;
-        const float dockPadding = 12.0f;
+        const float dockPadding = 10.0f;
         const float itemSize = 50.0f;    // ícones maiores (era 44)
-        const float itemSpacing = 14.0f;
-        const int numItems = 5;
+        const float itemSpacing = 12.0f;
+        const int numItems = 7;
 
         float dockWidth = (itemSize + itemSpacing) * numItems - itemSpacing + dockPadding * 2;
         float dockX = windowPos.x + (windowSize.x - dockWidth) * 0.5f;
@@ -212,30 +216,34 @@ void DrawDock(ImDrawList* dl, ImVec2 windowPos, ImVec2 windowSize, int& currentT
         };
 
         // [FIX] POD static buffers — sem magic statics do CRT
-        static char dock_labels[5][16] = { };
+        static char dock_labels[7][16] = { };
         static bool dock_init = false;
         if (!dock_init)
         {
                 strcpy_s(dock_labels[0], XorStr("Aimbot"));
                 strcpy_s(dock_labels[1], XorStr("Silent"));
                 strcpy_s(dock_labels[2], XorStr("Exploits"));
-                strcpy_s(dock_labels[3], XorStr("ESP"));
-                strcpy_s(dock_labels[4], XorStr("Config"));
+                strcpy_s(dock_labels[3], XorStr("Mods"));
+                strcpy_s(dock_labels[4], XorStr("ESP"));
+                strcpy_s(dock_labels[5], XorStr("Skin"));
+                strcpy_s(dock_labels[6], XorStr("Config"));
                 dock_init = true;
         }
 
         DockItemData items[] = {
-                { ICON_FA_CROSSHAIRS, dock_labels[0] },
-                { ICON_FA_GHOST, dock_labels[1] },
-                { ICON_FA_BOLT, dock_labels[2] },
-                { ICON_FA_EYE, dock_labels[3] },
-                { ICON_FA_GEAR, dock_labels[4] },
+                { ICON_FA_CROSSHAIRS,      dock_labels[0] },
+                { ICON_FA_GHOST,           dock_labels[1] },
+                { ICON_FA_BOLT,            dock_labels[2] },
+                { ICON_FA_PERSON_RUNNING,  dock_labels[3] },
+                { ICON_FA_EYE,             dock_labels[4] },
+                { ICON_FA_SHIRT,           dock_labels[5] },
+                { ICON_FA_GEAR,            dock_labels[6] },
         };
 
-        static float hoverAnims[5] = { 0, 0, 0, 0, 0 };
-        static float activeAnims[5] = { 0, 0, 0, 0, 0 };
-        static float bounceAnims[5] = { 0, 0, 0, 0, 0 };
-        static float bounceVelocity[5] = { 0, 0, 0, 0, 0 };
+        static float hoverAnims[7] = { 0, 0, 0, 0, 0, 0, 0 };
+        static float activeAnims[7] = { 0, 0, 0, 0, 0, 0, 0 };
+        static float bounceAnims[7] = { 0, 0, 0, 0, 0, 0, 0 };
+        static float bounceVelocity[7] = { 0, 0, 0, 0, 0, 0, 0 };
 
         ImGuiIO& io = ImGui::GetIO();
         float dt = io.DeltaTime;
@@ -1016,8 +1024,8 @@ lastFrameHoveredId = gc.HoveredId;
                         );
 
                         // [FIX] POD static buffers — sem magic statics do CRT
-                        // Tab order: 1=Aimbot, 2=Silent, 3=Exploits, 4=ESP, 5=Config
-                        static char tab_names[6][16] = { };
+                        // Tab order: 1=Aimbot, 2=Silent, 3=Exploits, 4=Mods, 5=ESP, 6=Skin, 7=Config
+                        static char tab_names[8][16] = { };
                         static bool tabs_init = false;
                         if (!tabs_init)
                         {
@@ -1025,17 +1033,20 @@ lastFrameHoveredId = gc.HoveredId;
                                 strcpy_s(tab_names[1], XorStr("Aimbot"));
                                 strcpy_s(tab_names[2], XorStr("Silent"));
                                 strcpy_s(tab_names[3], XorStr("Exploits"));
-                                strcpy_s(tab_names[4], XorStr("ESP"));
-                                strcpy_s(tab_names[5], XorStr("Config"));
+                                strcpy_s(tab_names[4], XorStr("Mods"));
+                                strcpy_s(tab_names[5], XorStr("ESP"));
+                                strcpy_s(tab_names[6], XorStr("Skin"));
+                                strcpy_s(tab_names[7], XorStr("Config"));
                                 tabs_init = true;
                         }
 
                         const char* tabNames[] = {
                                 tab_names[0], tab_names[1], tab_names[2],
-                                tab_names[3], tab_names[4], tab_names[5]
+                                tab_names[3], tab_names[4], tab_names[5],
+                                tab_names[6], tab_names[7]
                         };
 
-                        if (CurrentTab >= 1 && CurrentTab <= 5)
+                        if (CurrentTab >= 1 && CurrentTab <= 7)
                         {
                                 ImGui::PushFont(Fonts::InterBold);
                                 ImVec2 titleSize = ImGui::CalcTextSize(tabNames[CurrentTab]);
@@ -1205,6 +1216,7 @@ lastFrameHoveredId = gc.HoveredId;
                                                         Custom::Checkbox(XorStr("Aimbot 2x"), &g_Globals.Misc.Exploits.LocalPlayer.AimLock2x);
                                                         Custom::Checkbox(XorStr("Aimbot Sniper"), &g_Globals.Misc.Exploits.LocalPlayer.AimbotAwm);
                                                         Custom::Checkbox(XorStr("No Recoil"), &g_Globals.Misc.Exploits.LocalPlayer.NoRecoil);
+                                                        Custom::Checkbox(XorStr("No Reload [New]"), &g_Globals.Misc.Mods.NoReload);
                                                         if (g_Globals.Misc.Exploits.LocalPlayer.NoRecoil)
                                                                 Custom::SliderInt(XorStr("Recoil Control"), &g_Globals.Misc.Exploits.LocalPlayer.RecoilControl, 0, 100, "%d%%");
                                                 }
@@ -1370,9 +1382,63 @@ lastFrameHoveredId = gc.HoveredId;
                                         ImGui::EndGroup();
                                 }
                                 // ═══════════════════════════════════════════════════════════
-                                // TAB 4: ESP
+                                // TAB 4: MODS (V9 — portas do BR MOD)
                                 // ═══════════════════════════════════════════════════════════
                                 else if (CurrentTab == 4)
+                                {
+                                        ImGui::SetCursorPos(ImVec2(AnimaTab, 0));
+                                        ImGui::BeginGroup();
+                                        {
+                                                Custom::CustomChild(XorStr("Movement"), ImVec2(cardWidth, cardHeight));
+                                                {
+                                                        Custom::Checkbox(XorStr("Speed Lite [New]"), &g_Globals.Misc.Mods.SpeedLite);
+                                                        Custom::KeyBind(XorStr("SpeedLite"), &g_Globals.Misc.Mods.SpeedLiteKey, false, &g_Globals.Misc.Mods.SpeedLite);
+                                                        if (g_Globals.Misc.Mods.SpeedLite)
+                                                                Custom::SliderInt(XorStr("Level"), &g_Globals.Misc.Mods.SpeedLiteLevel, 0, 10, "%d");
+
+                                                        Custom::Checkbox(XorStr("Fly [New]"), &g_Globals.Misc.Mods.Fly);
+                                                        if (g_Globals.Misc.Mods.Fly)
+                                                        {
+                                                                Custom::KeyBind(XorStr("Fly Up"), &g_Globals.Misc.Mods.FlyUpKey, false, nullptr);
+                                                                Custom::KeyBind(XorStr("Fly Down"), &g_Globals.Misc.Mods.FlyDownKey, false, nullptr);
+                                                                Custom::SliderFloat(XorStr("Fly Speed"), &g_Globals.Misc.Mods.FlySpeed, 1.0f, 30.0f, "%.1f m/s");
+                                                        }
+
+                                                        Custom::Checkbox(XorStr("Vision Hack [New]"), &g_Globals.Misc.Mods.VisionHack);
+                                                        if (g_Globals.Misc.Mods.VisionHack)
+                                                                Custom::SliderFloat(XorStr("FOV"), &g_Globals.Misc.Mods.VisionFov, 30.0f, 120.0f, "%.0f");
+                                                }
+                                                Custom::EndCustomChild();
+
+                                                ImGui::SetCursorPos(ImVec2(cardWidth + 10 + AnimaTab, 0));
+                                                Custom::CustomChild(XorStr("Positional"), ImVec2(cardWidth, cardHeight));
+                                                {
+                                                        Custom::Checkbox(XorStr("Tele Kill [New]"), &g_Globals.Misc.Mods.TeleKill);
+                                                        Custom::KeyBind(XorStr("TeleKillKey"), &g_Globals.Misc.Mods.TeleKillKey, false, &g_Globals.Misc.Mods.TeleKill);
+                                                        if (g_Globals.Misc.Mods.TeleKill)
+                                                                Custom::SliderFloat(XorStr("Keep Distance"), &g_Globals.Misc.Mods.TeleKeepDist, 0.1f, 5.0f, "%.1f m");
+
+                                                        Custom::Checkbox(XorStr("Teleport Mark [New]"), &g_Globals.Misc.Mods.TeleportMark);
+                                                        Custom::KeyBind(XorStr("TeleportMark"), &g_Globals.Misc.Mods.TeleportMarkKey, false, &g_Globals.Misc.Mods.TeleportMark);
+
+                                                        Custom::Checkbox(XorStr("Up Player [New]"), &g_Globals.Misc.Mods.UpPlayer);
+                                                        Custom::KeyBind(XorStr("UpPlayer"), &g_Globals.Misc.Mods.UpPlayerKey, false, &g_Globals.Misc.Mods.UpPlayer);
+
+                                                        Custom::Checkbox(XorStr("Down Player [New]"), &g_Globals.Misc.Mods.DownPlayer);
+                                                        Custom::KeyBind(XorStr("DownPlayer"), &g_Globals.Misc.Mods.DownPlayerKey, false, &g_Globals.Misc.Mods.DownPlayer);
+
+                                                        ImGui::Dummy(ImVec2(0, 8));
+
+                                                        
+                                                }
+                                                Custom::EndCustomChild();
+                                        }
+                                        ImGui::EndGroup();
+                                }
+                                // ═══════════════════════════════════════════════════════════
+                                // TAB 5: ESP
+                                // ═══════════════════════════════════════════════════════════
+                                else if (CurrentTab == 5)
                                 {
                                         ImGui::SetCursorPos(ImVec2(AnimaTab, 0));
                                         ImGui::BeginGroup();
@@ -1443,9 +1509,214 @@ lastFrameHoveredId = gc.HoveredId;
                                         ImGui::EndGroup();
                                 }
                                 // ═══════════════════════════════════════════════════════════
-                                // TAB 5: CONFIG
+                                // TAB 6: SKIN CHANGER (V9)
                                 // ═══════════════════════════════════════════════════════════
-                                else if (CurrentTab == 5)
+                                else if (CurrentTab == 6)
+                                {
+                                        ImGui::SetCursorPos(ImVec2(AnimaTab, 0));
+                                        ImGui::BeginGroup();
+                                        {
+                                                Custom::CustomChild(XorStr("Skin Changer [New]"), ImVec2(cardWidth, cardHeight));
+                                                {
+                                                        static const char* kCats[] = { "Top", "Calca", "Sapato", "Cabeca", "Mascara", "Rosto" };
+
+                                                        Custom::Combo(XorStr("Categoria"), &g_Globals.Misc.Skin.Category,
+                                                                XorStr("Top\0Calca\0Sapato\0Cabeca\0Mascara\0Rosto\0"));
+
+                                                        if (g_Globals.Misc.Skin.Category >= 0 &&
+                                                            g_Globals.Misc.Skin.Category < (int)(sizeof(kCats) / sizeof(kCats[0])))
+                                                        {
+                                                                char searchBuf[sizeof(g_Globals.Misc.Skin.Search)];
+                                                                memcpy(searchBuf, g_Globals.Misc.Skin.Search, sizeof(searchBuf));
+                                                                searchBuf[sizeof(searchBuf) - 1] = '\0';
+
+                                                                ImGui::PushItemWidth(-1);
+                                                                if (ImGui::InputTextWithHint(XorStr("##skinsearch"), XorStr("buscar..."), searchBuf, sizeof(searchBuf)))
+                                                                        memcpy(g_Globals.Misc.Skin.Search, searchBuf, sizeof(g_Globals.Misc.Skin.Search));
+                                                                ImGui::PopItemWidth();
+                                                        }
+                                                }
+                                                Custom::EndCustomChild();
+
+                                                ImGui::SetCursorPos(ImVec2(cardWidth + 10 + AnimaTab, 0));
+                                                Custom::CustomChild(XorStr("Lista"), ImVec2(cardWidth, cardHeight));
+                                                {
+                                                        Skin::Initialize();
+
+                                                        const char* status = Skin::GetStatusText();
+                                                        if (status[0] != '\0')
+                                                        {
+                                                                ImGui::TextDisabled("%s", status);
+                                                                ImGui::Dummy(ImVec2(0, 4));
+                                                        }
+
+                                                        const int cat = g_Globals.Misc.Skin.Category;
+
+                                                        if (cat >= 0 && cat < Skin::CAT_COUNT)
+                                                        {
+                                                                const uint32_t prefix = (cat == Skin::CAT_TOP) ? 203u
+                                                                        : (cat == Skin::CAT_BOTTOM) ? 204u
+                                                                        : (cat == Skin::CAT_SHOES) ? 205u
+                                                                        : (cat == Skin::CAT_FACE) ? 214u
+                                                                        : 211u;
+
+                                                                const char* search = g_Globals.Misc.Skin.Search;
+                                                                const size_t searchLen = strlen(search);
+
+                                                                const float rowH = 30.0f;
+                                                                const float width = ImGui::GetWindowSize().x - 20.0f;
+
+                                                                int shown = 0;
+
+                                                                ImGui::BeginChild(XorStr("SkinList"), ImVec2(width, ImGui::GetWindowSize().y - 60.0f), ImGuiChildFlags_None);
+
+                                                                /*
+                                                                 * Scroll por arraste (mobile).
+                                                                 *
+                                                                 * O backend Android nunca gera eventos de wheel e a
+                                                                 * scrollbar padrao tem apenas 5px — impossivel de
+                                                                 * acertar com o dedo. Entao:
+                                                                 *   - arrastar dentro da lista rola o conteudo;
+                                                                 *   - toque curto (< 8px de movimento) continua
+                                                                 *     sendo um clique valido na skin;
+                                                                 *   - toque na faixa da scrollbar nao inicia drag
+                                                                 *     (a scrollbar continua funcionando).
+                                                                 */
+                                                                ImGuiIO& skinIO = ImGui::GetIO();
+                                                                const ImGuiStyle& skinStyle = ImGui::GetStyle();
+                                                                const ImVec2 listPos = ImGui::GetWindowPos();
+                                                                const ImVec2 listSize = ImGui::GetWindowSize();
+
+                                                                static bool   sSkinTouchDown = false;
+                                                                static bool   sSkinListDrag  = false;
+                                                                static float  sSkinDragDist  = 0.0f;
+                                                                static float  sSkinLastY     = 0.0f;
+
+                                                                const bool pressOnScrollbar =
+                                                                        skinIO.MousePos.x >= listPos.x + listSize.x - skinStyle.ScrollbarSize;
+
+                                                                if (ImGui::IsWindowHovered() &&
+                                                                        ImGui::IsMouseClicked(0) &&
+                                                                        !pressOnScrollbar)
+                                                                {
+                                                                        sSkinTouchDown = true;
+                                                                        sSkinListDrag  = false;
+                                                                        sSkinDragDist  = 0.0f;
+                                                                        sSkinLastY     = skinIO.MousePos.y;
+                                                                }
+
+                                                                if (sSkinTouchDown && ImGui::IsMouseDown(0))
+                                                                {
+                                                                        const float dy = skinIO.MousePos.y - sSkinLastY;
+                                                                        sSkinLastY     = skinIO.MousePos.y;
+                                                                        sSkinDragDist += (dy < 0.0f) ? -dy : dy;
+
+                                                                        if (!sSkinListDrag && sSkinDragDist > 8.0f)
+                                                                                sSkinListDrag = true;
+
+                                                                        if (sSkinListDrag)
+                                                                                ImGui::SetScrollY(ImGui::GetScrollY() - dy);
+                                                                }
+
+                                                                if (!ImGui::IsMouseDown(0))
+                                                                        sSkinTouchDown = false;
+
+                                                                for (uint32_t i = 0; i < Skin::kSkinItemCount && shown < 200; ++i)
+                                                                {
+                                                                        const Skin::SkinItemRow& row = Skin::kSkinItems[i];
+
+                                                                        if ((row.Id / 1000000u) != prefix)
+                                                                                continue;
+
+                                                                        if (searchLen != 0)
+                                                                        {
+                                                                                bool match = false;
+
+                                                                                for (const char* p = row.Name; *p; ++p)
+                                                                                {
+                                                                                        const char* q = search;
+                                                                                        const char* r = p;
+
+                                                                                        while (*q && *r &&
+                                                                                               tolower((unsigned char)*q) == tolower((unsigned char)*r))
+                                                                                        {
+                                                                                                ++q; ++r;
+                                                                                        }
+
+                                                                                        if (*q == '\0') { match = true; break; }
+                                                                                }
+
+                                                                                if (!match)
+                                                                                        continue;
+                                                                        }
+
+                                                                        const bool applied = Skin::IsApplied(row.Id);
+
+                                                                        ImGui::PushID((int)row.Id);
+
+                                                                        const ImVec2 pMin = ImGui::GetCursorScreenPos();
+                                                                        const ImVec2 pMax = ImVec2(pMin.x + width - 8.0f, pMin.y + rowH);
+
+                                                                        /*
+                                                                         * Clique valida no SOLTAR (padrao touch), e so
+                                                                         * conta como clique se nao virou um drag de scroll.
+                                                                         */
+                                                                        const bool released = ImGui::InvisibleButton(XorStr("##skinrow"), ImVec2(width - 8.0f, rowH));
+                                                                        const bool clicked = released && !sSkinListDrag;
+                                                                        const bool hovered = ImGui::IsItemHovered() && !sSkinListDrag;
+
+                                                                        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+                                                                        dl->AddRectFilled(pMin, pMax,
+                                                                                IM_COL32(hovered ? 42 : 28, 28, 28, 235), 6.0f);
+
+                                                                        static const ImU32 kRarityCols[9] = {
+                                                                                IM_COL32(200, 200, 200, 255),
+                                                                                IM_COL32(90, 200, 90, 255),
+                                                                                IM_COL32(80, 140, 255, 255),
+                                                                                IM_COL32(170, 90, 255, 255),
+                                                                                IM_COL32(200, 60, 255, 255),
+                                                                                IM_COL32(255, 150, 40, 255),
+                                                                                IM_COL32(255, 100, 30, 255),
+                                                                                IM_COL32(255, 60, 60, 255),
+                                                                                IM_COL32(120, 120, 120, 255),
+                                                                        };
+
+                                                                        dl->AddRectFilled(pMin,
+                                                                                ImVec2(pMin.x + 4.0f, pMax.y),
+                                                                                kRarityCols[row.Rarity], 2.0f);
+
+                                                                        dl->AddText(ImVec2(pMin.x + 12.0f, pMin.y + (rowH - ImGui::CalcTextSize(row.Name).y) * 0.5f),
+                                                                                IM_COL32(225, 225, 225, 255), row.Name);
+
+                                                                        const char* tag = applied ? "ON" : "Aplicar";
+                                                                        const ImVec2 tagSz = ImGui::CalcTextSize(tag);
+
+                                                                        dl->AddText(ImVec2(pMax.x - tagSz.x - 12.0f, pMin.y + (rowH - tagSz.y) * 0.5f),
+                                                                                applied ? IM_COL32(90, 230, 120, 255) : IM_COL32(200, 200, 200, 255), tag);
+
+                                                                        if (clicked)
+                                                                                Skin::ApplyOrToggle(row.Id, row.Name, cat);
+
+                                                                        ImGui::PopID();
+
+                                                                        ++shown;
+                                                                }
+
+                                                                if (shown == 0)
+                                                                        ImGui::TextDisabled("%s", XorStr("nada encontrado"));
+
+                                                                ImGui::EndChild();
+                                                        }
+                                                }
+                                                Custom::EndCustomChild();
+                                        }
+                                        ImGui::EndGroup();
+                                }
+                                // ═══════════════════════════════════════════════════════════
+                                // TAB 7: CONFIG
+                                // ═══════════════════════════════════════════════════════════
+                                else if (CurrentTab == 7)
                                 {
                                         ImGui::SetCursorPos(ImVec2(AnimaTab, 0));
                                         ImGui::BeginGroup();

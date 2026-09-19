@@ -108,6 +108,27 @@ enum BridgeCmd : uint32_t
      *   - cache hit/miss e kill-switch de escrita (wrKilled/writesOn)
      */
     BRIDGE_CMD_STATS = 9,
+
+    /*
+     * (V9) AUTO-RESOLVE DE TYPEINFO — cura o "para no AccessClass".
+     *
+     * Quando o jogo atualiza, os slots globais dos TypeInfo (GameFacade,
+     * GameVarDef, AvatarWardrobeDataManager, ...) SE MOVEM dentro da
+     * .data da libil2cpp.so e os valores manuais do Offsets.cpp ficam
+     * velhos — a cadeia morre no AccessClass.
+     *
+     * O daemon varre os mapeamentos LEGÍVEIS da lib no alvo (pread64 em
+     * blocos de 256 KB) procurando slots que apontam para um Il2CppClass
+     * cujo campo `name` (offset 0x8 em 32-bit / 0x10 em 64-bit) é
+     * EXATAMENTE o nome pedido. Cada slot achado = {RVA, klass}.
+     *
+     * Payload do pedido: "libName|ClassName" (ex: "libil2cpp.so|GameFacade").
+     * Payload da resposta: uint32 count + count x TypeInfoHitPayload
+     *     { uint64 rva; uint64 klass; } (16 bytes cada, count <= 16).
+     *
+     * Resultado é cacheado no daemon por (pid, lib, classe).
+     */
+    BRIDGE_CMD_FIND_TYPEINFO = 10,
 };
 
 enum BridgeStatus : uint32_t
@@ -201,3 +222,21 @@ struct BridgeStatsPayload
 
 static_assert(sizeof(BridgeStatsPayload) == 160,
               "BridgeStatsPayload deve ter 160 bytes");
+
+/*
+ * (V9) Hit de uma busca de TypeInfo (BRIDGE_CMD_FIND_TYPEINFO).
+ * Struct FIXA (packed): rva = offset do slot dentro da lib,
+ * klass = ponteiro do Il2CppClass lido NAQUELE instante (o cliente
+ * ainda assim deve ler *(lib + rva) na hora de usar — o klass pode
+ * mudar entre sessões do jogo, o RVA não).
+ */
+#pragma pack(push, 1)
+struct TypeInfoHitPayload
+{
+    uint64_t rva;
+    uint64_t klass;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(TypeInfoHitPayload) == 16,
+              "TypeInfoHitPayload deve ter 16 bytes");

@@ -880,6 +880,476 @@ namespace
 
         return true;
     }
+
+    /*
+     * ========================================================================
+     * (V9) AUTO-RESOLVE DE TYPEINFO — varredura dos slots de Il2CppClass.
+     * ========================================================================
+     *
+     * Encontra TODOS os slots (dentro dos mapeamentos legíveis da lib
+     * pedida) cujo valor é um ponteiro para um Il2CppClass cujo campo
+     * `name` bate EXATAMENTE com o nome da classe. Isso torna o painel
+     * IMUNE a atualização do jogo: GameFacade_TypeInfo, GameVarDef_TypeInfo
+     * e AvatarWardrobeDataManager_TypeInfo se re-resolvem sozinhos.
+     *
+     * 100% via syscall (SysPread = __NR_pread64 direto), em blocos de
+     * 256 KB. O klass é validado lendo o ponteiro do nome + a string —
+     * falso positivo é praticamente impossível.
+     */
+
+    struct TypeInfoHitLocal
+    {
+        uint64_t rva;
+        uint64_t klass;
+    };
+
+    struct LibMapping
+    {
+        uint64_t start;
+        uint64_t end;
+        bool readable;
+        bool exec;
+    };
+
+    bool ParseMapsOfLib(
+        pid_t pid,
+        const std::string& libName,
+        std::vector<LibMapping>& out,
+        uint64_t& libStart,
+        uint64_t& libEnd
+    )
+    {
+        std::string maps;
+
+        if (!ReadTextFile(
+                "/proc/" + std::to_string(pid) + "/maps",
+                maps
+            ))
+        {
+            return false;
+        }
+
+        libStart = UINT64_MAX;
+        libEnd   = 0;
+
+        size_t pos = 0;
+
+        while (pos < maps.size())
+        {
+            size_t eol = maps.find('\n', pos);
+
+            if (eol == std::string::npos)
+                eol = maps.size();
+
+            std::string line = maps.substr(pos, eol - pos);
+            pos = eol + 1;
+
+            if (line.find(libName) == std::string::npos)
+                continue;
+
+            unsigned long long s = 0, e = 0;
+            char perms[8] = {};
+
+            if (sscanf(
+                    line.c_str(),
+                    "%llx-%llx %7s",
+                    &s, &e, perms
+                ) != 3)
+                continue;
+
+            LibMapping m{};
+            m.start    = s;
+            m.end      = e;
+            m.readable = (perms[0] == 'r');
+            m.exec     = (perms[2] == 'x');
+
+            out.push_back(m);
+
+            if (s < libStart) libStart = s;
+            if (e > libEnd)   libEnd   = e;
+        }
+
+        return !out.empty();
+    }
+
+    /*
+     * Lê `size` bytes do /proc/<pid>/mem via syscall direta.
+     * Falha curta (EOF de página morta) é tolerada com leituras de
+     * acompanhamento menores — o scanner só precisa dos bytes.
+     */
+    bool ScanPread(
+        int fd,
+        uint64_t addr,
+        void* buf,
+        size_t size
+    )
+    {
+        char* out = static_cast<char*>(buf);
+        size_t total = 0;
+
+        while (total < size)
+        {
+            ssize_t n = StormRW::SysPread(
+                fd,
+                out + total,
+                size - total,
+                addr + total
+            );
+
+            if (n < 0)
+            {
+                if (errno == EINTR || errno == EAGAIN)
+                    continue;
+
+                return false;
+            }
+
+            if (n == 0)
+                return false;
+
+            total += static_cast<size_t>(n);
+        }
+
+        return true;
+    }
+
+    bool ReadTargetString(
+        int fd,
+        uint64_t strPtr,
+        const std::string& want,
+        size_t ptrSize
+    )
+    {
+        char buf[64] = {};
+
+        const size_t wantLen = want.size();
+
+        if (wantLen == 0 || wantLen >= sizeof(buf))
+            return false;
+
+        if (!ScanPread(
+                fd,
+                strPtr,
+                buf,
+                wantLen + 1
+            ))
+            return false;
+
+        /*
+         * (V9.1) MATCH EXATO: buf[wantLen] precisa ser o '\0' REAL lido
+         * da memoria. Antes o byte era SOBRESCRITO com 0 e o memcmp
+         * virava prefix-match: "GameFacade" casava "GameFacadeManager"
+         * etc., e o primeiro hit podia ser o slot da classe ERRADA.
+         */
+        return buf[wantLen] == '\0' &&
+               memcmp(buf, want.c_str(), wantLen) == 0;
+    }
+
+    bool FindTypeInfoSlots(
+        pid_t pid,
+        const std::string& libName,
+        const std::string& className,
+        std::vector<TypeInfoHitLocal>& out
+    )
+    {
+        std::vector<LibMapping> maps;
+
+        uint64_t libStart = 0, libEnd = 0;
+
+        if (!ParseMapsOfLib(
+                pid,
+                libName,
+                maps,
+                libStart,
+                libEnd
+            ))
+        {
+            LOGE(
+                "[TYPEINFO] lib '%s' nao encontrada no pid=%d",
+                libName.c_str(),
+                pid
+            );
+
+            return false;
+        }
+
+        /*
+         * (V9.1) BITNESS e resolvido DEPOIS de abrir o fd (abaixo): o
+         * EI_CLASS vem do ELF DA LIB lido direto da memoria do alvo.
+         * O metodo antigo (readlink /proc/pid/exe) nunca funcionou no
+         * Android — exe aponta pro base.apk (ZIP), o pread ve PK\x03\x04
+         * em vez de ELF e o fallback assumia 32-bit. Num jogo 64-bit
+         * isso forçava ptrSize=4 / nameOff=0x8 (gc_desc!) => 0 hits
+         * garantido pra qualquer classe — exatamente o bug do v8a.
+         */
+        bool target32 = false;
+
+        /*
+         * Cache por (pid, lib, classe): o scan custa ~0.5-2 s uma vez.
+         */
+        struct CacheKey
+        {
+            pid_t pid;
+            std::string lib;
+            std::string cls;
+
+            bool operator<(const CacheKey& o) const
+            {
+                if (pid != o.pid) return pid < o.pid;
+                if (lib != o.lib) return lib < o.lib;
+                return cls < o.cls;
+            }
+        };
+
+        static std::map<CacheKey, std::vector<TypeInfoHitLocal>> s_Cache;
+        static std::mutex s_CacheMutex;
+
+        CacheKey key{ pid, libName, className };
+
+        {
+            std::lock_guard<std::mutex> lk(s_CacheMutex);
+
+            auto it = s_Cache.find(key);
+
+            if (it != s_Cache.end())
+            {
+                out = it->second;
+
+                return true;
+            }
+        }
+
+        const int fd = StormRW::SysOpenMem(pid, false);
+
+        if (fd < 0)
+        {
+            LOGE(
+                "[TYPEINFO] open /proc/%d/mem falhou: %s",
+                pid,
+                strerror(errno)
+            );
+
+            return false;
+        }
+
+        /*
+         * (V9.1) BITNESS REAL: le o ELF header DA LIB direto da memoria
+         * do alvo em libStart (mesmo canal das leituras normais, 100%
+         * syscall). ident[4] == 1 -> 32-bit, == 2 -> 64-bit. Fallback:
+         * IsProcess32Bit (exe), e por ultimo assume 32-bit como antes.
+         */
+        bool haveBitness = false;
+
+        if (libStart != 0)
+        {
+            unsigned char elfId[6]{};
+
+            if (ScanPread(
+                    fd,
+                    libStart,
+                    elfId,
+                    sizeof(elfId)
+                ) &&
+                elfId[0] == 0x7F &&
+                elfId[1] == 'E' &&
+                elfId[2] == 'L' &&
+                elfId[3] == 'F')
+            {
+                target32    = (elfId[4] == 1);
+                haveBitness = true;
+
+                LOGI(
+                    "[TYPEINFO] bitness via ELF da lib: %d-bit (pid=%d)",
+                    target32 ? 32 : 64,
+                    pid
+                );
+            }
+        }
+
+        if (!haveBitness && !IsProcess32Bit(pid, target32))
+        {
+            target32 = true;   /* legacy fallback (FF TH 32-bit) */
+        }
+
+        const size_t ptrSize = target32 ? 4 : 8;
+        const size_t nameOff = target32 ? 0x8 : 0x10;
+
+        /*
+         * Varre cada mapeamento legível da lib em blocos de 256 KB.
+         */
+        static const size_t kChunk = 256 * 1024;
+
+        std::vector<uint8_t> chunk(kChunk);
+        std::vector<TypeInfoHitLocal> hits;
+        size_t candidateCount = 0;
+
+        for (const LibMapping& m : maps)
+        {
+            if (!m.readable)
+                continue;
+
+            /*
+             * (V9.1) Pula seções executaveis (.text): slot de TypeInfo
+             * e ponteiro de DADOS — vive em .data.rel.ro (RELRO, r--),
+             * .data/.bss (rw-), nunca no codigo. A lib v8a do FF tem
+             * centenas de MB de .text; pular corta o scan em ~70%.
+             */
+            if (m.exec)
+                continue;
+
+            /*
+             * Alinha o início ao passo do ponteiro dentro do bloco.
+             */
+            for (uint64_t a = m.start; a < m.end; )
+            {
+                const uint64_t chunkStart = a;
+                const size_t want = static_cast<size_t>(
+                    (m.end - a) < kChunk ? (m.end - a) : kChunk
+                );
+
+                if (!ScanPread(
+                        fd,
+                        chunkStart,
+                        chunk.data(),
+                        want
+                    ))
+                {
+                    a = chunkStart + kChunk;
+                    continue;
+                }
+
+                for (size_t off = 0;
+                     off + ptrSize <= want;
+                     off += ptrSize)
+                {
+                    uint64_t v = 0;
+
+                    if (ptrSize == 4)
+                        v = *reinterpret_cast<uint32_t*>(
+                            chunk.data() + off);
+                    else
+                        v = *reinterpret_cast<uint64_t*>(
+                            chunk.data() + off);
+
+                    if (v == 0)
+                        continue;
+
+                    if ((v & (ptrSize - 1)) != 0)
+                        continue;
+
+                    /*
+                     * O klass vive FORA da lib (heap/anon).
+                     */
+                    if (v >= libStart && v < libEnd)
+                        continue;
+
+                    if (target32)
+                    {
+                        if (v < 0x10000 || v > 0xE0000000ULL)
+                            continue;
+                    }
+                    else
+                    {
+                        /*
+                         * Heap userspace Android arm64 — descarta lixo
+                         * de código (valores < 4 GB).
+                         */
+                        if (v < 0x100000000ULL)
+                            continue;
+                    }
+
+                    ++candidateCount;
+
+                    /*
+                     * Il2CppClass::name é o 3º ponteiro:
+                     * 32-bit: image 0x0, gc_desc 0x4, name 0x8
+                     * 64-bit: image 0x0, gc_desc 0x8, name 0x10
+                     */
+                    uint64_t namePtr = 0;
+
+                    if (!ScanPread(
+                            fd,
+                            v + nameOff,
+                            &namePtr,
+                            ptrSize
+                        ))
+                        continue;
+
+                    if (namePtr == 0 ||
+                        (namePtr >= libStart && namePtr < libEnd))
+                        continue;
+
+                    if (!ReadTargetString(
+                            fd,
+                            namePtr,
+                            className,
+                            ptrSize
+                        ))
+                        continue;
+
+                    TypeInfoHitLocal h{};
+                    h.rva   = (chunkStart + off) - libStart;
+                    h.klass = v;
+
+                    hits.push_back(h);
+
+                    LOGI(
+                        "[TYPEINFO] '%s' slot @ rva=0x%llX klass=0x%llX",
+                        className.c_str(),
+                        (unsigned long long)h.rva,
+                        (unsigned long long)h.klass
+                    );
+
+                    if (hits.size() >= 16)
+                        break;
+                }
+
+                if (hits.size() >= 16)
+                    break;
+
+                a = chunkStart + want;
+            }
+
+            if (hits.size() >= 16)
+                break;
+        }
+
+        StormRW::SysClose(fd);
+
+        LOGI(
+            "[TYPEINFO] scan '%s' em '%s': %zu candidatos, %zu hits",
+            className.c_str(),
+            libName.c_str(),
+            candidateCount,
+            hits.size()
+        );
+
+        FileLog(
+            "TYPEINFO %s em %s: candidatos=%zu hits=%zu",
+            className.c_str(),
+            libName.c_str(),
+            candidateCount,
+            hits.size()
+        );
+
+        /*
+         * (V9.1) NAO cacheia resultado VAZIO: no arranque do jogo o slot
+         * ainda pode estar com token encoded / classe nao criada. Se
+         * cacheasse 0 hits, o retry de 30 s do cliente receberia a
+         * resposta vazia guardada PARA SEMPRE (por pid). Vazio = nova
+         * varredura no proximo pedido.
+         */
+        if (!hits.empty())
+        {
+            std::lock_guard<std::mutex> lk(s_CacheMutex);
+
+            s_Cache[key] = hits;
+        }
+
+        out = hits;
+
+        return true;   /* true = scan executou (hits pode ser 0) */
+    }
 }
 
 /*
@@ -1318,6 +1788,87 @@ namespace
                 );
 
                 resp.PayloadSize = static_cast<uint32_t>(payloadOut.size());
+                resp.Status = BRIDGE_OK;
+
+                break;
+            }
+
+            case BRIDGE_CMD_FIND_TYPEINFO:
+            {
+                /*
+                 * (V9) Payload do pedido: "libName|ClassName".
+                 * Resposta: uint32 count + count x TypeInfoHitPayload.
+                 */
+                std::string joined(
+                    payloadIn.begin(),
+                    payloadIn.end()
+                );
+
+                const size_t sep = joined.find('|');
+
+                if (sep == std::string::npos ||
+                    req.Pid <= 0 ||
+                    sep == 0 ||
+                    sep + 1 >= joined.size())
+                {
+                    resp.Status = BRIDGE_ERR_INVALID;
+                    break;
+                }
+
+                const std::string libName =
+                    joined.substr(0, sep);
+
+                const std::string className =
+                    joined.substr(sep + 1);
+
+                std::vector<TypeInfoHitLocal> hits;
+
+                if (!FindTypeInfoSlots(
+                        static_cast<pid_t>(req.Pid),
+                        libName,
+                        className,
+                        hits
+                    ))
+                {
+                    resp.Status = BRIDGE_ERR_GENERIC;
+                    break;
+                }
+
+                const uint32_t count =
+                    static_cast<uint32_t>(hits.size());
+
+                payloadOut.assign(
+                    sizeof(uint32_t) +
+                        count * sizeof(TypeInfoHitPayload),
+                    0
+                );
+
+                memcpy(
+                    payloadOut.data(),
+                    &count,
+                    sizeof(uint32_t)
+                );
+
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    TypeInfoHitPayload hp{};
+
+                    hp.rva   = hits[i].rva;
+                    hp.klass = hits[i].klass;
+
+                    memcpy(
+                        payloadOut.data() +
+                            sizeof(uint32_t) +
+                            i * sizeof(TypeInfoHitPayload),
+                        &hp,
+                        sizeof(hp)
+                    );
+                }
+
+                resp.PayloadSize =
+                    static_cast<uint32_t>(payloadOut.size());
+
+                resp.Value = count;
                 resp.Status = BRIDGE_OK;
 
                 break;

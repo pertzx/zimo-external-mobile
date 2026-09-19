@@ -15,6 +15,7 @@
 #include <Math/MathUtils.hpp>
 #include "Skeleton.hpp"
 #include "../Memory/BridgeClient.hpp"
+#include <Skin/ClothChanger.hpp>
 #include <android/log.h>
 #include <cstdarg>
 #include <cstdint>
@@ -790,6 +791,71 @@ void Data::ReadLoop( )
                                          ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
                         }
 
+                        /*
+                         * (V8A-LAZY) Em 64-bit o il2cpp novo inicializa os
+                         * slots de TypeInfo DE FORMA LAZY: o slot guarda um
+                         * TOKEN encoded (ex: 0x2001B431 = (1<<29)|0x1B431 =
+                         * TypeInfo, idx 111921) ate o jogo usar a classe pela
+                         * primeira vez — ai o slot vira o ponteiro real
+                         * (0x7xxxxxxxxx) NO MESMO lugar. O v7a nunca mostra
+                         * isso porque o il2cpp velho resolve tudo no start.
+                         *
+                         * Token aqui NAO e erro de leitura: a largura vem SO
+                         * da config (GameProfile v8a => N32=false => Read de
+                         * 8 bytes, comprovado no log). E estado do jogo.
+                         * Restart nao apressa o jogo, scan/resolver foi
+                         * REMOVIDO (daemon = so ponte de read/write). Loga o
+                         * estado (1x/30s) + janela hex (1x/sessao) e tenta de
+                         * novo no proximo ciclo.
+                         */
+                        if ( !N32 && GameFacade != 0 && GameFacade < 0x100000000ULL )
+                        {
+                                static LONGLONG s_LastLazyLog = 0;
+                                const LONGLONG nowLazy = GetTickCount64( );
+
+                                if ( nowLazy - s_LastLazyLog > 30000 )
+                                {
+                                        s_LastLazyLog = nowLazy;
+                                        DiagLog( "[CHAIN] v8a: slot GameFacade_TypeInfo = 0x%lX (< 4GB) = token encoded do il2cpp ((%u<<29)|%u) — slot LAZY: o jogo resolve ao usar a classe; aguardando (sem restart/scan)",
+                                                 ( unsigned long )GameFacade,
+                                                 ( unsigned )( GameFacade >> 29 ),
+                                                 ( unsigned )( GameFacade & 0x1FFFFFFFu ) );
+                                }
+
+                                /*
+                                 * Janela hex 1x por sessao (9 qwords): se os
+                                 * vizinhos forem 0x7xxxxxxxxx = o RVA esta
+                                 * certo (so esperando o jogo resolver); se a
+                                 * vizinhanca for token geral/lixo = o RVA caiu
+                                 * na regiao errada da .data (ajustar no perfil).
+                                 */
+                                static bool s_LazyWindowLogged = false;
+
+                                if ( !s_LazyWindowLogged )
+                                {
+                                        s_LazyWindowLogged = true;
+
+                                        const uintptr_t slotAddr =
+                                                Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo;
+
+                                        for ( int w = -4; w <= 4; ++w )
+                                        {
+                                                const uintptr_t a =
+                                                        slotAddr + ( uintptr_t )w * 8;
+
+                                                uint64_t v = 0;
+
+                                                if ( g_FreeFireMemory.Read<uint64_t>( a, v ) )
+                                                        DiagLog( "[CHAIN] janela slot %c0x%02lX: 0x%016llX",
+                                                                 ( w < 0 ) ? '-' : ( ( w == 0 ) ? '=' : '+' ),
+                                                                 ( unsigned long )( ( w < 0 ) ? ( uintptr_t )( -w * 8 ) : ( uintptr_t )( w * 8 ) ),
+                                                                 ( unsigned long long )v );
+                                        }
+                                }
+
+                                break;
+                        }
+
                         if ( OffsetZeroGuard( Offsets::AccessClass, ReadChain::AccessClass, "AccessClass" ) )
                                 break;
 
@@ -800,24 +866,15 @@ void Data::ReadLoop( )
 
                         if ( AccessClass == 0 )
                         {
-                                if ( !N32 && GameFacade < 0x100000000ULL )
-                                {
-                                        /*
-                                         * (PONTEFIX-V4) Em 64-bit, Il2CppClass* vive no heap
-                                         * (0x7xxxxxxxxx). Valor baixo tipo 0x2001B431 NAO e
-                                         * ponteiro: o offset GameFacade_TypeInfo esta lendo
-                                         * dados/codigo, nao o TypeInfo — desatualizado.
-                                         */
-                                        ChainFailLog( ReadChain::AccessClass,
-                                                      "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — GameFacade < 4GB em modo 64-bit = ponteiro truncado (thread lendo 4 bytes): PONTEFIX-V5 recria a thread com ptr 8 bytes — se persistir, confirme Game Type=FF v8a na Settings",
-                                                      ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
-                                }
-                                else
-                                {
-                                        ChainFailLog( ReadChain::AccessClass,
-                                                      "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — offset AccessClass errado?",
-                                                      ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
-                                }
+                                /*
+                                 * (V9.2) Chegou aqui com klass REAL (>= 4GB em
+                                 * 64-bit): o token lazy ja quebrou antes. Statics
+                                 * nulo com klass valido = offset AccessClass
+                                 * (0xB8) nao serve para o il2cpp desta build.
+                                 */
+                                ChainFailLog( ReadChain::AccessClass,
+                                              "AccessClass nulo (GameFacade=0x%lX + 0x%lX) — offset static_fields errado para esta build (0xB8 e do v7a?)",
+                                              ( unsigned long )GameFacade, ( unsigned long )Offsets::AccessClass );
                                 break;
                         }
 
@@ -2348,6 +2405,672 @@ template void Data::ReadLoop<false, false>( );   // v24.1 64-bit
 template void Data::ReadLoop<true, true>( );     // v31 32-bit
 template void Data::ReadLoop<false, true>( );    // v31 64-bit
 
+// ==================== (V9) MODS DO BR — motor das features portadas ====================
+
+/*
+ * Primitivas de leitura/escrita usadas pelos mods. Todos os ponteiros
+ * passam pela ponte (pread64/pwrite64 via daemon) — nada de acesso
+ * direto, mesmo aqui.
+ */
+static inline uintptr_t ModsReadPtr( uintptr_t addr, bool n32 )
+{
+        if ( addr == 0 )
+                return 0;
+
+        return n32
+                ? ( uintptr_t )g_FreeFireMemory.Read<uint32_t>( addr )
+                : ( uintptr_t )g_FreeFireMemory.Read<uint64_t>( addr );
+}
+
+/*
+ * Resolve o endereço da MATRIX do root (hip node) de qualquer Player
+ * (local ou inimigo). Mesma cadeia do Magnet: m_HipNode -> transObj ->
+ * transObj -> matrix. O offset de escrita/leitura de posição dentro da
+ * matrix é 0x80 (32-bit) / 0xB0 (64-bit) — igual ao magnet.
+ */
+static uintptr_t ModsResolveRootMatrix( uintptr_t entity, bool n32 )
+{
+        if ( entity == 0 )
+                return 0;
+
+        const uintptr_t node = ModsReadPtr( entity + Offsets::Player::m_HipNode, n32 );
+
+        if ( node == 0 )
+                return 0;
+
+        const uintptr_t t1 = ModsReadPtr( node + Offsets::GetPosWorld::transObj, n32 );
+
+        if ( t1 == 0 )
+                return 0;
+
+        const uintptr_t t2 = ModsReadPtr( t1 + Offsets::GetPosWorld::transObj, n32 );
+
+        if ( t2 == 0 )
+                return 0;
+
+        return ModsReadPtr( t2 + Offsets::GetPosWorld::matrix, n32 );
+}
+
+/*
+ * Inimigo não-time mais próximo do player local (world distance),
+ * a partir do snapshot do ESP (zero round-trip extra).
+ * Retorna 0 quando não há candidato (só mortos/aliados/vazios).
+ */
+static uintptr_t ModsNearestEnemy( const Vector3& from, float maxDist, Vector3* outPos )
+{
+        uintptr_t best = 0;
+        float bestDist = maxDist;
+        Vector3 bestPos = Vector3::Zero( );
+
+        std::lock_guard<std::mutex> lock( Data::GetMutex( ) );
+
+        for ( const PlayerData& p : Data::GetPlayers( ) )
+        {
+                if ( p.Entity == 0 || p.IsTeammate )
+                        continue;
+
+                if ( p.CurrentHealth <= 0 )
+                        continue;
+
+                const Vector3 d = p.FeetWorld - from;
+                const float dist = sqrtf( d.X * d.X + d.Y * d.Y + d.Z * d.Z );
+
+                if ( dist < bestDist )
+                {
+                        bestDist = dist;
+                        best = p.Entity;
+                        bestPos = p.FeetWorld;
+                }
+        }
+
+        if ( outPos && best != 0 )
+                *outPos = bestPos;
+
+        return best;
+}
+
+/*
+ * Tick dos MODS — chamado UMA vez por frame de render a partir de
+ * Data::Draw() com o localPlayer válido. Cada feature tem o próprio
+ * ritmo interno (50 ms de throttle geral = 20 Hz de writes, volume
+ * baixo o suficiente pra manter o stealth de escrita).
+ */
+static void ModsTick(
+        uintptr_t localPlayer,
+        bool n32,
+        uintptr_t PlayerAttributes,
+        bool IsObserving
+)
+{
+        auto& M = g_Globals.Misc.Mods;
+
+        const LONGLONG now = ( LONGLONG )GetTickCount64( );
+        static LONGLONG s_LastTick = 0;
+        const bool tick50 = ( now - s_LastTick ) >= 50;
+
+        if ( tick50 )
+                s_LastTick = now;
+
+        const uintptr_t posOff = n32 ? 0x80 : 0xB0;
+
+        /*
+         * ------------------------------------------------------------
+         * GAME FACADE STATICS (250 ms de cache) — porta pro TimeService
+         * (Speed Lite) e pra UIBaseScene (Teleport Mark).
+         * ------------------------------------------------------------
+         */
+        static LONGLONG s_LastStaticResolve = 0;
+        static uintptr_t s_BaseGame = 0;
+
+        if ( tick50 &&
+             ( now - s_LastStaticResolve > 250 || s_BaseGame == 0 ) &&
+             Offsets::LibIl2Cpp != 0 &&
+             Offsets::GameFacade::GameFacade_TypeInfo != 0 &&
+             Offsets::AccessClass != 0 )
+        {
+                s_LastStaticResolve = now;
+
+                const uintptr_t klassRaw =
+                        ModsReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo, n32 );
+
+                /*
+                 * (V8A-LAZY) Token encoded (< 4GB em 64-bit) = slot ainda
+                 * nao resolvido pelo jogo — ignora ate virar ponteiro real
+                 * (evita ler statics em endereco baixo invalido).
+                 */
+                const uintptr_t klass =
+                        ( !n32 && klassRaw != 0 && klassRaw < 0x100000000ULL )
+                                ? 0
+                                : klassRaw;
+
+                if ( klass != 0 )
+                {
+                        const uintptr_t statics =
+                                ModsReadPtr( klass + Offsets::AccessClass, n32 );
+
+                        if ( statics != 0 )
+                                s_BaseGame = ModsReadPtr( statics, n32 );   // statics[0] = CurrentGame (BaseGame)
+                }
+        }
+
+        /*
+         * ------------------------------------------------------------
+         * Helpers de posição do PLAYER LOCAL (root matrix).
+         * ------------------------------------------------------------
+         */
+        static uintptr_t s_LocalMatrix = 0;
+        static LONGLONG s_LastLocalMatrix = 0;
+
+        auto LocalRootMatrix = [ & ]( ) -> uintptr_t
+        {
+                if ( now - s_LastLocalMatrix > 2000 || s_LocalMatrix == 0 )
+                {
+                        s_LocalMatrix = ModsResolveRootMatrix( localPlayer, n32 );
+                        s_LastLocalMatrix = now;
+                }
+
+                return s_LocalMatrix;
+        };
+
+        /*
+         * ============================================================
+         * SPEED LITE — TimeService.m_FixedDeltaTime
+         * 0.033 (normal) -> 0.033 + (level/10) * 0.022 (0.055 no lvl 10)
+         * ============================================================
+         */
+        if ( M.SpeedLite )
+        {
+                /*
+                 * Keybind toggle (borda) quando um botão flutuante existe.
+                 */
+                static bool s_KeyPrev = false;
+
+                if ( M.SpeedLiteKey != 0 )
+                {
+                        const bool held = AndroidInput::IsKeyPressed( M.SpeedLiteKey );
+
+                        if ( held && !s_KeyPrev )
+                                M.SpeedLite = !M.SpeedLite;
+
+                        s_KeyPrev = held;
+                }
+
+                if ( M.SpeedLite && tick50 && s_BaseGame != 0 &&
+                     Offsets::BaseGame::m_GameTimer != 0 &&
+                     Offsets::TimeService::m_FixedDeltaTime != 0 && !IsObserving )
+                {
+                        const uintptr_t timer = ModsReadPtr( s_BaseGame + Offsets::BaseGame::m_GameTimer, n32 );
+
+                        if ( timer != 0 )
+                        {
+                                int lvl = M.SpeedLiteLevel;
+
+                                if ( lvl < 0 ) lvl = 0;
+                                if ( lvl > 10 ) lvl = 10;
+
+                                const float target = 0.033f + ( lvl / 10.0f ) * 0.022f;
+
+                                float cur = 0.0f;
+
+                                if ( g_FreeFireMemory.Read<float>( timer + Offsets::TimeService::m_FixedDeltaTime, cur ) &&
+                                     fabs( cur - target ) > 0.0005f )
+                                {
+                                        g_FreeFireMemory.Write<float>( timer + Offsets::TimeService::m_FixedDeltaTime, target );
+                                }
+                        }
+                }
+        }
+        else if ( M.SpeedLiteKey != 0 )
+        {
+                /*
+                 * Checkbox desligado: ainda consome a borda da tecla pra
+                 * não "acumular" toggles enquanto está off.
+                 */
+                static bool s_KeyPrevOff = false;
+                const bool held = AndroidInput::IsKeyPressed( M.SpeedLiteKey );
+
+                if ( held && !s_KeyPrevOff )
+                        M.SpeedLite = true;
+
+                s_KeyPrevOff = held;
+        }
+
+        /*
+         * ============================================================
+         * TELEPORT MARK — BaseGame.m_UIScene -> m_BigMapCtrl ->
+         * m_MapContentCtrl -> m_LocalMapMarkController.m_pos
+         * Máquina de estados do BR MOD: levita 5 m por 1 s, desce 0.5 s.
+         * ============================================================
+         */
+        {
+                static bool s_KeyPrev = false;
+                static bool s_Active = false;
+                static LONGLONG s_PhaseStart = 0;
+                static int s_Phase = 0;             // 0=parado 1=levitar 2=descer
+                static Vector3 s_MarkPos = Vector3::Zero( );
+
+                const bool held =
+                        ( M.TeleportMarkKey != 0 )
+                                ? AndroidInput::IsKeyPressed( M.TeleportMarkKey )
+                                : M.TeleportMark;
+
+                const bool edge = held && !s_KeyPrev;
+                s_KeyPrev = held;
+
+                if ( held && M.TeleportMarkKey == 0 )
+                {
+                        /*
+                         * Sem keybind, o checkbox É o gatilho: dispara na
+                         * borda de ativação do checkbox (transição
+                         * gerenciada aqui embaixo via s_Active).
+                         */
+                }
+
+                if ( edge && s_Phase == 0 && s_BaseGame != 0 && !IsObserving )
+                {
+                        /*
+                         * Resolve a cadeia de UI (5 ponteiros) só na hora
+                         * do disparo — é barato e evita leitura fantasma.
+                         */
+                        uintptr_t uiScene = 0, bigMap = 0, mapContent = 0, markCtrl = 0;
+
+                        if ( Offsets::BaseGame::m_UIScene != 0 &&
+                             Offsets::UIInGameScene::m_BigMapCtrl != 0 &&
+                             Offsets::UIBigMapController::m_MapContentCtrl != 0 &&
+                             Offsets::UIMapContentController::m_LocalMapMarkController != 0 &&
+                             Offsets::UIHudPlayerMarkController::m_pos != 0 )
+                        {
+                                uiScene    = ModsReadPtr( s_BaseGame + Offsets::BaseGame::m_UIScene, n32 );
+
+                                if ( uiScene != 0 )
+                                        bigMap = ModsReadPtr( uiScene + Offsets::UIInGameScene::m_BigMapCtrl, n32 );
+
+                                if ( bigMap != 0 )
+                                        mapContent = ModsReadPtr( bigMap + Offsets::UIBigMapController::m_MapContentCtrl, n32 );
+
+                                if ( mapContent != 0 )
+                                        markCtrl = ModsReadPtr( mapContent + Offsets::UIMapContentController::m_LocalMapMarkController, n32 );
+
+                                if ( markCtrl != 0 )
+                                        g_FreeFireMemory.Read<Vector3>( markCtrl + Offsets::UIHudPlayerMarkController::m_pos, s_MarkPos );
+                        }
+
+                        const uintptr_t mtx = LocalRootMatrix( );
+
+                        if ( mtx != 0 && s_MarkPos != Vector3::Zero( ) )
+                        {
+                                s_Phase = 1;
+                                s_PhaseStart = now;
+                                s_Active = true;
+
+                                DiagLog( "[MODS] TeleportMark: alvo=(%.1f, %.1f, %.1f)",
+                                         s_MarkPos.X, s_MarkPos.Y, s_MarkPos.Z );
+                        }
+                }
+
+                if ( s_Active )
+                {
+                        const uintptr_t mtx = LocalRootMatrix( );
+
+                        if ( mtx == 0 )
+                        {
+                                s_Active = false;
+                                s_Phase = 0;
+                        }
+                        else if ( s_Phase == 1 && now - s_PhaseStart < 1000 )
+                        {
+                                Vector3 p = s_MarkPos;
+                                p.Y += 5.0f;
+                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                        }
+                        else if ( s_Phase == 1 && now - s_PhaseStart >= 1000 )
+                        {
+                                s_Phase = 2;
+                                s_PhaseStart = now;
+                        }
+                        else if ( s_Phase == 2 && now - s_PhaseStart < 500 )
+                        {
+                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, s_MarkPos );
+                        }
+                        else
+                        {
+                                s_Active = false;
+                                s_Phase = 0;
+
+                                if ( M.TeleportMarkKey == 0 )
+                                        M.TeleportMark = false;     // checkbox volta sozinho
+                        }
+                }
+        }
+
+        /*
+         * ============================================================
+         * TELE KILL — puxa o inimigo mais próximo (≤ 10 m) pra uma
+         * posição a keepDist metros na sua frente, write contínuo.
+         * ============================================================
+         */
+        if ( M.TeleKill )
+        {
+                static bool s_KeyPrev = false;
+
+                if ( M.TeleKillKey != 0 )
+                {
+                        const bool held = AndroidInput::IsKeyPressed( M.TeleKillKey );
+
+                        if ( held && !s_KeyPrev )
+                                M.TeleKill = !M.TeleKill;
+
+                        s_KeyPrev = held;
+                }
+
+                if ( M.TeleKill && tick50 && !IsObserving )
+                {
+                        Vector3 enemyPos = Vector3::Zero( );
+
+                        Vector3 localPos = Vector3::Zero( );
+                        const uintptr_t localMtx = LocalRootMatrix( );
+
+                        if ( localMtx != 0 )
+                                g_FreeFireMemory.Read<Vector3>( localMtx + posOff, localPos );
+
+                        if ( localPos != Vector3::Zero( ) )
+                        {
+                                const uintptr_t enemy =
+                                        ModsNearestEnemy( localPos, 10.0f, &enemyPos );
+
+                                if ( enemy != 0 )
+                                {
+                                        /*
+                                         * Direção local->inimigo no plano XZ;
+                                         * posiciona o inimigo a keepDist na
+                                         * sua frente, mantendo a altura dele.
+                                         */
+                                        Vector3 dir = enemyPos - localPos;
+                                        dir.Y = 0.0f;
+
+                                        const float len = sqrtf( dir.X * dir.X + dir.Z * dir.Z );
+
+                                        if ( len > 0.01f )
+                                        {
+                                                dir.X /= len;
+                                                dir.Z /= len;
+                                        }
+                                        else
+                                        {
+                                                dir = Vector3( 0.f, 0.f, 1.f );
+                                        }
+
+                                        float keep = M.TeleKeepDist;
+
+                                        if ( keep < 0.1f ) keep = 0.1f;
+                                        if ( keep > 5.0f ) keep = 5.0f;
+
+                                        const uintptr_t enemyMtx =
+                                                ModsResolveRootMatrix( enemy, n32 );
+
+                                        if ( enemyMtx != 0 )
+                                        {
+                                                Vector3 dst;
+                                                dst.X = localPos.X + dir.X * keep;
+                                                dst.Z = localPos.Z + dir.Z * keep;
+                                                dst.Y = enemyPos.Y;
+
+                                                g_FreeFireMemory.Write<Vector3>( enemyMtx + posOff, dst );
+                                        }
+                                }
+                        }
+                }
+        }
+
+        /*
+         * ============================================================
+         * UP PLAYER (hold) — levanta o inimigo mais próximo +2.5 m
+         * enquanto o botão flutuante está pressionado.
+         * ============================================================
+         */
+        {
+                const bool holding =
+                        ( M.UpPlayerKey != 0 )
+                                ? AndroidInput::IsKeyPressed( M.UpPlayerKey )
+                                : M.UpPlayer;
+
+                static LONGLONG s_LastUp = 0;
+
+                if ( holding && tick50 && !IsObserving && now - s_LastUp >= 50 )
+                {
+                        Vector3 localPos = Vector3::Zero( );
+                        const uintptr_t localMtx = LocalRootMatrix( );
+
+                        if ( localMtx != 0 )
+                                g_FreeFireMemory.Read<Vector3>( localMtx + posOff, localPos );
+
+                        if ( localPos != Vector3::Zero( ) )
+                        {
+                                const uintptr_t enemy = ModsNearestEnemy( localPos, 30.0f, nullptr );
+
+                                if ( enemy != 0 )
+                                {
+                                        const uintptr_t enemyMtx =
+                                                ModsResolveRootMatrix( enemy, n32 );
+
+                                        if ( enemyMtx != 0 )
+                                        {
+                                                Vector3 p = Vector3::Zero( );
+
+                                                if ( g_FreeFireMemory.Read<Vector3>( enemyMtx + posOff, p ) &&
+                                                     p != Vector3::Zero( ) )
+                                                {
+                                                        p.Y += 2.5f;
+                                                        g_FreeFireMemory.Write<Vector3>( enemyMtx + posOff, p );
+                                                }
+                                        }
+                                }
+                        }
+
+                        s_LastUp = now;
+                }
+        }
+
+        /*
+         * ============================================================
+         * DOWN PLAYER — afunda 0.9 m e congela; restaura ao desligar.
+         * ============================================================
+         */
+        {
+                static Vector3 s_Original = Vector3::Zero( );
+                static bool s_HasOriginal = false;
+
+                /*
+                 * Keybind toggle (borda) — mesmo padrao do SpeedLite:
+                 * aperta solta o botao flutuante = liga/desliga.
+                 */
+                static bool s_DownKeyPrev = false;
+
+                if ( M.DownPlayerKey != 0 )
+                {
+                        const bool held = AndroidInput::IsKeyPressed( M.DownPlayerKey );
+
+                        if ( held && !s_DownKeyPrev )
+                                M.DownPlayer = !M.DownPlayer;
+
+                        s_DownKeyPrev = held;
+                }
+
+                if ( M.DownPlayer && !IsObserving )
+                {
+                        const uintptr_t mtx = LocalRootMatrix( );
+
+                        if ( mtx != 0 )
+                        {
+                                if ( !s_HasOriginal )
+                                {
+                                        g_FreeFireMemory.Read<Vector3>( mtx + posOff, s_Original );
+                                        s_HasOriginal = true;
+                                }
+
+                                if ( tick50 )
+                                {
+                                        Vector3 p = s_Original;
+                                        p.Y -= 0.9f;
+                                        g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                                }
+                        }
+                }
+                else if ( s_HasOriginal )
+                {
+                        const uintptr_t mtx = LocalRootMatrix( );
+
+                        if ( mtx != 0 )
+                        {
+                                for ( int i = 0; i < 5; ++i )
+                                        g_FreeFireMemory.Write<Vector3>( mtx + posOff, s_Original );
+                        }
+
+                        s_HasOriginal = false;
+                }
+        }
+
+        /*
+         * ============================================================
+         * FLY — write de posição vertical no root do player local.
+         * Botão UP sobe, DOWN desce; horizontal segue o joystick.
+         * ============================================================
+         */
+        if ( M.Fly && !IsObserving )
+        {
+                static LONGLONG s_LastFly = 0;
+
+                if ( tick50 && now - s_LastFly >= 50 )
+                {
+                        const uintptr_t mtx = LocalRootMatrix( );
+
+                        if ( mtx != 0 )
+                        {
+                                Vector3 p = Vector3::Zero( );
+
+                                if ( g_FreeFireMemory.Read<Vector3>( mtx + posOff, p ) &&
+                                     p != Vector3::Zero( ) )
+                                {
+                                        const bool up =
+                                                ( M.FlyUpKey != 0 ) &&
+                                                AndroidInput::IsKeyPressed( M.FlyUpKey );
+
+                                        const bool down =
+                                                ( M.FlyDownKey != 0 ) &&
+                                                AndroidInput::IsKeyPressed( M.FlyDownKey );
+
+                                        if ( up != down )
+                                        {
+                                                float dy = M.FlySpeed * 0.05f;
+
+                                                if ( down )
+                                                        dy = -dy;
+
+                                                p.Y += dy;
+                                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                                        }
+                                }
+                        }
+
+                        s_LastFly = now;
+                }
+        }
+
+        /*
+         * ============================================================
+         * VISION HACK — FOVOffset do FollowCamera do player local.
+         * ============================================================
+         */
+        {
+                static float s_OriginalFov = 0.0f;
+                static bool s_HasOriginal = false;
+
+                if ( M.VisionHack &&
+                     Offsets::Player::m_FollowCamera != 0 &&
+                     Offsets::FollowCamera::FOVOffset != 0 )
+                {
+                        const uintptr_t followCam =
+                                ModsReadPtr( localPlayer + Offsets::Player::m_FollowCamera, n32 );
+
+                        if ( followCam != 0 && tick50 )
+                        {
+                                if ( !s_HasOriginal )
+                                {
+                                        g_FreeFireMemory.Read<float>(
+                                                followCam + Offsets::FollowCamera::FOVOffset,
+                                                s_OriginalFov );
+
+                                        s_HasOriginal = true;
+                                }
+
+                                g_FreeFireMemory.Write<float>(
+                                        followCam + Offsets::FollowCamera::FOVOffset,
+                                        M.VisionFov );
+                        }
+                }
+                else if ( s_HasOriginal )
+                {
+                        const uintptr_t followCam =
+                                ModsReadPtr( localPlayer + Offsets::Player::m_FollowCamera, n32 );
+
+                        if ( followCam != 0 )
+                                g_FreeFireMemory.Write<float>(
+                                        followCam + Offsets::FollowCamera::FOVOffset,
+                                        s_OriginalFov );
+
+                        s_HasOriginal = false;
+                }
+        }
+
+        /*
+         * ============================================================
+         * NO RELOAD — ReloadNoConsumeAmmoclip + ShootNoReload.
+         * ============================================================
+         */
+        if ( PlayerAttributes != 0 &&
+             Offsets::PlayerAttributes::ReloadNoConsumeAmmoclip != 0 &&
+             Offsets::PlayerAttributes::ShootNoReload != 0 )
+        {
+                if ( M.NoReload && tick50 )
+                {
+                        g_FreeFireMemory.Write<bool>(
+                                PlayerAttributes + Offsets::PlayerAttributes::ReloadNoConsumeAmmoclip,
+                                true );
+
+                        g_FreeFireMemory.Write<bool>(
+                                PlayerAttributes + Offsets::PlayerAttributes::ShootNoReload,
+                                true );
+                }
+                else if ( !M.NoReload && tick50 )
+                {
+                        /*
+                         * Restore só quando ainda estão ligados (uma
+                         * checagem por segundo pra não virar spam).
+                         */
+                        static LONGLONG s_LastChk = 0;
+
+                        if ( now - s_LastChk > 1000 )
+                        {
+                                s_LastChk = now;
+
+                                bool a = false, b = false;
+
+                                if ( g_FreeFireMemory.Read<bool>(
+                                         PlayerAttributes + Offsets::PlayerAttributes::ReloadNoConsumeAmmoclip, a ) && a )
+                                        g_FreeFireMemory.Write<bool>(
+                                                PlayerAttributes + Offsets::PlayerAttributes::ReloadNoConsumeAmmoclip,
+                                                false );
+
+                                if ( g_FreeFireMemory.Read<bool>(
+                                         PlayerAttributes + Offsets::PlayerAttributes::ShootNoReload, b ) && b )
+                                        g_FreeFireMemory.Write<bool>(
+                                                PlayerAttributes + Offsets::PlayerAttributes::ShootNoReload,
+                                                false );
+                        }
+                }
+        }
+}
+
 GameContext Data::GetContext( )
 {
         std::lock_guard<std::mutex> lock( m_Mutex );
@@ -2707,6 +3430,13 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 ctx = m_Context;
                 snapshotFresh = m_SnapshotFresh;
         }
+
+        /*
+         * (V9) SKIN CHANGER — tick da lógica ClothChanger (barato: com
+         * nada aplicado retorna na hora). matchActive aproximado por
+         * Match != 0 — o gate real de crash é o lobby full-dirty.
+         */
+        Skin::Tick( N32, ctx.Match != 0, ctx.LocalPlayer );
 
         // ==================== Watchdog de recuperacao (ESP nunca desliga) ====================
         // Se o snapshot nao fica fresco por ~2s, o processo do jogo provavelmente
@@ -3728,6 +4458,18 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
         magnet_end:
                 ;
+        }
+
+        // ==================== (V9) MODS DO BR — porta das features do BR MOD ====================
+
+        if ( localPlayer != 0 && g_Globals.General.EnableFuncs )
+        {
+                ModsTick(
+                        localPlayer,
+                        N32,
+                        PlayerAttributes,
+                        IsObserving
+                );
         }
 
         // ==================== Estado de disparo (Player::UGCStartFiring) ====================

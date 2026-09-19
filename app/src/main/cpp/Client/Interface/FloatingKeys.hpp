@@ -165,7 +165,12 @@ namespace FloatingKeys
      * [vk, x, y, w, h, ...] — é o que o JNI (nativeGetFloatingKeys)
      * devolve pro Java posicionar as janelas de toque.
      */
-    constexpr int kMaxKeys = 6;
+    /*
+     * (V9) 6 -> 12: os MODS (Speed Lite, Tele Kill, Teleport Mark,
+     * Up Player, Fly Up/Down) criam os próprios botões flutuantes além
+     * dos originais (Aim, Pull, Silent, Ghost).
+     */
+    constexpr int kMaxKeys = 12;
     void GetBounds(int* outArr, int maxInts, int& outCount);
 
     /*

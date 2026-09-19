@@ -135,6 +135,32 @@ namespace BridgeClient
     );
 
     /*
+     * (V9) AUTO-RESOLVE DE TYPEINFO — cura o "para no AccessClass" quando
+     * o jogo atualiza e os slots de TypeInfo se movem na .data da lib.
+     *
+     * O daemon varre os mapeamentos legíveis de `libName` no alvo atrás
+     * de slots cujo valor aponta para um Il2CppClass com `name` == className
+     * (offset 0x8 em 32-bit / 0x10 em 64-bit). Resultado vem ordenado por
+     * posição e é cacheado no daemon por (pid, lib, classe).
+     *
+     * Uso: FindTypeInfo(pid, "libil2cpp.so", "GameFacade", out) →
+     * out[0].Rva é o NOVO GameFacade_TypeInfo. O cliente DEVE validar
+     * lendo *(lib + Rva) na hora (klass muda por sessão; RVA não).
+     */
+    struct TypeInfoHit
+    {
+        uint64_t Rva   = 0;
+        uint64_t Klass = 0;
+    };
+
+    bool FindTypeInfo(
+        uint32_t pid,
+        const char* libName,
+        const char* className,
+        std::vector<TypeInfoHit>& out
+    );
+
+    /*
      * Log de operação individual (verbose). Util para diagnosticar se
      * uma função específica do painel está lendo/gravando de verdade.
      */

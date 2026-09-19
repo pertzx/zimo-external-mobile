@@ -78,7 +78,7 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-19-SCANPERF-BYPASS-V8.7";
+        "StormMemory-2026-09-19-V8ALAZY-BRMOD-SKIN-V9.2";
 
     /*
      * Prioridade de acesso:
@@ -1555,6 +1555,45 @@ void Memory::SetOffsetsBroken(bool broken)
 bool Memory::IsOffsetsBroken()
 {
     return s_OffsetsBroken.load(std::memory_order_acquire);
+}
+
+/*
+ * (V9) AUTO-RESOLVE DE TYPEINFO — ponte direta para o scan do daemon.
+ * Precisa de pid + ponte conectada. Não altera estado da Memory.
+ */
+bool Memory::FindTypeInfoRvas(
+    const char* className,
+    std::vector<TypeInfoHit>& out
+)
+{
+    out.clear();
+
+    if (s_TargetPid <= 0)
+        return false;
+
+    std::vector<BridgeClient::TypeInfoHit> hits;
+
+    if (!BridgeClient::FindTypeInfo(
+            static_cast<uint32_t>(s_TargetPid),
+            "libil2cpp.so",
+            className,
+            hits
+        ))
+        return false;
+
+    out.reserve(hits.size());
+
+    for (const BridgeClient::TypeInfoHit& h : hits)
+    {
+        TypeInfoHit o{};
+
+        o.Rva   = static_cast<uintptr_t>(h.Rva);
+        o.Klass = static_cast<uintptr_t>(h.Klass);
+
+        out.push_back(o);
+    }
+
+    return !out.empty();
 }
 
 bool Memory::Initialize()

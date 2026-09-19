@@ -158,6 +158,92 @@ namespace Cheat {
                     int RecoilControl = 100;
                 } LocalPlayer;
             } Exploits;
+
+            /*
+             * ============================================================
+             * (V9) MODS — portas do BR MOD (Death Engine) que nao existiam
+             * no painel. Moram na aba "Mods" (tecla/icone novo no dock).
+             * KeyBinds usam o MESMO sistema de botoes flutuantes do painel
+             * (Custom::KeyBind + FloatingKeys, vk >= 0x7000).
+             * ============================================================
+             */
+            struct Mods
+            {
+                /*
+                 * SPEED LITE (SpeedTimer do BR MOD): reescreve o
+                 * TimeService.m_FixedDeltaTime do jogo (0.033 padrao ->
+                 * lerp ate 0.055 no nivel 10). Keybind = liga/desliga.
+                 */
+                bool SpeedLite = false;
+                int SpeedLiteLevel = 3;      // 0..10
+                int SpeedLiteKey = 0;
+
+                /*
+                 * TELE KILL: teleporta o inimigo mais proximo (ate 10 m)
+                 * para uma posicao a TeleKeepDist metros na sua frente.
+                 * Keybind = liga/desliga; enquanto ligado aplica continuo.
+                 */
+                bool TeleKill = false;
+                float TeleKeepDist = 1.0f;   // 0.1..5
+                int TeleKillKey = 0;
+
+                /*
+                 * TELEPORT MARK: teleporta para a marca do mapa
+                 * (cadeia de UI: BaseGame.m_UIScene -> BigMapCtrl ->
+                 * MapContentCtrl -> LocalMapMarkController.m_pos).
+                 * Keybind = dispara (levita 5 m por 1 s + desce 0.5 s).
+                 */
+                bool TeleportMark = false;
+                int TeleportMarkKey = 0;
+
+                /*
+                 * DOWN PLAYER: afunda o player local 0.9 m e congela a
+                 * posicao ali; ao desligar restaura a posicao original.
+                 */
+                bool DownPlayer = false;
+                int DownPlayerKey = 0;       // botao flutuante: toggle on/off
+
+                /*
+                 * UP PLAYER (hold): enquanto a tecla esta pressionada,
+                 * levanta o inimigo mais proximo +2.5 m (write continuo).
+                 */
+                bool UpPlayer = false;
+                int UpPlayerKey = 0;
+
+                /*
+                 * FLY (adaptacao do NoGravityFly): write de posicao no
+                 * root do player local. Botao flutuante UP sobe, DOWN
+                 * desce, movimento horizontal continua pelo joystick.
+                 */
+                bool Fly = false;
+                float FlySpeed = 6.0f;       // m/s
+                int FlyUpKey = 0;
+                int FlyDownKey = 0;
+
+                /*
+                 * VISION HACK (FOV): escreve FOVOffset no FollowCamera do
+                 * player local (padrao BR MOD = 75.0).
+                 */
+                bool VisionHack = false;
+                float VisionFov = 75.0f;
+
+                /*
+                 * NO RELOAD: ReloadNoConsumeAmmoclip + ShootNoReload
+                 * (PlayerAttributes) — pente nao consome / atira sem
+                 * recarregar.
+                 */
+                bool NoReload = false;
+            } Mods;
+
+            /*
+             * (V9) SKIN CHANGER — estado da aba Skin (a logica pesada e o
+             * estado de aplicacao ficam no modulo Skin::ClothChanger).
+             */
+            struct Skin
+            {
+                int Category = 0;             // indice da categoria ativa
+                char Search[48] = { 0 };      // filtro por nome
+            } Skin;
         } Misc;
         struct General
         {

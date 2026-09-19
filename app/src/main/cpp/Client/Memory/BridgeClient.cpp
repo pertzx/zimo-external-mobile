@@ -1240,6 +1240,110 @@ bool Is32Bit(
     return true;
 }
 
+/*
+ * (V9) AUTO-RESOLVE DE TYPEINFO: pede ao daemon a varredura dos slots
+ * de Il2CppClass pelo nome. O scan é pesado UMA vez (0.5-2 s) e fica
+ * cacheado no daemon por (pid, lib, classe).
+ */
+bool FindTypeInfo(
+    uint32_t pid,
+    const char* libName,
+    const char* className,
+    std::vector<TypeInfoHit>& out
+)
+{
+    out.clear();
+
+    if (!libName || !className ||
+        !libName[0] || !className[0] ||
+        pid == 0)
+        return false;
+
+    std::string reqStr(libName);
+    reqStr += '|';
+    reqStr += className;
+
+    BridgeRequest req{};
+
+    req.Cmd = BRIDGE_CMD_FIND_TYPEINFO;
+    req.Pid = pid;
+
+    BridgeResponse resp{};
+    std::vector<uint8_t> payload;
+
+    if (!Request(
+            req,
+            reinterpret_cast<const uint8_t*>(reqStr.data()),
+            static_cast<uint32_t>(reqStr.size()),
+            resp,
+            payload
+        ) ||
+        resp.Status != BRIDGE_OK ||
+        payload.size() < sizeof(uint32_t))
+    {
+        LOGW(
+            "FindTypeInfo('%s' em '%s') falhou: status=%s payload=%zu",
+            className,
+            libName,
+            LastStatusText(),
+            payload.size()
+        );
+
+        return false;
+    }
+
+    uint32_t count = 0;
+
+    memcpy(
+        &count,
+        payload.data(),
+        sizeof(uint32_t)
+    );
+
+    if (count > 16)
+        count = 16;
+
+    const size_t need =
+        sizeof(uint32_t) +
+        count * sizeof(TypeInfoHitPayload);
+
+    if (payload.size() < need)
+        return false;
+
+    out.reserve(count);
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        TypeInfoHitPayload hp{};
+
+        memcpy(
+            &hp,
+            payload.data() +
+                sizeof(uint32_t) +
+                i * sizeof(TypeInfoHitPayload),
+            sizeof(hp)
+        );
+
+        TypeInfoHit h{};
+
+        h.Rva   = hp.rva;
+        h.Klass = hp.klass;
+
+        out.push_back(h);
+    }
+
+    LOGI(
+        "FindTypeInfo('%s') -> %zu hits (primeiro rva=0x%llX)",
+        className,
+        out.size(),
+        out.empty()
+            ? 0ULL
+            : (unsigned long long)out[0].Rva
+    );
+
+    return true;
+}
+
 void EnableOpLogging(
     bool enabled
 )

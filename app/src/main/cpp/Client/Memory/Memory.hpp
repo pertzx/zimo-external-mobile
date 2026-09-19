@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 #include <string>
 #include <vector>
 #include <sys/types.h>
@@ -69,6 +70,23 @@ public:
      */
     static void SetOffsetsBroken(bool broken);
     static bool IsOffsetsBroken();
+
+    /*
+     * (V9) AUTO-RESOLVE DE TYPEINFO: devolve os RVAs dos slots de
+     * Il2CppClass da classe pedida (varredura no daemon, cacheada).
+     * Usado pelo Offsets::AutoResolveTypeInfos() para re-resolver
+     * GameFacade/GameVarDef/AvatarWardrobeDataManager após update.
+     */
+    struct TypeInfoHit
+    {
+        uintptr_t Rva;
+        uintptr_t Klass;
+    };
+
+    static bool FindTypeInfoRvas(
+        const char* className,
+        std::vector<TypeInfoHit>& out
+    );
 
     template<typename T>
     static bool Read(uintptr_t address, T& outValue)
