@@ -1272,6 +1272,91 @@ Stats GetStats()
     return s;
 }
 
+/*
+ * (V8.7) PROVA DE BYPASS — stats internas do daemon, com cache de 500 ms.
+ * O overlay PERF do painel chama isto por frame; no maximo 2 round-trips
+ * por segundo sao gerados.
+ */
+RemoteStats GetRemoteStats()
+{
+    static std::mutex s_CacheMutex;
+    static RemoteStats s_Cached{};
+    static long long s_CachedAtMs = -1000;
+
+    const long long now = NowMs();
+
+    {
+        std::lock_guard<std::mutex> lk(s_CacheMutex);
+
+        if (now - s_CachedAtMs < 500)
+            return s_Cached;
+    }
+
+    BridgeRequest req{};
+
+    req.Cmd =
+        BRIDGE_CMD_STATS;
+
+    BridgeResponse resp{};
+    std::vector<uint8_t> payload;
+
+    RemoteStats out{};
+
+    if (Request(
+            req,
+            nullptr,
+            0,
+            resp,
+            payload
+        ) &&
+        resp.Status == BRIDGE_OK &&
+        payload.size() >= sizeof(BridgeStatsPayload))
+    {
+        BridgeStatsPayload sp{};
+
+        memcpy(
+            &sp,
+            payload.data(),
+            sizeof(sp)
+        );
+
+        out.BridgeReads  = sp.bridgeReads;
+        out.BridgeWrites = sp.bridgeWrites;
+        out.BridgeErrors = sp.bridgeErrors;
+        out.UptimeSec    = sp.uptimeSec;
+
+        out.CacheHits    = sp.cacheHits;
+        out.CacheNegHits = sp.cacheNegHits;
+        out.CacheMisses  = sp.cacheMisses;
+        out.Syscalls     = sp.syscalls;
+        out.Retries      = sp.retries;
+
+        out.DirectReads  = sp.directReads;
+        out.ExactFb      = sp.exactFb;
+        out.VmFbReads    = sp.vmFbReads;
+
+        out.DirectWrites = sp.directWrites;
+        out.VmFbWrites   = sp.vmFbWrites;
+
+        out.NegCreated   = sp.negCreated;
+        out.OpenFails    = sp.openFails;
+        out.WrRefused    = sp.wrRefused;
+        out.WrKilled     = sp.wrKilled;
+
+        out.WritesOn     = sp.writesOn;
+        out.VmFallbackOn = sp.vmFallbackOn;
+
+        out.Ok = true;
+
+        std::lock_guard<std::mutex> lk(s_CacheMutex);
+
+        s_Cached = out;
+        s_CachedAtMs = now;
+    }
+
+    return out;
+}
+
 const char* GetSocketPath()
 {
     return SocketPath();

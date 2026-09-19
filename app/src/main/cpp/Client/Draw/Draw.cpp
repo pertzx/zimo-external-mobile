@@ -36,6 +36,9 @@ bool Data::m_SnapshotFresh = false;
 
 std::atomic<int64_t> Data::m_LastFreshTick{ 0 };
 
+// (V8.7) telemetria do readloop para o overlay PERF
+ReadPerf Data::m_Perf;
+
 // (PONTEFIX-V6) Prova de vida do alvo: atualizado todo frame em que a
 // cabeca da cadeia (GameFacade != 0) le com transporte OK. Com isso o
 // watchdog distingue "cadeia presa em estado/offset" (alvo VIVO, sem
@@ -546,8 +549,25 @@ void Data::ReadLoop( )
         int emptyFrames = 0;
         LONGLONG emptyStartMs = 0;
         LONGLONG lobbyStartMs = 0;
+
+        /*
+         * (V8.7) TELEMETRIA DE PERFORMANCE — alimenta o overlay PERF.
+         * frameMsEma = media movel do tempo de varredura; fpsEma = media
+         * movel de varreduras/segundo (x10 pra caber em inteiro). O
+         * ReadInterval da config aparece ao vivo como Hz no overlay —
+         * era o que faltava pra o ajuste ficar visivel/verificavel.
+         */
+        double perfFrameMsEma = 0.0;
+        double perfFpsEma = 0.0;
+        LONGLONG perfLastScanTick = 0;
+
         while ( m_Running.load( ) && !g_Globals.General.ShutDown )
         {
+                const LONGLONG perfScanStart = GetTickCount64( );
+
+                m_Perf.Waves.store( 0, std::memory_order_relaxed );
+                m_Perf.Addrs.store( 0, std::memory_order_relaxed );
+
                 try
                 {
                 /*
@@ -1081,6 +1101,17 @@ void Data::ReadLoop( )
                         {
                                 if (reqs.empty()) return;
 
+                                /*
+                                 * (V8.7) TELEMETRIA: cada RunWave = 1 round-trip
+                                 * READ_BATCH pela ponte. O overlay PERF mostra
+                                 * ondas/enderecos por frame pra o usuario ver o
+                                 * custo da varredura ao vivo.
+                                 */
+                                m_Perf.Waves.fetch_add(1, std::memory_order_relaxed);
+                                m_Perf.Addrs.fetch_add((uint32_t)reqs.size(), std::memory_order_relaxed);
+                                m_Perf.TotalWaves.fetch_add(1, std::memory_order_relaxed);
+                                m_Perf.TotalAddrs.fetch_add((uint32_t)reqs.size(), std::memory_order_relaxed);
+
                                 std::vector<Memory::BatchItem> items(reqs.size());
                                 size_t total = 0;
 
@@ -1120,6 +1151,7 @@ void Data::ReadLoop( )
                                 uintptr_t tf = 0, transObj = 0, matObj = 0, matList = 0, matIdx = 0;
                                 uintptr_t idx = 0;
                                 int iters = 0;
+                                int prevIdx = -1;      /* (V8.7) idx do nivel anterior (anti-ciclo) */
                                 bool ok = false;
                                 Vector3 acc = Vector3::Zero( );
                                 TMatrix tm = { };
@@ -1132,6 +1164,7 @@ void Data::ReadLoop( )
                                 bool alive = true;
                                 // nivel 1
                                 uintptr_t klass = 0, klassNamePtr = 0;
+                                char klassName[32] = { 0 };   /* (V8.7) nome da classe lido na ONDA 1c */
                                 uintptr_t avatarMgr = 0, priPool = 0, shadow = 0, profile = 0;
                                 uintptr_t cachedTF = 0, fireCol = 0, headNode = 0;
                                 uint8_t isBot = 0, isFemale = 0;
@@ -1205,37 +1238,134 @@ void Data::ReadLoop( )
                                 addPtr(wave, e.klass, N32 ? 0x8 : 0x10, &e.klassNamePtr);
                         RunWave(wave);
 
-                        // ---------- descarte por classe (antes do PlayerType UNKNOWN) ----------
-                        std::vector<EntWork> valid;
-                        valid.reserve(ents.size());
-
+                        /*
+                         * (V8.7) ONDA 1c — SCAN INICIAL DE CLASSE (nomes das classes).
+                         *
+                         * A lista m_AttackableEntities NAO e so de players: vem
+                         * veiculo, loot, airdrop, bola, animal, NPC etc. Antes,
+                         * TODA entidade passava pelas ONDAS 2..5 (~24 leituras por
+                         * entidade: 9 ponteiros nivel-1 + avatar/datas/nick +
+                         * umaData/hp/weapon + valores) so pra MORRER no filtro do
+                         * avatar la na frente. Com ~106 entidades e ~12 players,
+                         * eram ~2200 enderecos de leitura por frame — ~80% jogados
+                         * fora (e os walkers ainda podiam ir a 60 niveis).
+                         *
+                         * Agora: le o NOME da classe (C string em klassNamePtr) de
+                         * TODAS as entidades em UMA onda e filtra ANTES das ondas
+                         * pesadas. Player real no FreeFire tem classe "Player*"
+                         * (PlayerNetwork, PlayerUGCCommon, Player_TrainingHumanTarget...).
+                         * O nome vem da il2cpp (nao muda em runtime) — leitura
+                         * fresca por frame e barata (24 bytes x N, 1 round-trip).
+                         */
                         for (auto& e : ents)
                         {
-                                if (e.Entity == LocalPlayer) { entLocal++; continue; }
-                                if (e.klass == 0 || e.klassNamePtr == 0) { entClasse++; continue; }
+                                if (e.klassNamePtr != 0)
+                                        wave.push_back({ e.klassNamePtr, 24, e.klassName });
+                        }
+                        RunWave(wave);
 
-                                // Amostra da 1a entidade valida (mesmo proposito do log antigo)
-                                // (V8.5) ANTES o nome era CONSTANTE (GetPlayerTypeName
-                                // (PLAYER_NETWORK)) — o log mentia ("classe=PlayerNetwork"
-                                // para qualquer coisa). Agora le o nome REAL da classe:
-                                // Il2CppClass::name = C string em klassNamePtr (klass+0x8).
-                                if (!sampleLogged)
+                        /*
+                         * (V8.7) Verificacao de prefixo SEM dependência de string.h
+                         * extra: aceita classe cujo nome comeca com "Player".,
+                         * igual ao mapeamento do GetPlayerType (PlayerNetwork /
+                         * PlayerUGCCommon / Player_TrainingHumanTarget*).
+                         */
+                        auto IsPlayerClassName = []( const char* name ) -> bool
+                        {
+                                if ( name == nullptr || name[ 0 ] == '\0' )
+                                        return false;
+
+                                static const char kPlayerPrefix[] = "Player";
+                                for ( size_t i = 0; i < sizeof( kPlayerPrefix ) - 1; ++i )
                                 {
-                                        sampleLogged = true;
-
-                                        char kname[40] = { 0 };
-                                        if (e.klassNamePtr != 0)
-                                                g_FreeFireMemory.Read( e.klassNamePtr, kname, sizeof( kname ) - 1 );
-
-                                        DiagLog("[ENTITY] amostra ent=0x%lX classe=%s",
-                                                (unsigned long)e.Entity, kname[0] ? kname : "?");
+                                        if ( name[ i ] != kPlayerPrefix[ i ] )
+                                                return false;
                                 }
 
-                                seenThisFrame.insert(e.Entity);
-                                valid.push_back(e);
-                        }
+                                return true;
+                        };
 
-                        ents.swap(valid);
+                        /*
+                         * (V8.7) DESCARTE ANTES DAS ONDAS PESADAS — so player
+                         * (ou candidato em frame relaxado) segue pro funil de
+                         * avatar/HP/posicao. Contadores preservados + novo
+                         * bucket "naoPlayer" no resumo [ENTITY].
+                         */
+                        {
+                                std::vector<EntWork> valid;
+                                valid.reserve(ents.size());
+
+                                int naoPlayerFrame = 0;
+
+                                for (auto& e : ents)
+                                {
+                                        if (e.Entity == LocalPlayer) { entLocal++; continue; }
+                                        if (e.klass == 0 || e.klassNamePtr == 0) { entClasse++; continue; }
+
+                                        if (!IsPlayerClassName(e.klassName))
+                                        {
+                                                naoPlayerFrame++;
+                                                continue;
+                                        }
+
+                                        // Amostra da 1a entidade valida (mesmo proposito do log antigo).
+                                        // (V8.7) o nome ja veio na ONDA 1c — zero leitura individual.
+                                        if (!sampleLogged)
+                                        {
+                                                sampleLogged = true;
+
+                                                DiagLog("[ENTITY] amostra ent=0x%lX classe=%s",
+                                                        (unsigned long)e.Entity,
+                                                        e.klassName[0] ? e.klassName : "?");
+                                        }
+
+                                        seenThisFrame.insert(e.Entity);
+                                        valid.push_back(e);
+                                }
+
+                                /*
+                                 * (V8.7) REDE DE SEGURANCA — o ESP nunca pode sumir por
+                                 * causa do filtro de classe. Se NENHUMA entidade passou
+                                 * mas havia candidatas (lista com entidades validas),
+                                 * este frame roda RELAXADO (comportamento antigo: aceita
+                                 * qualquer classe e deixa o funil avatar/HP filtrar).
+                                 * Log com rate-limit 5s pra avisar que o nome mudou.
+                                 */
+                                if (valid.empty() && !ents.empty())
+                                {
+                                        static LONGLONG s_LastRelaxLog = 0;
+                                        const LONGLONG nowRelax = GetTickCount64();
+
+                                        if (nowRelax - s_LastRelaxLog > 5000)
+                                        {
+                                                s_LastRelaxLog = nowRelax;
+
+                                                char kn0[32] = { 0 };
+                                                for (auto& e : ents)
+                                                {
+                                                        if (e.klassName[0]) { memcpy(kn0, e.klassName, sizeof(kn0) - 1); break; }
+                                                }
+
+                                                DiagLog("[FILTER] nenhuma classe Player* na lista (%d ents, ex=%s) — frame RELAXADO",
+                                                        (int)ents.size(), kn0[0] ? kn0 : "?");
+                                        }
+
+                                        for (auto& e : ents)
+                                        {
+                                                if (e.Entity == LocalPlayer) continue;
+                                                if (e.klass == 0 || e.klassNamePtr == 0) continue;
+
+                                                seenThisFrame.insert(e.Entity);
+                                                valid.push_back(e);
+                                        }
+                                }
+
+                                m_Perf.EntNaoPlayer.store((uint32_t)naoPlayerFrame, std::memory_order_relaxed);
+
+                                ents.swap(valid);
+
+                                m_Perf.EntPlayers.store((uint32_t)ents.size(), std::memory_order_relaxed);
+                        }
 
                         // ---------- ONDA 2: ponteiros de nivel 1 ----------
                         for (auto& e : ents)
@@ -1308,15 +1438,20 @@ void Data::ReadLoop( )
                                 /*
                                  * (V8.5) AUDITORIA DO FUNIL — 1 amostra por frame:
                                  *  - [FUNIL] avatarFAIL: 1a entidade que MORRE no
-                                 *    avatar, com o nome REAL da classe. Se NAO for
-                                 *    "Player*" = entidade nao-player (veiculo/loot/
-                                 *    airdrop) = bucket esperado, nao e bug.
+                                 *    avatar, com o nome REAL da classe. Com o scan
+                                 *    inicial V8.7 so sobra aqui entidade "Player*"
+                                 *    que falhou por cadeia de avatar quebrada.
                                  *  - [FUNIL] ok: 1a entidade que PASSA do avatar.
                                  *    Mostra o nome da classe do PRI pool
                                  *    ("PRIDataPool" = union inline @0x10 v7a,
                                  *    "PRIDataPoolUnsafe" = Void* @0xC v7a) e o
                                  *    dump cru de 16 bytes do objeto de HP — fecha
                                  *    a questao do variant do pool sem chutar.
+                                 * (V8.7) o nome da classe da ENTIDADE agora sai do
+                                 *    klassName lido na ONDA 1c (zero re-read) e o
+                                 *    dump "ok" virou rate-limit 5s (o dump fazia
+                                 *    3 leituras individuais = 3 round-trips POR
+                                 *    FRAME — investigacao do V8.5 concluida).
                                  */
                                 bool avSample = false, okSample = false;
 
@@ -1327,12 +1462,9 @@ void Data::ReadLoop( )
                                         {
                                                 avSample = true;
 
-                                                char kn[40] = { 0 };
-                                                if (e.klassNamePtr != 0)
-                                                        g_FreeFireMemory.Read( e.klassNamePtr, kn, sizeof( kn ) - 1 );
-
                                                 DiagLog("[FUNIL] avatarFAIL ent=0x%lX classe=%s avMgr=0x%lX ava=0x%lX uma=0x%lX",
-                                                        (unsigned long)e.Entity, kn[0] ? kn : "?",
+                                                        (unsigned long)e.Entity,
+                                                        e.klassName[0] ? e.klassName : "?",
                                                         (unsigned long)e.avatarMgr,
                                                         (unsigned long)e.avatar, (unsigned long)e.umaData);
                                         }
@@ -1342,46 +1474,53 @@ void Data::ReadLoop( )
                                         {
                                                 okSample = true;
 
-                                                char kn[40] = { 0 }, pn[40] = { 0 };
-                                                if (e.klassNamePtr != 0)
-                                                        g_FreeFireMemory.Read( e.klassNamePtr, kn, sizeof( kn ) - 1 );
+                                                static LONGLONG s_LastFunilOkLog = 0;
+                                                const LONGLONG nowFo = GetTickCount64();
 
-                                                // classe do PRI pool (klass = 1o campo do objeto)
-                                                uintptr_t poolKlass = 0;
-                                                if (e.priPool != 0)
-                                                        poolKlass = N32
-                                                                ? g_FreeFireMemory.Read<uint32_t>( e.priPool )
-                                                                : g_FreeFireMemory.Read<uint64_t>( e.priPool );
-
-                                                if (poolKlass != 0)
+                                                if (nowFo - s_LastFunilOkLog > 5000)
                                                 {
-                                                        uintptr_t poolNamePtr = N32
-                                                                ? g_FreeFireMemory.Read<uint32_t>( poolKlass + 0x8 )
-                                                                : g_FreeFireMemory.Read<uint64_t>( poolKlass + 0x10 );
+                                                        s_LastFunilOkLog = nowFo;
 
-                                                        if (poolNamePtr != 0)
-                                                                g_FreeFireMemory.Read( poolNamePtr, pn, sizeof( pn ) - 1 );
+                                                        char pn[40] = { 0 };
+
+                                                        // classe do PRI pool (klass = 1o campo do objeto)
+                                                        uintptr_t poolKlass = 0;
+                                                        if (e.priPool != 0)
+                                                                poolKlass = N32
+                                                                        ? g_FreeFireMemory.Read<uint32_t>( e.priPool )
+                                                                        : g_FreeFireMemory.Read<uint64_t>( e.priPool );
+
+                                                        if (poolKlass != 0)
+                                                        {
+                                                                uintptr_t poolNamePtr = N32
+                                                                        ? g_FreeFireMemory.Read<uint32_t>( poolKlass + 0x8 )
+                                                                        : g_FreeFireMemory.Read<uint64_t>( poolKlass + 0x10 );
+
+                                                                if (poolNamePtr != 0)
+                                                                        g_FreeFireMemory.Read( poolNamePtr, pn, sizeof( pn ) - 1 );
+                                                        }
+
+                                                        // dump cru do objeto de HP (bytes 0x8..0x17):
+                                                        // v7a safe = GroupID@0x8 | pad@0xC | union@0x10
+                                                        // v7a unsafe = GroupID@0x8 | Void* Value@0xC
+                                                        uint8_t hRaw[16] = { 0 };
+                                                        if (e.hCur != 0)
+                                                                g_FreeFireMemory.Read( e.hCur + 0x8, hRaw, sizeof( hRaw ) );
+
+                                                        DiagLog("[FUNIL] ok ent=0x%lX classe=%s pool=%s pri=0x%lX datas=0x%lX hCur=0x%lX hRaw=%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x hp=%d/%d team=%u vis=%u tf=0x%lX head=0x%lX fire=0x%lX",
+                                                                (unsigned long)e.Entity,
+                                                                e.klassName[0] ? e.klassName : "?",
+                                                                pn[0] ? pn : "?",
+                                                                (unsigned long)e.priPool, (unsigned long)e.datas,
+                                                                (unsigned long)e.hCur,
+                                                                hRaw[0], hRaw[1], hRaw[2], hRaw[3],
+                                                                hRaw[4], hRaw[5], hRaw[6], hRaw[7],
+                                                                hRaw[8], hRaw[9], hRaw[10], hRaw[11],
+                                                                hRaw[12], hRaw[13], hRaw[14], hRaw[15],
+                                                                e.hpCur, e.hpMax, e.isTeam, e.meshVisible,
+                                                                (unsigned long)e.cachedTF,
+                                                                (unsigned long)e.headNode, (unsigned long)e.fireCol);
                                                 }
-
-                                                // dump cru do objeto de HP (bytes 0x8..0x17):
-                                                // v7a safe = GroupID@0x8 | pad@0xC | union@0x10
-                                                // v7a unsafe = GroupID@0x8 | Void* Value@0xC
-                                                uint8_t hRaw[16] = { 0 };
-                                                if (e.hCur != 0)
-                                                        g_FreeFireMemory.Read( e.hCur + 0x8, hRaw, sizeof( hRaw ) );
-
-                                                DiagLog("[FUNIL] ok ent=0x%lX classe=%s pool=%s pri=0x%lX datas=0x%lX hCur=0x%lX hRaw=%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x hp=%d/%d team=%u vis=%u tf=0x%lX head=0x%lX fire=0x%lX",
-                                                        (unsigned long)e.Entity, kn[0] ? kn : "?",
-                                                        pn[0] ? pn : "?",
-                                                        (unsigned long)e.priPool, (unsigned long)e.datas,
-                                                        (unsigned long)e.hCur,
-                                                        hRaw[0], hRaw[1], hRaw[2], hRaw[3],
-                                                        hRaw[4], hRaw[5], hRaw[6], hRaw[7],
-                                                        hRaw[8], hRaw[9], hRaw[10], hRaw[11],
-                                                        hRaw[12], hRaw[13], hRaw[14], hRaw[15],
-                                                        e.hpCur, e.hpMax, e.isTeam, e.meshVisible,
-                                                        (unsigned long)e.cachedTF,
-                                                        (unsigned long)e.headNode, (unsigned long)e.fireCol);
                                         }
 
                                         if (e.avatarMgr == 0 || e.avatar == 0 || e.umaData == 0) { entAvatar++; continue; }
@@ -1610,6 +1749,31 @@ void Data::ReadLoop( )
                                 RunWave(wave);
                                 RunWave(nextIdx);
 
+                                /*
+                                 * (V8.7) ANTI-CICLO: se NENHUM walker ativo avancou
+                                 * o indice neste nivel, a cadeia entrou em loop
+                                 * (parente apontando pra si mesmo / idx repetido).
+                                 * Antes o loop insistia ate o teto de 60 niveis = ate
+                                 * ~120 round-trips de onda desperdicados por frame;
+                                 * aplicar a MESMA matriz repetida vezes e lixo de
+                                 * posicao de qualquer jeito. Para no 1o nivel sem
+                                 * progresso — posicao real converge antes disso.
+                                 */
+                                bool anyProgress = false;
+
+                                for (auto& r : lvl)
+                                {
+                                        WalkSt* w = r.w;
+
+                                        if ((int)w->idx != w->prevIdx)
+                                                anyProgress = true;
+
+                                        w->prevIdx = (int)w->idx;
+                                }
+
+                                if (!anyProgress)
+                                        break;
+
                                 // compor localmente (mesma matematica do get_position_Injected)
                                 for (auto& r : lvl)
                                 {
@@ -1674,18 +1838,36 @@ void Data::ReadLoop( )
                          */
                         const EntWork* posFailSample = nullptr;
 
+                        /*
+                         * (V8.6-PERF) TETO DO FALLBACK DE REFERENCIA: 1
+                         * entidade por frame no maximo. A cadeia de
+                         * referencia e elo-por-elo (≈15 round-trips de
+                         * socket) — quando os offsets estavam errados, ela
+                         * rodava pra TODAS as entidades com pos zero no
+                         * mesmo tick (44 cadeias individuais por frame =
+                         * maior consumidor de socket do ESP). Com o teto, a
+                         * recuperacao de falha sistematica continua (1 por
+                         * tick, [POSFAIL] segue mostrando o elo quebrado),
+                         * mas o custo fica limitado.
+                         */
+                        int refFbBudget = 1;
+
                         for (auto& e : ents)
                         {
-                                if (e.headPos == Vector3::Zero( ))
+                                if (e.headPos == Vector3::Zero( ) && refFbBudget > 0)
                                 {
+                                        refFbBudget--;
+
                                         Vector3 refHead = Transform::GetHeadPosition( e.Entity, N32 );
 
                                         if ( refHead != Vector3::Zero( ) )
                                                 e.headPos = refHead;
                                 }
 
-                                if (e.feetPos == Vector3::Zero( ))
+                                if (e.feetPos == Vector3::Zero( ) && refFbBudget > 0)
                                 {
+                                        refFbBudget--;
+
                                         Vector3 refFeet = Transform::GetPosition( e.Entity, N32 );
 
                                         if ( refFeet != Vector3::Zero( ) )
@@ -1814,12 +1996,18 @@ void Data::ReadLoop( )
 
                         // Resumo de descarte (rate-limit 5s). Se o ESP nao aparece e a
                         // cadeia esta OK, ESTE log mostra qual filtro esta comendo tudo.
+                        // (V8.7) bucket novo: naoPlayer = descartadas pelo scan inicial
+                        // de classe (veiculo/loot/airdrop/NPC — nao e bug).
+                        m_Perf.EntList.store((uint32_t)dictCount, std::memory_order_relaxed);
+                        m_Perf.EntDrawn.store((uint32_t)entOk, std::memory_order_relaxed);
+
                         static LONGLONG s_LastEntSummary = 0;
                         if ( GetTickCount64( ) - s_LastEntSummary > 5000 )
                         {
                                 s_LastEntSummary = GetTickCount64( );
-                                DiagLog( "[ENTITY] lista=%d ok=%d nulo=%d | descartados: local=%d classe=%d avatar=%d team=%d pri=%d hp=%d posH=%d posF=%d",
-                                        dictCount, entOk, entNulo, entLocal, entClasse, entAvatar,
+                                DiagLog( "[ENTITY] lista=%d ok=%d nulo=%d naoPlayer=%d | descartados: local=%d classe=%d avatar=%d team=%d pri=%d hp=%d posH=%d posF=%d",
+                                        dictCount, entOk, entNulo, m_Perf.EntNaoPlayer.load( std::memory_order_relaxed ),
+                                        entLocal, entClasse, entAvatar,
                                         entTeam, entPri, entHp, entPosHead, entPosFeet );
                         }
 
@@ -1846,10 +2034,15 @@ void Data::ReadLoop( )
                         //  - não aparece em seenThisFrame (saiu da lista de ataque);
                         //  - a re-leitura de vida dá <= 0 (morreu);
                         //  - passou da janela de validade (3s sem nenhuma leitura boa).
+                        /*
+                         * (V8.7) Candidatas ao carry-over (coletadas sob o lock,
+                         * vida re-lida em LOTE fora do lock — 4 ondas fixas).
+                         */
+                        std::vector<PlayerData> carryCands;
+
                         {
                                 LONGLONG nowCarry = GetTickCount64( );
-                                std::vector<PlayerData> carried;
-                                carried.reserve( m_Players.size( ) / 2 );
+                                carryCands.reserve( m_Players.size( ) / 2 );
                                 std::lock_guard<std::mutex> lock( m_Mutex );
                                 for ( const auto& prev : m_Players )
                                 {
@@ -1868,18 +2061,130 @@ void Data::ReadLoop( )
                                         }
                                         if ( alreadyIn )
                                                 continue;
-                                        // Não ressuscita morto: re-lê a vida (mesma cadeia do loop).
-                                        // Se voltar <= 0 a entidade morreu e cai no próximo frame.
-                                        uintptr_t priPool = N32 ? g_FreeFireMemory.Read<uint32_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool ) : g_FreeFireMemory.Read<uint64_t>( prev.Entity + Offsets::ReplicationEntity::m_PRIDataPool );
-                                        uintptr_t arrPtr = ( priPool != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( priPool + Offsets::ReplicationEntity::m_Datas ) : g_FreeFireMemory.Read<uint64_t>( priPool + Offsets::ReplicationEntity::m_Datas ) ) : 0;
-                                        uintptr_t hPtr = ( arrPtr != 0 ) ? ( N32 ? g_FreeFireMemory.Read<uint32_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) : g_FreeFireMemory.Read<uint64_t>( arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr ) ) : 0;
-                                        int h = ( hPtr != 0 ) ? g_FreeFireMemory.Read<int>( hPtr + Offsets::ReplicationEntity::Value ) : -1;
-                                        if ( h <= 0 )
-                                                continue;
-                                        carried.push_back( prev );
+
+                                        /*
+                                         * (V8.7) Re-leitura de vida EM LOTE — candidata
+                                         * apenas marcada aqui; a leitura da cadeia
+                                         * priPool->datas->hPtr->valor acontece em 4 ondas
+                                         * fixas DEPOIS do lock (antes: 4 round-trips
+                                         * individuais POR entidade carregada dentro do
+                                         * lock — com 3+ carregadas eram 12+ viagens de
+                                         * socket segurando o mutex do snapshot).
+                                         * Não ressuscita morto: se a vida voltar <= 0 a
+                                         * entidade cai no próximo frame.
+                                         */
+                                        carryCands.push_back( prev );
                                 }
-                                for ( const auto& c : carried )
-                                        tempPlayers.push_back( c );
+
+                                /*
+                                 * (V8.7) 4 ondas de lote (mesma cadeia do funil, mesma
+                                 * semântica de zero = falha). Fora do lock do snapshot:
+                                 * movido o processamento para depois do escopo do
+                                 * lock_guard — ver bloco abaixo.
+                                 */
+                        }
+
+                        if ( !carryCands.empty( ) )
+                        {
+                                struct CarryRt
+                                {
+                                        PlayerData pd;
+                                        uintptr_t priPool = 0, arrPtr = 0, hPtr = 0;
+                                        int h = -1;
+                                };
+
+                                std::vector<CarryRt> crs;
+                                crs.reserve( carryCands.size( ) );
+
+                                for ( const auto& p : carryCands )
+                                {
+                                        CarryRt r;
+                                        r.pd = p;
+                                        crs.push_back( r );
+                                }
+
+                                auto CarryWave = [ & ]( std::vector< std::pair< uintptr_t, std::pair< uint32_t, void* > > >& reqs )
+                                {
+                                        if ( reqs.empty( ) )
+                                                return;
+
+                                        std::vector< Memory::BatchItem > items( reqs.size( ) );
+                                        size_t total = 0;
+
+                                        for ( size_t i = 0; i < reqs.size( ); i++ )
+                                        {
+                                                items[ i ].address = reqs[ i ].first;
+                                                items[ i ].size    = reqs[ i ].second.first;
+                                                total             += reqs[ i ].second.first;
+                                        }
+
+                                        std::vector< uint8_t > blob;
+
+                                        if ( !Memory::ReadBatch( items.data( ), items.size( ), blob ) || blob.size( ) < total )
+                                                blob.resize( total, 0 );
+
+                                        size_t off = 0;
+
+                                        for ( size_t i = 0; i < reqs.size( ); i++ )
+                                        {
+                                                memcpy( reqs[ i ].second.second, blob.data( ) + off, reqs[ i ].second.first );
+                                                off += reqs[ i ].second.first;
+                                        }
+
+                                        reqs.clear( );
+                                };
+
+                                // onda 1: priPool
+                                {
+                                        std::vector< std::pair< uintptr_t, std::pair< uint32_t, void* > > > w;
+
+                                        for ( auto& r : crs )
+                                                if ( r.pd.Entity != 0 )
+                                                        w.push_back( { r.pd.Entity + Offsets::ReplicationEntity::m_PRIDataPool, { ( uint32_t )( N32 ? 4 : 8 ), &r.priPool } } );
+
+                                        CarryWave( w );
+                                }
+
+                                // onda 2: datas
+                                {
+                                        std::vector< std::pair< uintptr_t, std::pair< uint32_t, void* > > > w;
+
+                                        for ( auto& r : crs )
+                                                if ( r.priPool != 0 )
+                                                        w.push_back( { r.priPool + Offsets::ReplicationEntity::m_Datas, { ( uint32_t )( N32 ? 4 : 8 ), &r.arrPtr } } );
+
+                                        CarryWave( w );
+                                }
+
+                                // onda 3: health ptr
+                                {
+                                        std::vector< std::pair< uintptr_t, std::pair< uint32_t, void* > > > w;
+
+                                        for ( auto& r : crs )
+                                                if ( r.arrPtr != 0 )
+                                                        w.push_back( { r.arrPtr + Offsets::ReplicationEntity::HealthCurrentPtr, { ( uint32_t )( N32 ? 4 : 8 ), &r.hPtr } } );
+
+                                        CarryWave( w );
+                                }
+
+                                // onda 4: valor da vida
+                                {
+                                        std::vector< std::pair< uintptr_t, std::pair< uint32_t, void* > > > w;
+
+                                        for ( auto& r : crs )
+                                                if ( r.hPtr != 0 )
+                                                        w.push_back( { r.hPtr + Offsets::ReplicationEntity::Value, { 4, &r.h } } );
+
+                                        CarryWave( w );
+                                }
+
+                                for ( auto& r : crs )
+                                {
+                                        if ( r.h <= 0 )
+                                                continue;
+
+                                        tempPlayers.push_back( r.pd );
+                                }
                         }
 
                         std::lock_guard<std::mutex> lock( m_Mutex );
@@ -1974,6 +2279,41 @@ void Data::ReadLoop( )
                 catch ( ... )
                 {
                         DiagLog( "[diag] ReadLoop exception (unknown)" );
+                }
+
+                /*
+                 * (V8.7) Atualiza a telemetria de performance do frame:
+                 *  - frameMs  = tempo desta varredura (EMA alpha ~0.1)
+                 *  - Hz       = 1000 / periodo real entre varreduras (EMA)
+                 * O overlay PERF mostra os dois — o usuario VE o ReadInterval
+                 * da config mudando o ritmo de varredura de verdade.
+                 */
+                {
+                        const LONGLONG nowPerf = GetTickCount64( );
+                        const double frameMs = (double)( nowPerf - perfScanStart );
+
+                        perfFrameMsEma = ( perfFrameMsEma == 0.0 )
+                                ? frameMs
+                                : perfFrameMsEma + ( frameMs - perfFrameMsEma ) * 0.1;
+
+                        if ( perfLastScanTick != 0 )
+                        {
+                                const LONGLONG period = nowPerf - perfLastScanTick;
+
+                                if ( period > 0 )
+                                {
+                                        const double hz = 1000.0 / (double)period;
+
+                                        perfFpsEma = ( perfFpsEma == 0.0 )
+                                                ? hz
+                                                : perfFpsEma + ( hz - perfFpsEma ) * 0.1;
+                                }
+                        }
+
+                        perfLastScanTick = nowPerf;
+
+                        m_Perf.FrameMsEma.store( ( uint32_t )( perfFrameMsEma + 0.5 ), std::memory_order_relaxed );
+                        m_Perf.FpsEma.store( ( uint32_t )( perfFpsEma * 10.0 + 0.5 ), std::memory_order_relaxed );
                 }
 
                 /*
@@ -2240,29 +2580,64 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
                 BS_ActiveByCursor = false;
         }
 
-        /* Se o perfil nao preencheu GameVarDef_TypeInfo (ex: v8a vazio),
-    * pula — sem isso lia o proprio ELF (0x464C457F) como TypeInfo. */
-    uintptr_t GameVar_TI = ( Offsets::GameVarDef::GameVarDef_TypeInfo != 0 )
-                ? ReadPtr( Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo ) : 0;
-    uintptr_t GameVar = ( GameVar_TI != 0 )
-                ? ReadPtr( GameVar_TI + Offsets::AccessClass ) : 0;
+        /*
+         * (V8.6-PERF) Resolve do GameVar com cache de 500ms.
+         *
+         * Antes: 2 ReadPtr TODO FRAME (GameVar_TypeInfo + AccessClass) a
+         * 60fps = 120 round-trips de socket por segundo pra um ponteiro
+         * estatico que nao muda dentro da partida. O cache corta pra 2
+         * leituras por segundo; transicao de partida (GameVar vira lixo)
+         * se autocorrige em no maximo 500ms.
+         */
+        uintptr_t GameVar = 0;
+        {
+            static LONGLONG s_LastGvResolveMs = 0;
+            static uintptr_t s_GvResolved = 0;
+
+            const LONGLONG nowGv = GetTickCount64();
+
+            if ( nowGv - s_LastGvResolveMs > 500 )
+            {
+                s_LastGvResolveMs = nowGv;
+                s_GvResolved = 0;
+
+                /* Se o perfil nao preencheu GameVarDef_TypeInfo (ex: v8a
+                 * vazio), pula — sem isso lia o proprio ELF (0x464C457F)
+                 * como TypeInfo. */
+                if ( Offsets::GameVarDef::GameVarDef_TypeInfo != 0 )
+                {
+                    uintptr_t GameVar_TI = ReadPtr( Offsets::LibIl2Cpp + Offsets::GameVarDef::GameVarDef_TypeInfo );
+
+                    if ( GameVar_TI != 0 )
+                        s_GvResolved = ReadPtr( GameVar_TI + Offsets::AccessClass );
+                }
+            }
+
+            GameVar = s_GvResolved;
+        }
 
         // --- BugarPixel ---
         if ( GameVar != 0 )
         {
                 static bool lastBugarPixelState = false;
-                float currentValue = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold );
-                if ( g_Globals.Misc.Exploits.LocalPlayer.BugarPixel )
+                const bool bugarOn = g_Globals.Misc.Exploits.LocalPlayer.BugarPixel;
+
+                /*
+                 * (V8.6-PERF) exploit DESLIGADO e sem transicao pendente =
+                 * ZERO leitura (antes: 1 Read<float> por frame mesmo com o
+                 * exploit off so pra decidir se escrevia).
+                 */
+                if ( bugarOn )
                 {
+                        float currentValue = g_FreeFireMemory.Read<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold );
                         if ( currentValue != 0.0f )
                                 g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 0.0f );
                 }
-                else
+                else if ( lastBugarPixelState )
                 {
-                        if ( lastBugarPixelState )
-                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 1.5f );
+                        g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::ShootTraceAdjustmentDistanceThreshold, 1.5f );
                 }
-                lastBugarPixelState = g_Globals.Misc.Exploits.LocalPlayer.BugarPixel;
+                lastBugarPixelState = bugarOn;
 
                 // --- Precision ---
                 static bool lastPrecisionState = false;
@@ -2296,25 +2671,29 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                 // --- BackJump ---
                 static bool LastBackJumpState = false;
-                bool AccelerationOnFallingValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling );
-                bool FallingSwapWeaponValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon );
-                if ( g_Globals.Misc.Exploits.LocalPlayer.BackJump )
+                const bool backJumpOn = g_Globals.Misc.Exploits.LocalPlayer.BackJump;
+
+                /*
+                 * (V8.6-PERF) idem BugarPixel: OFF e sem transicao = ZERO
+                 * leitura (antes: 2 Read<bool> por frame inuteis).
+                 */
+                if ( backJumpOn )
                 {
+                        bool AccelerationOnFallingValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling );
+                        bool FallingSwapWeaponValue = g_FreeFireMemory.Read<bool>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon );
+
                         if ( AccelerationOnFallingValue == true || FallingSwapWeaponValue == false )
                         {
                                 g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, false );
                                 g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
                         }
                 }
-                else
+                else if ( LastBackJumpState )
                 {
-                        if ( LastBackJumpState )
-                        {
-                                g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, true );
-                                g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
-                        }
+                        g_FreeFireMemory.Write<bool>( GameVar + Offsets::GameVarDef::EnableAccelerationOnFalling, true );
+                        g_FreeFireMemory.Write<float>( GameVar + Offsets::GameVarDef::EnableLowFallingSwapWeapon, true );
                 }
-                LastBackJumpState = g_Globals.Misc.Exploits.LocalPlayer.BackJump;
+                LastBackJumpState = backJumpOn;
         }
 
         // ==================== Snapshot ====================
@@ -3070,6 +3449,94 @@ void Data::Draw( int width, int height, bool N32, bool V31 )
 
                 DL->AddText( Fonts::Verdana, fontSize, ImVec2( textPos.x + 1, textPos.y + 1 ), shadowColor, text );
                 DL->AddText( Fonts::Verdana, fontSize, textPos, textColor, text );
+
+                ImGui::PopFont( );
+        }
+
+        // ==================== (V8.7) Overlay PERF ====================
+        /*
+         * Telemetria ao vivo do readloop + PROVA DE BYPASS da ponte:
+         *  - Hz real de varredura (responde ao slider Read Interval)
+         *  - tempo de varredura, ondas (round-trips) e enderecos por frame
+         *  - funil de entidades: lista -> players (pos-scan de classe) -> desenhados
+         *  - contadores do daemon: directReads (pread64) vs vmFb (fallback) —
+         *    vmfb=0 = TODAS as leituras foram pread64 direto.
+         * Toggle na aba Config (ShowPerfOverlay). Custo: 1 string buffer +
+         * alguns AddText; stats do daemon vem com cache de 500 ms (max 2
+         * round-trips/s, zero impacto no ESP).
+         */
+        if ( g_Globals.General.ShowPerfOverlay )
+        {
+                const ReadPerf& pf = m_Perf;
+
+                const BridgeClient::RemoteStats rs = BridgeClient::GetRemoteStats( );
+
+                const uint32_t fpsX10 = pf.FpsEma.load( std::memory_order_relaxed );
+                const uint32_t frameMs = pf.FrameMsEma.load( std::memory_order_relaxed );
+                const uint32_t waves = pf.Waves.load( std::memory_order_relaxed );
+                const uint32_t addrs = pf.Addrs.load( std::memory_order_relaxed );
+                const uint32_t entList = pf.EntList.load( std::memory_order_relaxed );
+                const uint32_t entNaoP = pf.EntNaoPlayer.load( std::memory_order_relaxed );
+                const uint32_t entPl = pf.EntPlayers.load( std::memory_order_relaxed );
+                const uint32_t entOk2 = pf.EntDrawn.load( std::memory_order_relaxed );
+
+                char line1[160];
+                char line2[160];
+                char line3[160];
+                char line4[200];
+
+                std::snprintf( line1, sizeof( line1 ), "STORM PERF  %u.%u Hz | varredura %ums | intervalo %dms",
+                        fpsX10 / 10u, fpsX10 % 10u, frameMs, g_Globals.General.ReadIntervalMs );
+
+                std::snprintf( line2, sizeof( line2 ), "ondas %u | enderecos %u (acum %llu)",
+                        waves, addrs, ( unsigned long long )pf.TotalAddrs.load( std::memory_order_relaxed ) );
+
+                std::snprintf( line3, sizeof( line3 ), "ents: lista %u -> players %u (fora %u) -> desenhados %u",
+                        entList, entPl, entNaoP, entOk2 );
+
+                if ( rs.Ok )
+                {
+                        uint64_t hitTotal = rs.CacheHits + rs.CacheMisses;
+                        const int hitPct = ( hitTotal > 0 ) ? ( int )( ( rs.CacheHits * 100ULL ) / hitTotal ) : 0;
+
+                        std::snprintf( line4, sizeof( line4 ), "ponte: R %llu W %llu | pread64 %llu | vmfb %llu | cache %d%% | up %llus",
+                                ( unsigned long long )rs.BridgeReads,
+                                ( unsigned long long )rs.BridgeWrites,
+                                ( unsigned long long )rs.DirectReads,
+                                ( unsigned long long )( rs.VmFbReads + rs.VmFbWrites ),
+                                hitPct,
+                                ( unsigned long long )rs.UptimeSec );
+                }
+                else
+                {
+                        std::snprintf( line4, sizeof( line4 ), "ponte: stats indisponiveis (daemon fora?)" );
+                }
+
+                ImGui::PushFont( Fonts::Verdana );
+
+                const float pfFontSize = 13.0f;
+                const float pfLineH = pfFontSize + 2.0f;
+                ImVec2 pfPos( 10.0f, 10.0f );
+
+                const bool bypassClean = ( !rs.Ok ) ? true : ( rs.VmFbReads + rs.VmFbWrites ) == 0;
+                const ImU32 pfTitleColor = ImColor( 0.35f, 1.0f, 0.45f, 0.95f );
+                const ImU32 pfTextColor = ImColor( 1.0f, 1.0f, 1.0f, 0.85f );
+                const ImU32 pfBypassColor = bypassClean
+                        ? ImColor( 0.35f, 1.0f, 0.45f, 0.95f )
+                        : ImColor( 1.0f, 0.75f, 0.15f, 0.95f );
+                const ImU32 pfShadow = ImColor( 0, 0, 0, 200 );
+
+                auto PfText = [ & ]( float y, const char* txt, ImU32 color )
+                {
+                        DL->AddText( Fonts::Verdana, pfFontSize, ImVec2( pfPos.x + 1, y + 1 ), pfShadow, txt );
+                        DL->AddText( Fonts::Verdana, pfFontSize, ImVec2( pfPos.x, y ), color, txt );
+                };
+
+                float pfY = pfPos.y;
+                PfText( pfY, line1, pfTitleColor ); pfY += pfLineH;
+                PfText( pfY, line2, pfTextColor );  pfY += pfLineH;
+                PfText( pfY, line3, pfTextColor );  pfY += pfLineH;
+                PfText( pfY, line4, pfBypassColor );
 
                 ImGui::PopFont( );
         }

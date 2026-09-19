@@ -95,6 +95,19 @@ enum BridgeCmd : uint32_t
      * falharam — o payload ainda assim contém os bytes de todos).
      */
     BRIDGE_CMD_READ_BATCH = 8,
+
+    /*
+     * (V8.7) ESTATISTICAS DO DAEMON — PROVA DE BYPASS.
+     *
+     * Sem payload de entrada. Payload de resposta = BridgeStatsPayload
+     * (struct fixa, packed). O painel usa para mostrar EM TEMPO REAL:
+     *   - quantas leituras o daemon fez por pread64 (directReads)
+     *   - quantas caíram no fallback process_vm (vmFbReads — 0 = bypass
+     *     100% pread64)
+     *   - quantas escritas por pwrite64 (directWrites) vs vmFbWrites
+     *   - cache hit/miss e kill-switch de escrita (wrKilled/writesOn)
+     */
+    BRIDGE_CMD_STATS = 9,
 };
 
 enum BridgeStatus : uint32_t
@@ -138,3 +151,53 @@ struct BridgeResponse
 
 static_assert(sizeof(BridgeRequest) == 40, "BridgeRequest deve ter 40 bytes");
 static_assert(sizeof(BridgeResponse) == 32, "BridgeResponse deve ter 32 bytes");
+
+/*
+ * (V8.7) Payload da resposta do BRIDGE_CMD_STATS. Struct FIXA (packed,
+ * campos de largura definida) — versoes futuras só ADICIONAM campos no
+ * fim; o cliente valida pelo Size recebido.
+ */
+#pragma pack(push, 1)
+struct BridgeStatsPayload
+{
+    /* totals da ponte (g_Total*) */
+    uint64_t bridgeReads;
+    uint64_t bridgeWrites;
+    uint64_t bridgeErrors;
+
+    /* tempo de vida do daemon (segundos) */
+    uint64_t uptimeSec;
+
+    /* cache de blocos de 256 B */
+    uint64_t cacheHits;
+    uint64_t cacheNegHits;
+    uint64_t cacheMisses;
+    uint64_t syscalls;
+    uint64_t retries;
+
+    /* (V8.7) caminhos de leitura */
+    uint64_t directReads;    /* pread64 direto (CAMINHO 1)              */
+    uint64_t exactFb;        /* pread64 do range exato (CAMINHO 1b)     */
+    uint64_t vmFbReads;      /* process_vm_readv (CAMINHO 2 — fallback) */
+
+    /* (V8.7) caminhos de escrita */
+    uint64_t directWrites;   /* pwrite64 direto (CAMINHO 1)             */
+    uint64_t vmFbWrites;     /* process_vm_writev (CAMINHO 2 — fallback)*/
+
+    /* misc de telemetria */
+    uint64_t negCreated;
+    uint64_t openFails;
+    uint64_t wrRefused;
+    uint64_t wrKilled;
+
+    uint32_t writesOn;         /* canal de escrita habilitado           */
+    uint32_t vmFallbackOn;     /* STORM_VM_FALLBACK com que o daemon
+                                * foi compilado (0 = build 100%
+                                * pread64/pwrite64)                     */
+    uint32_t daemonProtoVersion;
+    uint32_t reserved0;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(BridgeStatsPayload) == 160,
+              "BridgeStatsPayload deve ter 160 bytes");

@@ -1,0 +1,30 @@
+@"
+# Visual Studio
+.vs/
+**/.vs/
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android/CMake generated files
+.cxx/
+**/.cxx/
+.externalNativeBuild/
+
+# Visual Studio build output
+x64/
+**/x64/
+Debug/
+**/Debug/
+Release/
+**/Release/
+
+# Compiled/debug artifacts
+*.iobj
+*.ipch
+*.pdb
+*.obj
+*.ilk
+"@ | Set-Content .gitignore

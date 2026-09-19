@@ -73,6 +73,29 @@ struct GameContext
         float LocalYaw;
 };
 
+/*
+ * (V8.7) TELEMETRIA DO READLOOP — exibida no overlay PERF do painel.
+ * Os contadores sao atomics porque o ReadLoop e template (1 instância por
+ * N32/V31) e o overlay le da thread de render. FrameMs/Fps são EMAs
+ * (média móvel) para o número não piscar.
+ */
+struct ReadPerf
+{
+        // por frame (reiniciado a cada varredura)
+        std::atomic<uint32_t> Waves{ 0 };            // ondas (round-trips READ_BATCH)
+        std::atomic<uint32_t> Addrs{ 0 };            // endereços lidos no frame
+        std::atomic<uint32_t> EntList{ 0 };          // entidades na lista oficial
+        std::atomic<uint32_t> EntNaoPlayer{ 0 };     // descartadas pelo scan inicial de classe
+        std::atomic<uint32_t> EntPlayers{ 0 };       // confirmadas player (pós-scan)
+        std::atomic<uint32_t> EntDrawn{ 0 };         // passaram todos os filtros
+
+        // acumulados
+        std::atomic<uint32_t> FrameMsEma{ 0 };       // EMA do tempo de varredura (ms)
+        std::atomic<uint32_t> FpsEma{ 0 };           // EMA de varreduras/seg x10 (Hz*10)
+        std::atomic<uint64_t> TotalWaves{ 0 };
+        std::atomic<uint64_t> TotalAddrs{ 0 };
+};
+
 class Data
 {
         public:
@@ -139,6 +162,9 @@ class Data
         static GameContext& GetContextRef() { return m_Context; }
         static std::mutex& GetMutex() { return m_Mutex; }
         static std::atomic<bool>& GetRunning() { return m_Running; }
+
+        // (V8.7) telemetria para o overlay PERF (thread-safe via atomics)
+        static ReadPerf m_Perf;
 
         public:
         // Explicitly allow access to private members from implementation

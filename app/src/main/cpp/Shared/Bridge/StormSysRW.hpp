@@ -15,11 +15,55 @@
 //  objeto vivo. E o cliente tem writer a cada frame: AtributarArma
 //  escrevia 1.0f SEM toggle e SEM check; MoreDamage/FireDelay/Aimlock
 //  escreviam todo frame quando ligados; AimLock2x sem null-check.
-//  AGORA: KILL-SWITCH no chokepoint — STORM_WRITES_ENABLED=0 (padrao)
-//  faz TODO WriteMem virar no-op ABSORVIDO (retorna true, wrKilled++),
-//  nenhuma syscall de escrita acontece. ESP nao precisa de ESCRITA.
-//  Re-habilitar: -DSTORM_WRITES_ENABLED=1 (ou SetWritesEnabled(true)).
-//  Com 1, a guarda V8.2 continua ativa.)
+//  AGORA: KILL-SWITCH no chokepoint — STORM_WRITES_ENABLED=0 faz TODO
+//  WriteMem virar no-op ABSORVIDO (retorna true, wrKilled++), nenhuma
+//  syscall de escrita acontece. ESP nao precisa de ESCRITA.
+// (V8.6 — DUAS MUDANCAS:
+//  1. CANAL DE ESCRITA REABILITADO por padrao: a causa raiz do crash foi
+//     corrigida no Draw.cpp (null-check + value-check + restore so na
+//     transicao). Padrao agora = 1; -DSTORM_WRITES_ENABLED=0 volta a
+//     absorver tudo; SetWritesEnabled(false) desliga em runtime. A guard
+//     V8.2 (AddrWritable) continua em pe na frente de toda escrita.
+//  2. READ EM LOTE COM FD COMPARTILHADO (perf): o READ_BATCH agora abre
+//     /proc/<pid>/mem UMA vez por lote (ReadBatchMem) em vez de open+close
+//     POR ITEM que der miss no cache. Com ~100 itens/onda e ~25 ondas/tick,
+//     eram dezenas de milhares de openat/s — o lag do ESP. Mesmos cache
+//     de 256 B, fallback exato, plano B e cache negativo de antes.)
+// (V8.7 — PROVA DE BYPASS (pedido do usuario: "preciso saber se TUDO vai
+//  via pread64/pwrite64 ou se esta caindo no fallback"):
+//
+//  CAMINHOS DE LEITURA (em ordem de prioridade, DENTRO do daemon root):
+//    CAMINHO 1 (PRINCIPAL, ~100% dos casos):
+//      __NR_openat(/proc/<pid>/mem) -> __NR_pread64 -> __NR_close
+//      Contador: directReads (cada fill por pread64).
+//    CAMINHO 1b (EXATO, so se o fill do bloco vier curto):
+//      pread64 direto do range exato pedido (ReadExactFdRetry).
+//      Contador: exactFb.
+//    CAMINHO 2 (FALLBACK, so se o CAMINHO 1 esgotar):
+//      SYS_process_vm_readv — TAMBEM e syscall direta no daemon root
+//      (nunca no app), mas NAO e pread64. Contador: vmFbReads.
+//      COM -DSTORM_VM_FALLBACK=0 este caminho e COMPILADO FORA:
+//      a funcao retorna false na hora e NENHUM process_vm existe no
+//      binario — build 100% pread64/pwrite64, garantia absoluta.
+//
+//  CAMINHOS DE ESCRITA:
+//    CAMINHO 1 (PRINCIPAL): __NR_pwrite64 em /proc/<pid>/mem.
+//      Contador: directWrites.
+//    CAMINHO 2 (FALLBACK): SYS_process_vm_writev (vmFbWrites), idem —
+//      compilado fora com -DSTORM_VM_FALLBACK=0.
+//
+//  COMO PROVAR NO APARELHO:
+//    - Overlay PERF do painel mostra "pread64 OK | vmfb N": vmfb=0
+//      significa que NENHUMA leitura caiu no fallback desde o start
+//      do daemon (o contador so cresce quando o fallback roda).
+//    - Novo comando BRIDGE_CMD_STATS da ponte entrega esses numeros
+//      ao painel em tempo real (sem precisar de logcat).
+//    - Logcat do daemon: [STATS] agora imprime vmfbR/vmfbW/direct.
+//
+//  E o CLIENTE? O app (libclient.so) NAO le memoria do jogo direto:
+//  os caminhos locais (process_vm//proc/pid/mem no proprio app) ja
+//  estavam COMENTADOS no Memory.cpp — toda leitura/escrita sai pela
+//  ponte. Quem executa a syscall e o daemon root.)
 //
 // ARQUITETURA (o que continua valendo):
 //   - Leitura : __NR_pread64  em /proc/<pid>/mem (fd aberto e fechado na hora)
@@ -103,6 +147,25 @@
 
 #if defined(SYS_process_vm_readv) || defined(SYS_process_vm_writev)
 #include <sys/uio.h>
+#endif
+
+/* ========================================================================
+ * (V8.7) PROVA DE BYPASS — CHAVE DO CANAL DE FALLBACK.
+ *
+ *   STORM_VM_FALLBACK=1 (padrao): o fallback process_vm_readv/writev
+ *     continua disponivel como plano B (so roda se o pread64/pwrite64
+ *     esgotar as re-tentativas; o contador vmFbReads/vmFbWrites prova
+ *     se/quanto ele rodou).
+ *
+ *   STORM_VM_FALLBACK=0 (-DSTORM_VM_FALLBACK=0 na compilacao):
+ *     o fallback e COMPILADO FORA — as funcoes retornam false na
+ *     primeira linha e o binario fica 100% pread64/pwrite64. Se a
+ *     syscall direta falhar de verdade, a leitura falha (sem plano B).
+ *     Use este build para PROVAR que o bypass funciona so com
+ *     pread64/pwrite64.
+ * ======================================================================== */
+#ifndef STORM_VM_FALLBACK
+#define STORM_VM_FALLBACK 1
 #endif
 
 #include <atomic>
@@ -382,10 +445,19 @@ namespace StormRW
         size_t size
     )
     {
-#if defined(SYS_process_vm_readv)
-
+        /*
+         * (V8.7) CAMINHO 2 — FALLBACK process_vm_readv. So chega aqui se
+         * o CAMINHO 1 (pread64 direto) esgotou as re-tentativas. Com
+         * -DSTORM_VM_FALLBACK=0 a linha abaixo encerra a funcao e o
+         * binario NAO TEM processo de fallback nenhum (prova de bypass).
+         */
+#if !STORM_VM_FALLBACK
+        return false;
+#else
         if (pid <= 0 || address == 0 || !buffer || size == 0)
             return false;
+
+#if defined(SYS_process_vm_readv)
 
         char* out = static_cast<char*>(buffer);
         size_t total = 0;
@@ -469,6 +541,7 @@ namespace StormRW
         return false;
 
 #endif
+#endif /* STORM_VM_FALLBACK */
     }
 
     inline bool
@@ -479,10 +552,18 @@ namespace StormRW
         size_t size
     )
     {
-#if defined(SYS_process_vm_writev)
-
+        /*
+         * (V8.7) CAMINHO 2 — FALLBACK process_vm_writev. So chega aqui se
+         * o CAMINHO 1 (pwrite64 direto) esgotou as re-tentativas. Com
+         * -DSTORM_VM_FALLBACK=0 encerra aqui (build 100% pwrite64).
+         */
+#if !STORM_VM_FALLBACK
+        return false;
+#else
         if (pid <= 0 || address == 0 || !buffer || size == 0)
             return false;
+
+#if defined(SYS_process_vm_writev)
 
         const char* in = static_cast<const char*>(buffer);
         size_t total = 0;
@@ -570,6 +651,7 @@ namespace StormRW
         return false;
 
 #endif
+#endif /* STORM_VM_FALLBACK */
     }
 
     // ========================================================================
@@ -624,6 +706,8 @@ namespace StormRW
         /* (V8) telemetria do caminho de leitura/escrita */
         uint64_t retries;      /* pread64 repetidos (parcial/errno)        */
         uint64_t exactFb;      /* leituras salvas pelo range exato         */
+        uint64_t directReads;  /* (V8.7) fills feitos por pread64 DIRETO   */
+        uint64_t directWrites; /* (V8.7) escritas por pwrite64 DIRETO      */
         uint64_t vmFbReads;    /* leituras salvas pelo process_vm_readv    */
         uint64_t vmFbWrites;   /* escritas salvas pelo process_vm_writev   */
         uint64_t negCreated;   /* entradas negativas criadas               */
@@ -650,9 +734,11 @@ namespace StormRW
         std::atomic<uint64_t> misses{ 0 };
         std::atomic<uint64_t> syscalls{ 0 };
 
-        /* (V8) */
+        /* (V8) + (V8.7) telemetria de bypass */
         std::atomic<uint64_t> retries{ 0 };
         std::atomic<uint64_t> exactFb{ 0 };
+        std::atomic<uint64_t> directReads{ 0 };
+        std::atomic<uint64_t> directWrites{ 0 };
         std::atomic<uint64_t> vmFbReads{ 0 };
         std::atomic<uint64_t> vmFbWrites{ 0 };
         std::atomic<uint64_t> negCreated{ 0 };
@@ -663,17 +749,26 @@ namespace StormRW
         std::atomic<uint64_t> mapsFails{ 0 };
 
         /*
-         * (V8.3) WRITELOCK: padrao = DESLIGADO (0). Compile-time
-         * STORM_WRITES_ENABLED=1 levanta o default; SetWritesEnabled()
-         * muda em runtime. Padrao desligado = nenhuma syscall de escrita
-         * acontece — impossivel corromper o jogo enquanto o ESP/diagnostico
-         * esta em foco (ESP e read-only).
+         * (V8.3) WRITELOCK -> (V8.6) CANAL DE ESCRITA REABILITADO.
+         *
+         * Historico: o padrao virou 0 no V8.3 porque o crash de entrada
+         * em partida foi rastreado a writers sem guard (AtributarArma
+         * escrevendo todo frame em endereco garbage). A CAUSA RAIZ desses
+         * writers foi corrigida no Draw.cpp (null-check + value-check +
+         * restore so na transicao do toggle), entao o canal volta pro
+         * padrao ABERTO.
+         *
+         * Padrao agora = 1 (ligado). Kill-switch mantido:
+         *   - compile-time: -DSTORM_WRITES_ENABLED=0 (volta a absorver tudo)
+         *   - runtime:      StormRW::SetWritesEnabled(false)
+         * A guard de permissao do V8.2 (AddrWritable) continua em pe na
+         * frente de TODA escrita — lixo/garbage continua sendo recusado.
          */
         std::atomic<uint32_t> writesEnabled{
 #ifdef STORM_WRITES_ENABLED
             STORM_WRITES_ENABLED ? 1u : 0u
 #else
-            0u
+            1u
 #endif
         };
         std::atomic<uint64_t> wrKilled{ 0 };
@@ -765,6 +860,8 @@ namespace StormRW
 
         st.retries = s.retries.load();
         st.exactFb = s.exactFb.load();
+        st.directReads = s.directReads.load();
+        st.directWrites = s.directWrites.load();
         st.vmFbReads = s.vmFbReads.load();
         st.vmFbWrites = s.vmFbWrites.load();
         st.negCreated = s.negCreated.load();
@@ -1202,6 +1299,24 @@ namespace StormRW
     }
 
     /*
+     * (V8.6-PERF) FD COMPARTILHADO DE LOTE.
+     *
+     * -2 = sem lote (padrao): cada ReadMem/ReadMemNoCache abre-usa-fecha
+     *      o proprio fd (higiene original da Task 12, item por item).
+     * >=0 = fd de /proc/<pid>/mem ja aberto pelo ReadBatchMem: as leituras
+     *      do lote reutilizam e NAO fecham (o batch abre/fecha UMA vez).
+     *
+     * thread_local: cada thread de atendimento do daemon tem o seu slot,
+     * entao a thread-safety de 1 thread por cliente fica intacta.
+     */
+    inline int&
+    BatchFdSlot()
+    {
+        static thread_local int t_BatchFd = -2;
+        return t_BatchFd;
+    }
+
+    /*
      * Leitura SEM cache: abre-usa-fecha. Disponivel para casos criticos.
      * (V8) com fallback vm_readv se o pread64 esgotar.
      */
@@ -1218,8 +1333,12 @@ namespace StormRW
         if (pid <= 0 || address == 0 || !buffer || size == 0)
             return false;
 
+        const int& tBatch = BatchFdSlot();
+
         const int fd =
-            SysOpenMem(pid, false);
+            (tBatch != -2)
+                ? tBatch
+                : SysOpenMem(pid, false);
 
         if (fd < 0)
         {
@@ -1244,9 +1363,19 @@ namespace StormRW
         const bool ok =
             ReadExactFdRetry(fd, address, buffer, size);
 
-        SysClose(fd);
+        if (ok)
+            s.directReads.fetch_add(1);     /* (V8.7) pread64 direto   */
 
-        C().syscalls.fetch_add(3);
+        if (tBatch == -2)
+        {
+            SysClose(fd);
+
+            C().syscalls.fetch_add(3);          /* open + pread + close   */
+        }
+        else
+        {
+            C().syscalls.fetch_add(1);          /* so o pread (lote)      */
+        }
 
         if (ok)
             return true;
@@ -1346,10 +1475,16 @@ namespace StormRW
         }
 
         /*
-         * 2) MISS: preenche o bloco com UM pread64 (abre-usa-fecha).
+         * 2) MISS: preenche o bloco com UM pread64.
+         *    (V8.6-PERF) dentro de um lote, reutiliza o fd compartilhado
+         *    (1 openat/close pra dezenas de itens em vez de 1 por item).
          */
+        const int& tBatch = BatchFdSlot();
+
         const int fd =
-            SysOpenMem(pid, false);
+            (tBatch != -2)
+                ? tBatch
+                : SysOpenMem(pid, false);
 
         if (fd < 0)
         {
@@ -1480,9 +1615,10 @@ namespace StormRW
                 s.exactFb.fetch_add(1);
         }
 
-        SysClose(fd);
+        if (tBatch == -2)
+            SysClose(fd);
 
-        s.syscalls.fetch_add(3);                /* open + pread + close   */
+        s.syscalls.fetch_add(tBatch == -2 ? 3 : 1);
 
         /*
          * (V8) PLANO B: pedido NAO satisfeito pelo pread64 — fill falhou
@@ -1548,6 +1684,8 @@ namespace StormRW
                     slot.used = false;
                     slot.fails = 0;
 
+                    s.directReads.fetch_add(1); /* (V8.7) pread64 exato   */
+
                     return true;
                 }
 
@@ -1602,11 +1740,25 @@ namespace StormRW
                     size
                 );
 
+                /*
+                 * (V8.7) sucesso veio do fill do bloco por pread64 —
+                 * CAMINHO 1 confirmado.
+                 */
+                s.directReads.fetch_add(1);
+
                 return true;
             }
 
             if (exactOk)
+            {
+                /*
+                 * (V8.7) sucesso veio do pread64 do range EXATO —
+                 * continua sendo pread64 (CAMINHO 1b), NAO e fallback.
+                 */
+                s.directReads.fetch_add(1);
+
                 return true;                    /* (PONTEFIX-V5)          */
+            }
         }
 
         /*
@@ -1614,6 +1766,99 @@ namespace StormRW
          * parou antes do fim do pedido): mesmo resultado do read direto.
          */
         return false;
+    }
+
+    /*
+     * ============================================================================
+     * (V8.6-PERF) LEITURA EM LOTE COM FD COMPARTILHADO
+     * ============================================================================
+     * O READ_BATCH da ponte chamava ReadMem por item e CADA miss pagava
+     * openat + pread64 + close (3 syscalls por item — com ~100 itens por
+     * onda e ~25 ondas por tick, eram dezenas de MILHARES de openat por
+     * segundo no aparelho: esse e o lag/travamento do ESP).
+     *
+     * Agora o lote inteiro compartilha UM openat/close: os preads continuam
+     * 1 por bloco de 256 B, com o MESMO cache, fallback exato e plano B de
+     * antes. Itens falhos ficam ZERADOS no buffer de saida (contrato do
+     * READ_BATCH: zero = falha, igual ao read individual).
+     *
+     * Retorna true so se TODOS os itens validos leram; failedOut devolve o
+     * numero de falhas (itens invalidos contam como falha).
+     * ============================================================================
+     */
+    struct BatchItemRW
+    {
+        uint64_t address;      /* endereco alvo                          */
+        uint32_t size;         /* bytes                                  */
+        void* out;             /* buffer de saida (preenchido ou zerado) */
+    };
+
+    inline bool
+    ReadBatchMem(
+        pid_t pid,
+        const BatchItemRW* items,
+        size_t count,
+        size_t* failedOut = nullptr
+    )
+    {
+        CacheState& s = C();
+
+        if (failedOut)
+            *failedOut = 0;
+
+        if (pid <= 0 || !items || count == 0)
+        {
+            if (failedOut)
+                *failedOut = (items && count) ? count : 0;
+
+            return false;
+        }
+
+        /*
+         * Abre UM fd pro lote inteiro. Se o open falhar, cai pra -2 e cada
+         * item tenta o proprio caminho (identico ao comportamento antigo).
+         */
+        int sharedFd =
+            SysOpenMem(pid, false);
+
+        if (sharedFd < 0)
+            sharedFd = -2;
+
+        int& tBatch = BatchFdSlot();
+        tBatch = sharedFd;
+
+        size_t failed = 0;
+
+        for (size_t i = 0; i < count; i++)
+        {
+            const BatchItemRW& it = items[i];
+
+            if (it.address == 0 || it.size == 0 || !it.out)
+            {
+                failed++;
+                continue;
+            }
+
+            /* contrato do lote: falha = zeros no buffer de saida */
+            std::memset(it.out, 0, it.size);
+
+            if (!ReadMem(pid, it.address, it.out, it.size))
+                failed++;
+        }
+
+        tBatch = -2;
+
+        if (sharedFd >= 0)
+        {
+            SysClose(sharedFd);
+
+            s.syscalls.fetch_add(1);            /* o close compartilhado */
+        }
+
+        if (failedOut)
+            *failedOut = failed;
+
+        return failed == 0;
     }
 
     /*
@@ -1764,6 +2009,14 @@ namespace StormRW
             SysClose(fd);
 
             s.syscalls.fetch_add(3);
+
+            /*
+             * (V8.7) a escrita saiu pelo CAMINHO 1 (pwrite64 direto).
+             * Se o fallback vm_writev salvar depois, este contador NAO
+             * cresce — quem cresce e o vmFbWrites.
+             */
+            if (ok)
+                s.directWrites.fetch_add(1);
         }
         else
         {

@@ -153,6 +153,50 @@ namespace BridgeClient
     Stats GetStats();
 
     /*
+     * (V8.7) Estatisticas INTERNAS DO DAEMON (prova de bypass).
+     *
+     * Espelha BridgeStatsPayload (BRIDGE_CMD_STATS). vmFbReads/vmFbWrites
+     * = 0 significa que TODAS as leituras/escritas sairam por
+     * pread64/pwrite64 direto desde o start do daemon. directReads/
+     * directWrites crescem a cada sucesso da syscall direta.
+     *
+     * Cache interno de 500 ms: chamadas repetidas no mesmo meio-segundo
+     * nao geram round-trip novo (seguro para chamar por frame).
+     */
+    struct RemoteStats
+    {
+        uint64_t BridgeReads   = 0;
+        uint64_t BridgeWrites  = 0;
+        uint64_t BridgeErrors  = 0;
+        uint64_t UptimeSec     = 0;
+
+        uint64_t CacheHits     = 0;
+        uint64_t CacheNegHits  = 0;
+        uint64_t CacheMisses   = 0;
+        uint64_t Syscalls      = 0;
+        uint64_t Retries       = 0;
+
+        uint64_t DirectReads   = 0;
+        uint64_t ExactFb       = 0;
+        uint64_t VmFbReads     = 0;
+
+        uint64_t DirectWrites  = 0;
+        uint64_t VmFbWrites    = 0;
+
+        uint64_t NegCreated    = 0;
+        uint64_t OpenFails     = 0;
+        uint64_t WrRefused     = 0;
+        uint64_t WrKilled      = 0;
+
+        uint32_t WritesOn      = 0;
+        uint32_t VmFallbackOn  = 0;
+
+        bool Ok = false;       /* conseguiu falar com o daemon?          */
+    };
+
+    RemoteStats GetRemoteStats();
+
+    /*
      * Caminho do socket (pode ser sobrescrito pela env
      * STORM_BRIDGE_SOCK antes do primeiro uso).
      */

@@ -1467,6 +1467,16 @@ lastFrameHoveredId = gc.HoveredId;
                                                         Custom::SliderInt(XorStr("Read Interval"), &g_Globals.General.ReadIntervalMs, 15, 300, "%d ms");
                                                         Custom::Checkbox(XorStr("Stealth (jitter)"), &g_Globals.General.StealthRead);
 
+                                                        /*
+                                                         * (V8.7) PERF OVERLAY — telemetria ao vivo no canto
+                                                         * superior-esquerdo: Hz real de varredura (prova
+                                                         * visual de que o Read Interval acima funciona),
+                                                         * ondas/enderecos por frame, funil de entidades
+                                                         * (lista -> players -> desenhados) e prova de
+                                                         * bypass (pread64 direto vs fallback).
+                                                         */
+                                                        Custom::Checkbox(XorStr("Perf Overlay (bypass/Hz)"), &g_Globals.General.ShowPerfOverlay);
+
                                                         ImGui::Dummy(ImVec2(0, 8));
 
                                                         /*

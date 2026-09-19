@@ -159,6 +159,7 @@ namespace Cheat {
             wInt(ofs, "GameProfile", g_Globals.General.GameProfile);   // << NOVA
             wInt(ofs, "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
             wBool(ofs, "StealthRead", g_Globals.General.StealthRead);
+            wBool(ofs, "ShowPerfOverlay", g_Globals.General.ShowPerfOverlay);   // (V8.7)
             ofs << "\n";
 
                 return true;
@@ -300,6 +301,7 @@ namespace Cheat {
             gInt("General", "GameProfile", g_Globals.General.GameProfile);   // << NOVA
             gInt("General", "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
             gBool("General", "StealthRead", g_Globals.General.StealthRead);
+            gBool("General", "ShowPerfOverlay", g_Globals.General.ShowPerfOverlay);   // (V8.7)
 
 
             return true;

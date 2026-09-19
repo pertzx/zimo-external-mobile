@@ -78,7 +78,7 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-19-RWLOCK-V8.3";
+        "StormMemory-2026-09-19-SCANPERF-BYPASS-V8.7";
 
     /*
      * Prioridade de acesso:
@@ -91,8 +91,19 @@ namespace
      *                 rodando como root; no aparelho normal da EPERM)
      *  3. MEMFD  -> pread64/pwrite64 em /proc/<pid>/mem aberto localmente
      *
-     * A ponte sempre vem primeiro; o fallback mantem o comportamento
-     * antigo quando o daemon ainda nao subiu.
+     * ============================================================
+     * (V8.7) PROVA DE BYPASS — LEIA ANTES DE DUVIDAR:
+     * os CAMINHOS 2 e 3 acima estão COMENTADOS nos corpos de
+     * Memory::Read e Memory::Write logo abaixo (procure "CAMINHO
+     * 2/3"). Eles existem so como referência histórica — NENHUMA
+     * leitura/escrita do jogo sai do processo do app. TUDO passa
+     * pela PONTE, e DENTRO do daemon o canal principal é
+     * pread64/pwrite64 (syscall direta). Os contadores de bypass
+     * aparecem no overlay PERF (vmfb=0 = 100% pread64) e no
+     * [STATS] do daemon (vmfbR/vmfbW). Compile o daemon com
+     * -DSTORM_VM_FALLBACK=0 para compilar o fallback FORA do
+     * binário (garantia absoluta).
+     * ============================================================
      */
     static std::atomic<uint64_t> g_BridgeReads{ 0 };
     static std::atomic<uint64_t> g_BridgeWrites{ 0 };

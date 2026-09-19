@@ -1,0 +1,6 @@
+#pragma once
+
+class TelaParada {
+public:
+    static void Run();
+};

@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{0587d7a3-f2ce-4d56-b84f-a0005d3bfce6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sources">
+      <UniqueIdentifier>{08e36723-ce4f-4cff-9662-c40801cf1acf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="imgui\edited_elements">
+      <UniqueIdentifier>{aedf718d-cec7-4f6e-9aca-07394bb16e22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Protect">
+      <UniqueIdentifier>{09b05090-a783-46aa-99e8-8f8216fd6b9c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP">
+      <UniqueIdentifier>{286ed598-c64f-4113-9844-ab2e425dcb7c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP\MinHook">
+      <UniqueIdentifier>{f46582da-be76-44f6-a2db-084b13e053b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP\MinHook\src">
+      <UniqueIdentifier>{67c760ce-e840-401b-a0b7-77c51581c11e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP\MinHook\include">
+      <UniqueIdentifier>{4014bced-817e-48c7-a51a-2e9b17656f4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP\MinHook\src\hde">
+      <UniqueIdentifier>{512c00b0-a7be-4fca-8e56-e8d627ed0af2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ESP\ESP LINES">
+      <UniqueIdentifier>{64ddf13f-10d0-4c9e-9c5f-3b8b7aeb17ba}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ext\DirectX\Include\audiodefs.h" />
+    <ClInclude Include="ext\DirectX\Include\comdecl.h" />
+    <ClInclude Include="ext\DirectX\Include\D2D1.h" />
+    <ClInclude Include="ext\DirectX\Include\D2D1Helper.h" />
+    <ClInclude Include="ext\DirectX\Include\D2DBaseTypes.h" />
+    <ClInclude Include="ext\DirectX\Include\D2Derr.h" />
+    <ClInclude Include="ext\DirectX\Include\d3d9.h" />
+    <ClInclude Include="ext\DirectX\Include\d3d9caps.h" />
+    <ClInclude Include="ext\DirectX\Include\d3d9types.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D10.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D10_1.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D10_1shader.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D10effect.h" />
+    <ClInclude Include="ext\DirectX\Include\d3d10misc.h" />
+    <ClInclude Include="ext\DirectX\Include\d3d10sdklayers.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D10shader.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D11.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D11SDKLayers.h" />
+    <ClInclude Include="ext\DirectX\Include\D3D11Shader.h" />
+    <ClInclude Include="ext\DirectX\Include\D3Dcommon.h" />
+    <ClInclude Include="ext\DirectX\Include\D3Dcompiler.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DCSX.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9anim.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9core.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9effect.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9math.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9mesh.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9shader.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9shape.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9tex.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx9xof.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX10.h" />
+    <ClInclude Include="ext\DirectX\Include\d3dx10async.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX10core.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX10math.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX10mesh.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX10tex.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX11.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX11async.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX11core.h" />
+    <ClInclude Include="ext\DirectX\Include\D3DX11tex.h" />
+    <ClInclude Include="ext\DirectX\Include\Dcommon.h" />
+    <ClInclude Include="ext\DirectX\Include\dinput.h" />
+    <ClInclude Include="ext\DirectX\Include\dinputd.h" />
+    <ClInclude Include="ext\DirectX\Include\dsconf.h" />
+    <ClInclude Include="ext\DirectX\Include\dsetup.h" />
+    <ClInclude Include="ext\DirectX\Include\dsound.h" />
+    <ClInclude Include="ext\DirectX\Include\DWrite.h" />
+    <ClInclude Include="ext\DirectX\Include\dxdiag.h" />
+    <ClInclude Include="ext\DirectX\Include\DxErr.h" />
+    <ClInclude Include="ext\DirectX\Include\dxfile.h" />
+    <ClInclude Include="ext\DirectX\Include\DXGI.h" />
+    <ClInclude Include="ext\DirectX\Include\DXGIFormat.h" />
+    <ClInclude Include="ext\DirectX\Include\DXGIType.h" />
+    <ClInclude Include="ext\DirectX\Include\dxsdkver.h" />
+    <ClInclude Include="ext\DirectX\Include\gameux.h" />
+    <ClInclude Include="ext\DirectX\Include\PIXPlugin.h" />
+    <ClInclude Include="ext\DirectX\Include\rmxfguid.h" />
+    <ClInclude Include="ext\DirectX\Include\rmxftmpl.h" />
+    <ClInclude Include="ext\DirectX\Include\rpcsal.h" />
+    <ClInclude Include="ext\DirectX\Include\X3DAudio.h" />
+    <ClInclude Include="ext\DirectX\Include\xact3.h" />
+    <ClInclude Include="ext\DirectX\Include\xact3d3.h" />
+    <ClInclude Include="ext\DirectX\Include\xact3wb.h" />
+    <ClInclude Include="ext\DirectX\Include\XAPO.h" />
+    <ClInclude Include="ext\DirectX\Include\XAPOBase.h" />
+    <ClInclude Include="ext\DirectX\Include\XAPOFX.h" />
+    <ClInclude Include="ext\DirectX\Include\XAudio2.h" />
+    <ClInclude Include="ext\DirectX\Include\XAudio2fx.h" />
+    <ClInclude Include="ext\DirectX\Include\XDSP.h" />
+    <ClInclude Include="ext\DirectX\Include\XInput.h" />
+    <ClInclude Include="ext\DirectX\Include\xma2defs.h" />
+    <ClInclude Include="ext\DirectX\Include\xnamath.h" />
+    <ClInclude Include="ext\MinHook\include\MinHook.h" />
+    <ClInclude Include="ext\MinHook\src\hde\hde32.h" />
+    <ClInclude Include="ext\MinHook\src\hde\hde64.h" />
+    <ClInclude Include="ext\MinHook\src\hde\pstdint.h" />
+    <ClInclude Include="ext\MinHook\src\hde\table32.h" />
+    <ClInclude Include="ext\MinHook\src\hde\table64.h" />
+    <ClInclude Include="ext\MinHook\src\buffer.h" />
+    <ClInclude Include="ext\MinHook\src\trampoline.h" />
+    <ClInclude Include="src\Fonts\FontAwesome.hpp" />
+    <ClInclude Include="src\Fonts\FontInter.hpp" />
+    <ClInclude Include="src\Overlay\Overlay.hpp" />
+    <ClInclude Include="src\Overlay\Render.hpp" />
+    <ClInclude Include="src\ui\ui.hpp" />
+    <ClInclude Include="src\Globals.hpp" />
+    <ClInclude Include="ext\ImGui\imconfig.h" />
+    <ClInclude Include="ext\ImGui\imgui.h" />
+    <ClInclude Include="ext\ImGui\imgui_impl_dx11.h" />
+    <ClInclude Include="ext\ImGui\imgui_impl_win32.h" />
+    <ClInclude Include="ext\ImGui\imgui_internal.h" />
+    <ClInclude Include="ext\ImGui\imgui_stdlib.h" />
+    <ClInclude Include="ext\ImGui\imstb_rectpack.h" />
+    <ClInclude Include="ext\ImGui\imstb_textedit.h" />
+    <ClInclude Include="ext\ImGui\imstb_truetype.h" />
+    <ClInclude Include="src\Fonts\Fonts.hpp" />
+    <ClInclude Include="EspLines\Math\Vector\Vector3.hpp" />
+    <ClInclude Include="EspLines\Math\Vector\Vector2.hpp" />
+    <ClInclude Include="EspLines\Math\AimB.hpp" />
+    <ClInclude Include="EspLines\Math\Quaternion.hpp" />
+    <ClInclude Include="EspLines\Offsets.hpp" />
+    <ClInclude Include="EspLines\Math\Vector\Vector4.hpp" />
+    <ClInclude Include="EspLines\Math\Matrix4v4.hpp" />
+    <ClInclude Include="EspLines\Math\WordToScreen.hpp" />
+    <ClInclude Include="EspLines\Player.h" />
+    <ClInclude Include="EspLines\Math\TMatrix.hpp" />
+    <ClInclude Include="EspLines\Memory\Memory.hpp" />
+    <ClInclude Include="EspLines\Data\Data.hpp" />
+    <ClInclude Include="EspLines\Features\Visuals\Visual.hpp" />
+    <ClInclude Include="src\adb\Adb.hpp" />
+    <ClInclude Include="src\adb\adb_utils.hpp" />
+    <ClInclude Include="EspLines\Features\Visuals\NameGun.h" />
+    <ClInclude Include="EspLines\Aimbot\Aimbot.hpp" />
+    <ClInclude Include="EspLines\BrutalSilent\BrutalSilent.hpp" />
+    <ClInclude Include="Auth\HabitAuth.hpp" />
+    <ClInclude Include="Auth\json.hpp" />
+    <ClInclude Include="Auth\Curl\curl.h" />
+    <ClInclude Include="Auth\Curl\curlver.h" />
+    <ClInclude Include="Auth\Curl\easy.h" />
+    <ClInclude Include="Auth\Curl\header.h" />
+    <ClInclude Include="Auth\Curl\mprintf.h" />
+    <ClInclude Include="Auth\Curl\multi.h" />
+    <ClInclude Include="Auth\Curl\options.h" />
+    <ClInclude Include="Auth\Curl\stdcheaders.h" />
+    <ClInclude Include="Auth\Curl\system.h" />
+    <ClInclude Include="Auth\Curl\typecheck-gcc.h" />
+    <ClInclude Include="Auth\Curl\urlapi.h" />
+    <ClInclude Include="Auth\Curl\websockets.h" />
+    <ClInclude Include="Imagens\LogoBytes.hpp" />
+    <ClInclude Include="FontAwesome.hpp" />
+    <ClInclude Include="FontAwesome6.hpp" />
+    <ClInclude Include="Logo.hpp" />
+    <ClInclude Include="EspLines\Exploits\Exploit\UpPlayer.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\TeleKill.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\DownPlayer.hpp" />
+    <ClInclude Include="EspLines\Exploits\Camera\Undercam.hpp" />
+    <ClInclude Include="EspLines\AimLock\AimLock.hpp" />
+    <ClInclude Include="Fonts\NotoArabic.h" />
+    <ClInclude Include="Fonts\NotoDevanagari.h" />
+    <ClInclude Include="Fonts\NotoJapanese.h" />
+    <ClInclude Include="Fonts\NotoKhmer.h" />
+    <ClInclude Include="Fonts\NotoKorean.h" />
+    <ClInclude Include="Fonts\NotoRegular.h" />
+    <ClInclude Include="Fonts\NotoSc.h" />
+    <ClInclude Include="Fonts\NotoSinhala.h" />
+    <ClInclude Include="Fonts\NotoSymbols2.h" />
+    <ClInclude Include="Fonts\NotoTamil.h" />
+    <ClInclude Include="Fonts\NotoTc.h" />
+    <ClInclude Include="Fonts\NotoThai.h" />
+    <ClInclude Include="Fonts\Unifont.h" />
+    <ClInclude Include="EspLines\Memory\NashMem.hpp" />
+    <ClInclude Include="EspLines\Exploits\Camera\CamRigth.hpp" />
+    <ClInclude Include="EspLines\Exploits\Speed\SpeedHack.hpp" />
+    <ClInclude Include="EspLines\Exploits\Speed\SpeedTimer.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\InfiniteAmmo.hpp" />
+    <ClInclude Include="EspLines\Exploits\Exploit\FastMedkit.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\FastFire.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\NoReload.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\NoRecoil.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\VisionHack.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\Sniper.hpp" />
+    <ClInclude Include="EspLines\Data\SkeletonDrawer.hpp" />
+    <ClInclude Include="EspLines\Exploits\Weapons\WeaponAttributes.hpp" />
+    <ClInclude Include="EspLines\Exploits\SpinBot.hpp" />
+    <ClInclude Include="EspLines\Exploits\TeleportMark.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\NoGravityFly.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\PullEnemy.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\BackJump.hpp" />
+    <ClInclude Include="EspLines\Exploits\Others\TelaParada.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\MinHook\src\hde\hde32.c" />
+    <ClCompile Include="ext\MinHook\src\hde\hde64.c" />
+    <ClCompile Include="ext\MinHook\src\buffer.c" />
+    <ClCompile Include="ext\MinHook\src\hook.c" />
+    <ClCompile Include="ext\MinHook\src\trampoline.c" />
+    <ClCompile Include="src\Overlay\Overlay.cpp" />
+    <ClCompile Include="src\Overlay\Render.cpp" />
+    <ClCompile Include="src\ui\ui.cpp" />
+    <ClCompile Include="ext\ImGui\imgui.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_draw.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_impl_win32.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_stdlib.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_tables.cpp" />
+    <ClCompile Include="ext\ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="src\Fonts\Fonts.cpp" />
+    <ClCompile Include="EspLines\Data\Data.cpp" />
+    <ClCompile Include="EspLines\Features\Visuals\Visual.cpp" />
+    <ClCompile Include="src\adb\Adb.cpp" />
+    <ClCompile Include="src\adb\adb_utils.cpp" />
+    <ClCompile Include="src\Fonts\FontsTwo.hpp" />
+    <ClCompile Include="EspLines\Features\Visuals\NameGun.cpp" />
+    <ClCompile Include="EspLines\Aimbot\Aimbot.cpp" />
+    <ClCompile Include="EspLines\BrutalSilent\BrutalSilent.cpp" />
+    <ClCompile Include="FileName.cpp" />
+    <ClCompile Include="Imspinner\Imspinner.h" />
+    <ClCompile Include="EspLines\Exploits\Exploit\UpPlayer.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\TeleKill.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\DownPlayer.cpp" />
+    <ClCompile Include="EspLines\Exploits\Camera\UnderCam.cpp" />
+    <ClCompile Include="EspLines\AimLock\AimLock.cpp" />
+    <ClCompile Include="EspLines\Exploits\Camera\CamRigth.cpp" />
+    <ClCompile Include="EspLines\Exploits\Speed\SpeedHack.cpp" />
+    <ClCompile Include="EspLines\Exploits\Speed\SpeedTimer.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\InfiniteAmmo.cpp" />
+    <ClCompile Include="EspLines\Exploits\Exploit\FastMedkit.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\FastFire.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\NoReload.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\NoRecoil.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\VisionHack.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\Sniper.cpp" />
+    <ClCompile Include="EspLines\Exploits\Weapons\WeaponAttributes.cpp" />
+    <ClCompile Include="EspLines\Exploits\SpinBot.cpp" />
+    <ClCompile Include="EspLines\Exploits\TeleportMark.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\NoGravityFly.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\PullEnemy.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\BackJump.cpp" />
+    <ClCompile Include="EspLines\Exploits\Others\TelaParada.cpp" />
+    <ClCompile Include="launcher_entry.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ext\DirectX\Include\D3DX_DXGIFormatConvert.inl" />
+    <None Include="ext\DirectX\Include\d3dx9math.inl" />
+    <None Include="ext\DirectX\Include\D3DX10math.inl" />
+    <None Include="ext\DirectX\Include\xnamathconvert.inl" />
+    <None Include="ext\DirectX\Include\xnamathmatrix.inl" />
+    <None Include="ext\DirectX\Include\xnamathmisc.inl" />
+    <None Include="ext\DirectX\Include\xnamathvector.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="ext\DirectX\Lib\XInput.lib" />
+    <Library Include="ext\DirectX\Lib\xapobased.lib" />
+    <Library Include="ext\DirectX\Lib\XAPOFX.lib" />
+    <Library Include="ext\DirectX\Lib\xapobase.lib" />
+    <Library Include="ext\DirectX\Lib\X3DAudio.lib" />
+    <Library Include="ext\DirectX\Lib\dxguid.lib" />
+    <Library Include="ext\DirectX\Lib\dxgi.lib" />
+    <Library Include="ext\DirectX\Lib\DxErr.lib" />
+    <Library Include="ext\DirectX\Lib\dwrite.lib" />
+    <Library Include="ext\DirectX\Lib\dsound.lib" />
+    <Library Include="ext\DirectX\Lib\dinput8.lib" />
+    <Library Include="ext\DirectX\Lib\d3dxof.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx11d.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx11.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx10d.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx10.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx9.lib" />
+    <Library Include="ext\DirectX\Lib\d3dx9d.lib" />
+    <Library Include="ext\DirectX\Lib\D3DCSXd.lib" />
+    <Library Include="ext\DirectX\Lib\d3dcompiler.lib" />
+    <Library Include="ext\DirectX\Lib\D3DCSX.lib" />
+    <Library Include="ext\DirectX\Lib\d3d11.lib" />
+    <Library Include="ext\DirectX\Lib\d3d10_1.lib" />
+    <Library Include="ext\DirectX\Lib\d3d10.lib" />
+    <Library Include="ext\DirectX\Lib\d3d9.lib" />
+    <Library Include="ext\DirectX\Lib\d2d1.lib" />
+    <Library Include="Auth\Curl\libcurl_a.lib" />
+    <Library Include="Auth\Curl\libcurl_a_debug.lib" />
+  </ItemGroup>
+</Project>

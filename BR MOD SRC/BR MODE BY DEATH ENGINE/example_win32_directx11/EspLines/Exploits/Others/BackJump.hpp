@@ -1,0 +1,6 @@
+#pragma once
+
+class BackJump {
+public:
+    static void Run();
+};

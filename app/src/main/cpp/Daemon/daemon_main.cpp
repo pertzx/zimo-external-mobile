@@ -104,6 +104,20 @@ static std::atomic<bool> g_Stop{ false };
 static std::atomic<uint64_t> g_TotalReads{ 0 };
 static std::atomic<uint64_t> g_TotalWrites{ 0 };
 static std::atomic<uint64_t> g_TotalErrors{ 0 };
+
+/* (V8.7) instante do start (CLOCK_MONOTONIC, ms) para uptime nos STATS */
+static const long long g_StartMs = [] {
+    struct timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}();
+
+static long long NowMsDaemon()
+{
+    struct timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}
 static std::atomic<uint64_t> g_TotalConnections{ 0 };
 
 /*
@@ -1186,7 +1200,16 @@ namespace
 
                 payloadOut.assign(totalBytes, 0);
 
-                size_t failed = 0;
+                /*
+                 * (V8.6-PERF) UM openat/close pra o lote inteiro. Antes:
+                 * BridgeReadMem por item = open+pread+close POR ITEM que
+                 * der miss no cache de 256 B — com ~100 itens por onda e
+                 * ~25 ondas por tick do ESP, eram dezenas de milhares de
+                 * openat/s no aparelho (o lag/travamento do ESP). Os preads
+                 * continuam 1 por bloco, com o mesmo cache/fallback/plan B.
+                 */
+                std::vector<StormRW::BatchItemRW> rwItems(itemCount);
+
                 size_t offset = 0;
 
                 for (size_t i = 0; i < itemCount; i++)
@@ -1197,25 +1220,20 @@ namespace
                     memcpy(&addr, in + i * 12, sizeof(addr));
                     memcpy(&sz, in + i * 12 + 8, sizeof(sz));
 
-                    if (addr == 0 || sz == 0 || offset + sz > totalBytes)
-                    {
-                        failed++;
-                        offset += sz;
-                        continue;
-                    }
-
-                    if (!BridgeReadMem(
-                            static_cast<pid_t>(req.Pid),
-                            addr,
-                            payloadOut.data() + offset,
-                            sz))
-                    {
-                        /* Item ja vem zerado no payload (assign inicial). */
-                        failed++;
-                    }
+                    rwItems[i].address = addr;
+                    rwItems[i].size    = sz;
+                    rwItems[i].out     = payloadOut.data() + offset;
 
                     offset += sz;
                 }
+
+                size_t failed = 0;
+
+                StormRW::ReadBatchMem(
+                    static_cast<pid_t>(req.Pid),
+                    rwItems.data(),
+                    itemCount,
+                    &failed);
 
                 resp.PayloadSize = static_cast<uint32_t>(totalBytes);
                 resp.Status = (failed == 0) ? BRIDGE_OK : BRIDGE_ERR_PARTIAL;
@@ -1238,6 +1256,69 @@ namespace
                         );
                     }
                 }
+
+                break;
+            }
+
+            case BRIDGE_CMD_STATS:
+            {
+                /*
+                 * (V8.7) PROVA DE BYPASS: devolve os contadores internos
+                 * do daemon (StormRW::GetStats + totals da ponte) numa
+                 * struct fixa (BridgeStatsPayload). O painel mostra os
+                 * numeros ao usuario: directReads (pread64) vs vmFbReads
+                 * (fallback process_vm — 0 = bypass 100% pread64).
+                 */
+                static_assert(
+                    sizeof(BridgeStatsPayload) == 160,
+                    "payload de stats mudou — atualize o cliente junto"
+                );
+
+                const StormRW::Stats rs = StormRW::GetStats();
+
+                BridgeStatsPayload sp{};
+
+                sp.bridgeReads       = g_TotalReads.load();
+                sp.bridgeWrites      = g_TotalWrites.load();
+                sp.bridgeErrors      = g_TotalErrors.load();
+                sp.uptimeSec         = (uint64_t)((NowMsDaemon() - g_StartMs) / 1000LL);
+
+                sp.cacheHits         = rs.hits;
+                sp.cacheNegHits      = rs.negHits;
+                sp.cacheMisses       = rs.misses;
+                sp.syscalls          = rs.syscalls;
+                sp.retries           = rs.retries;
+
+                sp.directReads       = rs.directReads;
+                sp.exactFb           = rs.exactFb;
+                sp.vmFbReads         = rs.vmFbReads;
+
+                sp.directWrites      = rs.directWrites;
+                sp.vmFbWrites        = rs.vmFbWrites;
+
+                sp.negCreated        = rs.negCreated;
+                sp.openFails         = rs.openFails;
+                sp.wrRefused         = rs.wrRefused;
+                sp.wrKilled          = rs.wrKilled;
+
+                sp.writesOn          = rs.writesOn;
+                sp.vmFallbackOn      = (uint32_t)STORM_VM_FALLBACK;
+                sp.daemonProtoVersion = BRIDGE_PROTO_VERSION;
+                sp.reserved0         = 0;
+
+                payloadOut.assign(
+                    sizeof(sp),
+                    0
+                );
+
+                memcpy(
+                    payloadOut.data(),
+                    &sp,
+                    sizeof(sp)
+                );
+
+                resp.PayloadSize = static_cast<uint32_t>(payloadOut.size());
+                resp.Status = BRIDGE_OK;
 
                 break;
             }
@@ -1870,7 +1951,7 @@ int main(
 
                     const StormRW::Stats rwStats = StormRW::GetStats();
                     LOGI(
-                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms",
+                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms | bypass: directR=%llu exact=%llu vmfbR=%llu directW=%llu vmfbW=%llu wlock=%llu on=%d fb=%d",
                         (unsigned long long)reads,
                         (unsigned long long)(reads - lastReads),
                         (unsigned long long)writes,
@@ -1881,11 +1962,19 @@ int main(
                         (unsigned long long)rwStats.misses,
                         (unsigned long long)rwStats.syscalls,
                         (unsigned long long)rwStats.retries,
-                        StormRW::GetTtlMs()
+                        StormRW::GetTtlMs(),
+                        (unsigned long long)rwStats.directReads,
+                        (unsigned long long)rwStats.exactFb,
+                        (unsigned long long)rwStats.vmFbReads,
+                        (unsigned long long)rwStats.directWrites,
+                        (unsigned long long)rwStats.vmFbWrites,
+                        (unsigned long long)rwStats.wrKilled,
+                        (int)rwStats.writesOn,
+                        (int)STORM_VM_FALLBACK
                     );
 
                     FileLog(
-                        "stats reads=%llu writes=%llu erros=%llu | cache hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms",
+                        "stats reads=%llu writes=%llu erros=%llu | cache hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms | bypass directR=%llu vmfbR=%llu directW=%llu vmfbW=%llu",
                         (unsigned long long)reads,
                         (unsigned long long)writes,
                         (unsigned long long)g_TotalErrors.load(),
@@ -1894,7 +1983,11 @@ int main(
                         (unsigned long long)rwStats.misses,
                         (unsigned long long)rwStats.syscalls,
                         (unsigned long long)rwStats.retries,
-                        StormRW::GetTtlMs()
+                        StormRW::GetTtlMs(),
+                        (unsigned long long)rwStats.directReads,
+                        (unsigned long long)rwStats.vmFbReads,
+                        (unsigned long long)rwStats.directWrites,
+                        (unsigned long long)rwStats.vmFbWrites
                     );
 
                     lastReads = reads;

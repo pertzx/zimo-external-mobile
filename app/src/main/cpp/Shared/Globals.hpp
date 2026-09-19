@@ -183,6 +183,16 @@ namespace Cheat {
             int ReadIntervalMs = 60;
             bool StealthRead = true;
 
+            /*
+             * (V8.7) Overlay PERF no canto superior-esquerdo do jogo:
+             * Hz real da varredura do ESP (responde ao Read Interval),
+             * tempo/ondas/enderecos por frame, funil de entidades
+             * (lista -> players -> desenhados) e PROVA DE BYPASS
+             * (pread64 direto vs fallback process_vm do daemon).
+             * Padrao ligado; desligue na aba Config se incomodar.
+             */
+            bool ShowPerfOverlay = true;
+
             bool CaptureBypass = true;
             bool WebRemote = false;
             bool ShutDown = false;

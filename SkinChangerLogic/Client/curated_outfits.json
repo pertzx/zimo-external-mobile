@@ -1,0 +1,9 @@
+{
+  "trajes": [
+    { "name": "Top Criminal", "match": ["Top Criminal ("], "mode": "each" },
+    { "name": "Plan Bermuda", "match": ["Plan Bermuda"], "mode": "each" },
+    { "name": "Crimson Criminal", "match": ["Crimson Criminal"], "mode": "group" },
+    { "name": "Red Robster", "match": ["Red Robster"], "mode": "group" }
+  ],
+  "note": "Source of truth: Client/ClothChanger.cpp RebuildCategoryCache (79 curated pass outfits + trajes)."
+}
