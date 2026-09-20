@@ -175,7 +175,13 @@ namespace Skin
             if (Offsets::LibIl2Cpp == 0 ||
                 Offsets::AvatarWardrobeDataManager::AvatarWardrobeDataManager_TypeInfo == 0 ||
                 Offsets::AccessClass == 0)
+            {
+                SKIN_LOGW("ResolWardrobe: perfil sem offsets (lib=%lu typeinfo=%lu access=%lu)",
+                          (unsigned long)Offsets::LibIl2Cpp,
+                          (unsigned long)Offsets::AvatarWardrobeDataManager::AvatarWardrobeDataManager_TypeInfo,
+                          (unsigned long)Offsets::AccessClass);
                 return 0;
+            }
 
             const uintptr_t klass = ReadP(
                 Offsets::LibIl2Cpp +
@@ -183,17 +189,43 @@ namespace Skin
                 n32);
 
             if (klass == 0)
+            {
+                static LONGLONG s_W1 = 0;
+                if (now - s_W1 > 10000)
+                {
+                    s_W1 = now;
+                    SKIN_LOGW("ResolWardrobe [1/3]: klass=0 em lib+0x%lu — slot TypeInfo sem ponteiro (lobby sem dados? RVA velho?)",
+                              (unsigned long)Offsets::AvatarWardrobeDataManager::AvatarWardrobeDataManager_TypeInfo);
+                }
                 return 0;
+            }
 
             const uintptr_t statics = ReadP(klass + Offsets::AccessClass, n32);
 
             if (statics == 0)
+            {
+                static LONGLONG s_W2 = 0;
+                if (now - s_W2 > 10000)
+                {
+                    s_W2 = now;
+                    SKIN_LOGW("ResolWardrobe [2/3]: statics=0 (klass=0x%lx + AccessClass=0x%lx) — static_fields errado pro build",
+                              (unsigned long)klass, (unsigned long)Offsets::AccessClass);
+                }
                 return 0;
+            }
 
             const uintptr_t inst = ReadP(statics, n32);   // statics[0]
 
             if (inst == 0)
+            {
+                static LONGLONG s_W3 = 0;
+                if (now - s_W3 > 10000)
+                {
+                    s_W3 = now;
+                    SKIN_LOGW("ResolWardrobe [3/3]: statics[0]=0 — AvatarWardrobeDataManager ainda nao foi criado (entre no lobby/aba de itens do jogo)");
+                }
                 return 0;
+            }
 
             s_Cached = inst;
 
@@ -227,22 +259,62 @@ namespace Skin
                 n32);
 
             if (tree == 0)
+            {
+                static LONGLONG s_WT = 0;
+                const LONGLONG now = (LONGLONG)GetTickCount64();
+                if (now - s_WT > 10000)
+                {
+                    s_WT = now;
+                    SKIN_LOGW("ResolWardrobe [tree]: tree=0 (inst=0x%lx + m_dict=0x%lx) — offset da arvore errado pro build",
+                              (unsigned long)inst,
+                              (unsigned long)Offsets::AvatarWardrobeDataManager::m_dictIdToWardrobeDataTree);
+                }
                 return false;
+            }
 
             const uintptr_t list = ReadP(tree + Offsets::IntervalTreeDic::m_Data, n32);
 
             if (list == 0)
+            {
+                static LONGLONG s_WL = 0;
+                const LONGLONG now = (LONGLONG)GetTickCount64();
+                if (now - s_WL > 10000)
+                {
+                    s_WL = now;
+                    SKIN_LOGW("ResolWardrobe [list]: list=0 (tree=0x%lx + m_Data=0x%lx)",
+                              (unsigned long)tree,
+                              (unsigned long)Offsets::IntervalTreeDic::m_Data);
+                }
                 return false;
+            }
 
             const uintptr_t items = ReadP(list + ListItemsOff(n32), n32);
 
             if (items == 0)
+            {
+                static LONGLONG s_WI = 0;
+                const LONGLONG now = (LONGLONG)GetTickCount64();
+                if (now - s_WI > 10000)
+                {
+                    s_WI = now;
+                    SKIN_LOGW("ResolWardrobe [items]: items=0 — _items do List vazio");
+                }
                 return false;
+            }
 
             const int count = g_FreeFireMemory.Read<int>(list + ListCountOff(n32));
 
             if (count < 1 || count > 300000)
+            {
+                static LONGLONG s_WC = 0;
+                const LONGLONG now = (LONGLONG)GetTickCount64();
+                if (now - s_WC > 10000)
+                {
+                    s_WC = now;
+                    SKIN_LOGW("ResolWardrobe [count]: count=%d fora de faixa — stride/offset errado pro build", count);
+                }
                 return false;
+            }
 
             out.Items = items + ArrayDataOff(n32);
             out.Count = count;

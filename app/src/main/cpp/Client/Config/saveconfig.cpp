@@ -177,6 +177,15 @@ namespace Cheat {
                 wInt(ofs, "Category", g_Globals.Misc.Skin.Category);
                 ofs << "\n";
 
+                // ---------- [Chain.Fix] (V9.4 SLOTFIX) ----------
+                // RVAs alternativos do slot GameFacade_TypeInfo (hex, do
+                // offsets_dump.txt do offsetdumper). 0 = desativado.
+                ofs << "[Chain.Fix]\n";
+                wRva(ofs, "TypeInfoAlt1", g_Globals.General.TypeInfoAlt1);
+                wRva(ofs, "TypeInfoAlt2", g_Globals.General.TypeInfoAlt2);
+                wRva(ofs, "TypeInfoAlt3", g_Globals.General.TypeInfoAlt3);
+                ofs << "\n";
+
 // ---------- [General] ----------
             ofs << "[General]\n";
             wInt(ofs, "MenuKey", g_Globals.General.MenuKey);
@@ -224,6 +233,7 @@ namespace Cheat {
             // Helpers
             auto gBool = [&](const char* sec, const char* key, bool& out) { return readBool(kv, sec, key, out); };
             auto gInt = [&](const char* sec, const char* key, int& out) {  return readInt(kv, sec, key, out);  };
+            auto gRva = [&](const char* sec, const char* key, int& out) {  return readRva(kv, sec, key, out);  };
             auto gFloat = [&](const char* sec, const char* key, float& out) {return readFloat(kv, sec, key, out); };
             auto gF4 = [&](const char* sec, const char* key, float out[4]) { readFloatN(kv, sec, key, out, 4); };
             // auto gStr = ...  (n�o usado mais, pois strings foram removidas do carregamento)
@@ -353,6 +363,10 @@ namespace Cheat {
             gBool("General", "StealthRead", g_Globals.General.StealthRead);
             gBool("General", "ShowPerfOverlay", g_Globals.General.ShowPerfOverlay);   // (V8.7)
 
+            // ---------- [Chain.Fix] (V9.4 SLOTFIX) — RVAs alternativos do slot TypeInfo ----------
+            gRva("Chain.Fix", "TypeInfoAlt1", g_Globals.General.TypeInfoAlt1);
+            gRva("Chain.Fix", "TypeInfoAlt2", g_Globals.General.TypeInfoAlt2);
+            gRva("Chain.Fix", "TypeInfoAlt3", g_Globals.General.TypeInfoAlt3);
 
             return true;
         }
@@ -404,6 +418,13 @@ namespace Cheat {
             std::string s(buf, buf + (len < cap ? len : cap));
             os << key << '=' << s << '\n';
         }
+        // (V9.4 SLOTFIX) RVA em HEX no arquivo (0x...), pra colar direto do
+        // offsets_dump.txt do offsetdumper sem converter pra decimal
+        static void wRva(std::ostream& os, const char* key, int v) {
+            char tmp[32];
+            snprintf(tmp, sizeof(tmp), "0x%X", (unsigned)(v));
+            os << key << '=' << tmp << '\n';
+        }
 
         // ---------- Helpers de leitura ----------
         static inline void stripCR(std::string& s) { if (!s.empty() && s.back() == '\r') s.pop_back(); }
@@ -427,6 +448,13 @@ namespace Cheat {
         static bool readInt(const std::unordered_map<std::string, std::string>& kv, const char* sec, const char* k, int& out) {
             auto it = kv.find(keyOf(sec, k)); if (it == kv.end()) return false;
             out = std::stoi(it->second); return true;
+        }
+        // (V9.4 SLOTFIX) le RVA com auto-deteccao de base: "0xAC1E768" (hex)
+        // ou "180494696" (decimal) — strtoul base 0 resolve os dois
+        static bool readRva(const std::unordered_map<std::string, std::string>& kv, const char* sec, const char* k, int& out) {
+            auto it = kv.find(keyOf(sec, k)); if (it == kv.end()) return false;
+            out = (int)(uint32_t)std::strtoul(it->second.c_str(), nullptr, 0);
+            return true;
         }
         static bool readFloat(const std::unordered_map<std::string, std::string>& kv, const char* sec, const char* k, float& out) {
             auto it = kv.find(keyOf(sec, k)); if (it == kv.end()) return false;

@@ -325,6 +325,31 @@ namespace Cheat {
             bool V31 = false;
             bool NoAnogs = true;
 
+            /*
+             * ============================================================
+             * (V9.4 SLOTFIX) RVAs ALTERNATIVOS do slot GameFacade_TypeInfo.
+             *
+             * O offsetdumper (modulo Zygisk) so enxerga o slot se ele ja
+             * estava RESOLVIDO no momento do scan. No il2cpp novo do v8a os
+             * slots sao LAZY: cada um so vira ponteiro quando o codigo que
+             * o referencia roda. Se o RVA principal caiu no slot de outra
+             * classe (lib mudou de build), o token (0x2xxxxxxx) fica la pra
+             * sempre e a cadeia morre.
+             *
+             * Aqui voce cola até 3 RVAs de UMA NOVA corrida do offsetdumper
+             * na build atual (arquivo offsets_dump.txt). O cliente tenta:
+             *   principal (Offsets.cpp) -> alt1 -> alt2 -> alt3
+             * e usa o primeiro que voltar com ponteiro de heap valido.
+             *
+             * No arquivo de config ([Chain.Fix]) aceita HEX com prefixo 0x:
+             *   TypeInfoAlt1=0xAC1E768
+             * 0 = desativado. Mudou? Apply + Restart.
+             * ============================================================
+             */
+            int TypeInfoAlt1 = 0;
+            int TypeInfoAlt2 = 0;
+            int TypeInfoAlt3 = 0;
+
             char Username[20] = {0};
             char Role[20] = {0};
             char PassWord[20] = {0};

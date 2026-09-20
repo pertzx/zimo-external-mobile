@@ -846,7 +846,7 @@ bool Offsets::AutoResolveTypeInfos()
  */
 void Offsets::FFTHV8A() // 64-bit
 {
-        AccessClass = 0xB8; // MANUAL (mantido) — fora da dump
+        AccessClass = 0x6c; // MANUAL (mantido) — fora da dump
 
         // (V9) BaseGame / TimeService / Teleport Mark / FollowCamera
         BaseGame::m_UIScene = 0x10; // dump novo

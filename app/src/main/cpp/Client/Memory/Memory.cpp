@@ -78,7 +78,7 @@ const char* Memory::s_LastInitError = "nao inicializado";
 namespace
 {
     static constexpr const char* MEMORY_BACKEND_VERSION =
-        "StormMemory-2026-09-19-V8ALAZY-BRMOD-SKIN-V9.2";
+        "StormMemory-2026-09-19-V9.4-SLOTFIX";
 
     /*
      * Prioridade de acesso:

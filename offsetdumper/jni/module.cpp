@@ -14,6 +14,7 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <ctime>
 #include <inttypes.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "OffsetDumper", __VA_ARGS__)
@@ -70,10 +71,14 @@ static void SaveToFile(const std::string& content) {
     const char* paths[] = {
         "/data/data/com.dts.freefireth/files/offsets_dump.txt",
         "/sdcard/Android/data/com.dts.freefireth/files/offsets_dump.txt",
+        "/data/data/com.dts.freefiremax/files/offsets_dump.txt",
+        "/sdcard/Android/data/com.dts.freefiremax/files/offsets_dump.txt",
         nullptr
     };
     for (int i = 0; paths[i]; ++i) {
-        std::ofstream f(paths[i], std::ios::app);
+        // (V2) TRUNC: o arquivo fica sempre com a ULTIMA rodada completa
+        // (append acumulava lixo de rodadas antigas com offsets velhos)
+        std::ofstream f(paths[i], std::ios::trunc);
         if (f.is_open()) {
             f << content << "\n";
             f.close();
@@ -172,8 +177,87 @@ static void* ResolveClassType(const std::string& dll,
 }
 
 // ============================================================
-// DoDump
+// DoDump (V2 — rescan continuo)
+//
+// POR QUE O RESCAN: no il2cpp novo os slots de TypeInfo sao LAZY —
+// o slot guarda o TOKEN encoded ate o jogo rodar o codigo que usa a
+// classe. Um scan unico aos ~25s (só loading) pegava hits=0 ou pior:
+// apenas slots de codigo de loading, que podem nunca mais refletir o
+// estado real. Re-escaneando a cada 15s por 10 min, qualquer slot que
+// o jogo resolver durante o login/lobby/match aparece.
 // ============================================================
+struct Target {
+    std::string dll;
+    std::vector<std::string> namespaces;
+    std::string cls;
+    std::string outName;
+};
+
+static const std::vector<Target>& GetTargets() {
+    static const std::vector<Target> targets = {
+        { "Assembly-CSharp.dll", { "COW", ""  }, "GameFacade", "GameFacade_TypeInfo" },
+        { "Assembly-CSharp.dll", { "",   "COW"}, "GameVarDef", "GameVarDef_TypeInfo" },
+        { "Assembly-CSharp.dll", { "", "COW"  }, "AvatarWardrobeDataManager", "AvatarWardrobeDataManager_TypeInfo" },
+    };
+    return targets;
+}
+
+// Escaneia os targets UMA vez; devolve o conteudo formatado e marca
+// found[i]=1 quando o target tem pelo menos 1 hit.
+static std::string ScanRound(uintptr_t libBase, uintptr_t libStart, uintptr_t libEnd, int* found) {
+    char buf[512];
+    std::string content;
+
+    snprintf(buf, sizeof(buf), "base=0x%" PRIxPTR " ptr_size=%zu", libBase, PTR_SZ);
+    content += std::string(buf) + "\n";
+
+    for (size_t ti = 0; ti < GetTargets().size() && ti < 8; ++ti) {
+        const Target& t = GetTargets()[ti];
+
+        if (found[ti]) {
+            snprintf(buf, sizeof(buf), "%-32s : OK (ja encontrado)", t.outName.c_str());
+            content += std::string(buf) + "\n";
+            continue;
+        }
+
+        void* classPtr = ResolveClassType(t.dll, t.namespaces, t.cls);
+        if (!classPtr) {
+            snprintf(buf, sizeof(buf), "%-32s : CLASS NOT FOUND", t.outName.c_str());
+            LOGI("%s", buf); content += std::string(buf) + "\n"; continue;
+        }
+
+        uintptr_t target = (uintptr_t)classPtr;
+        auto hits = FindAllSlots(libBase, target, libStart, libEnd);
+
+        if (hits.empty()) {
+            snprintf(buf, sizeof(buf), "%-32s : hits=0 (slot LAZY/token — codigo da classe ainda nao rodou; rescan continua)", t.outName.c_str());
+            LOGI("%s", buf); content += std::string(buf) + "\n"; continue;
+        }
+
+        found[ti] = 1;
+
+        auto& best = hits[0];
+        snprintf(buf, sizeof(buf), "%-32s = 0x%" PRIxPTR " (score=%d hits=%zu)",
+                 t.outName.c_str(), best.offset, best.neighborScore, hits.size());
+        LOGI("%s", buf); content += std::string(buf) + "\n";
+
+        snprintf(buf, sizeof(buf), "  ^ ReadPtr(LibIl2Cpp + 0x%" PRIxPTR ")", best.offset);
+        LOGI("%s", buf); content += std::string(buf) + "\n";
+
+        // (V2) TODOS os hits servem pro cheat: qualquer slot ja resolvido
+        // guarda o MESMO ponteiro do klass. Cola o best no principal ou
+        // qualquer hit nos TypeInfoAlt1..3 do config [Chain.Fix].
+        size_t n = hits.size() < 8 ? hits.size() : 8;
+        for (size_t h = 0; h < n; ++h) {
+            snprintf(buf, sizeof(buf), "  hit[%zu] offset=0x%" PRIxPTR " score=%d",
+                     h, hits[h].offset, hits[h].neighborScore);
+            LOGI("%s", buf); content += std::string(buf) + "\n";
+        }
+    }
+
+    return content;
+}
+
 static void DoDump() {
     LOGI("[DoDump] Esperando libil2cpp.so no maps...");
     int retries = 0;
@@ -212,54 +296,42 @@ static void DoDump() {
         if (m.end   > libEnd  ) libEnd   = m.end;
     }
 
-    struct Target {
-        std::string dll;
-        std::vector<std::string> namespaces;
-        std::string cls;
-        std::string outName;
-    };
-
-    std::vector<Target> targets = {
-        { "Assembly-CSharp.dll", { "COW", ""  }, "GameFacade", "GameFacade_TypeInfo" },
-        { "Assembly-CSharp.dll", { "",   "COW"}, "GameVarDef", "GameVarDef_TypeInfo" },
-        { "Assembly-CSharp.dll", { "", "COW"  }, "AvatarWardrobeDataManager", "AvatarWardrobeDataManager_TypeInfo" },
-    };
-
     LOGI("========================================================");
     LOGI(" OffsetDumper | libil2cpp.so base = 0x%" PRIxPTR, libBase);
     LOGI("========================================================");
 
-    std::string content;
-    char buf[512];
-    snprintf(buf, sizeof(buf), "base=0x%" PRIxPTR " ptr_size=%zu", libBase, PTR_SZ);
-    content += std::string(buf) + "\n";
+    const int kMaxRounds = 40;               // 40 x 15s = 10 min
+    const int kTargetCount = (int)GetTargets().size();
+    int found[8] = {0};
 
-    for (auto& t : targets) {
-        void* classPtr = ResolveClassType(t.dll, t.namespaces, t.cls);
-        if (!classPtr) {
-            snprintf(buf, sizeof(buf), "%-32s : CLASS NOT FOUND", t.outName.c_str());
-            LOGI("%s", buf); content += std::string(buf) + "\n"; continue;
+    for (int round = 1; round <= kMaxRounds; ++round) {
+        LOGI("[DoDump] rodada %d/%d...", round, kMaxRounds);
+
+        std::string content = ScanRound(libBase, libStart, libEnd, found);
+
+        char stamp[64] = {0};
+        time_t nowT = time(nullptr);
+        struct tm* lt = localtime(&nowT);
+        if (lt) strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", lt);
+
+        std::string fileContent = std::string("== OffsetDumper rodada ") +
+                                  std::to_string(round) + "/" + std::to_string(kMaxRounds) +
+                                  " " + stamp + " ==\n" + content;
+        SaveToFile(fileContent);
+
+        int total = 0;
+        for (int i = 0; i < kTargetCount && i < 8; ++i) total += found[i];
+        if (total == kTargetCount) {
+            LOGI("[DoDump] todos os %d targets encontrados (rodada %d) — fim", kTargetCount, round);
+            break;
         }
 
-        uintptr_t target = (uintptr_t)classPtr;
-        auto hits = FindAllSlots(libBase, target, libStart, libEnd);
-
-        if (hits.empty()) {
-            snprintf(buf, sizeof(buf), "%-32s : hits=0 NAO ENCONTRADO", t.outName.c_str());
-            LOGI("%s", buf); content += std::string(buf) + "\n"; continue;
-        }
-
-        auto& best = hits[0];
-        snprintf(buf, sizeof(buf), "%-32s = 0x%" PRIxPTR " (score=%d hits=%zu)",
-                 t.outName.c_str(), best.offset, best.neighborScore, hits.size());
-        LOGI("%s", buf); content += std::string(buf) + "\n";
-        
-        snprintf(buf, sizeof(buf), "  ^ ReadPtr(LibIl2Cpp + 0x%" PRIxPTR ")", best.offset);
-        LOGI("%s", buf); content += std::string(buf) + "\n";
+        std::this_thread::sleep_for(std::chrono::seconds(15));
     }
 
     LOGI("========================================================");
-    SaveToFile(content);
+    LOGI("[DoDump] fim — offsets_dump.txt tem a ULTIMA rodada; cole os offsets no app (config [Chain.Fix])");
+    LOGI("========================================================");
 }
 
 // ============================================================
@@ -277,7 +349,9 @@ public:
 
     void preAppSpecialize(AppSpecializeArgs *args) override {
         const char *process = env_->GetStringUTFChars(args->nice_name, nullptr);
-        is_game_ = (process && strcmp(process, "com.dts.freefireth") == 0);
+        // (V2) suporta FF normal e FF MAX
+        is_game_ = (process && (strcmp(process, "com.dts.freefireth") == 0 ||
+                                strcmp(process, "com.dts.freefiremax") == 0));
         env_->ReleaseStringUTFChars(args->nice_name, process);
         if (!is_game_) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
     }

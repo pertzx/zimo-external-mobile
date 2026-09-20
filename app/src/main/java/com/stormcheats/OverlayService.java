@@ -24,6 +24,12 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowMetrics;
 import android.view.WindowManager;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 
 public class OverlayService extends Service implements SurfaceHolder.Callback {
 
@@ -94,6 +100,7 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
             syncScreenSize();
             syncPanelBoundsFromNative();
             syncCaptureBypassFromNative();
+            syncKeyboardFromNative();
             syncFloatingKeys();
             panelTracker.postDelayed(this, 16);
         }
@@ -332,7 +339,15 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     }
 
     private void createTouchWindow() {
-        touchView = new View(this);
+        /*
+         * (V9.3) A janela de toque agora e um FrameLayout que contem o
+         * proprio capturador de toque (o listener antigo) + um EditText
+         * INVISIVEL 1x1. O EditText existe porque IME (teclado) so
+         * entrega texto pra uma View com InputConnection — uma View
+         * crua nao tem, e era por isso que o campo de busca do
+         * SkinChanger nao abria teclado.
+         */
+        touchView = new FrameLayout(this);
         touchView.setBackgroundColor(Color.TRANSPARENT);
 
         int flag = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -431,6 +446,144 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
         });
 
         windowManager.addView(touchView, touchParams);
+
+        /*
+         * (V9.3) EditText invisivel: recebe o foco quando o ImGui quer
+         * texto (io.WantTextInput) e repassa cada codepoint pro painel
+         * via nativeOnKeyChar. Nao clicavel (toques passam pro listener
+         * do FrameLayout); foco so via requestFocus programatico.
+         */
+        imguiEdit = new EditText(this);
+        imguiEdit.setAlpha(0.0f);
+        imguiEdit.setLayoutParams(new FrameLayout.LayoutParams(1, 1));
+        imguiEdit.setBackground(null);
+        imguiEdit.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        imguiEdit.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | EditorInfo.IME_FLAG_NO_FULLSCREEN
+                | EditorInfo.IME_ACTION_DONE);
+        imguiEdit.setClickable(false);
+        imguiEdit.setLongClickable(false);
+        imguiEdit.setFocusable(true);
+        imguiEdit.setFocusableInTouchMode(true);
+        imguiEdit.setTextIsSelectable(false);
+
+        imguiEdit.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (editingProgrammatic) return;
+
+                /*
+                 * Diff contra o ultimo texto enviado: acrescimos viram
+                 * codepoints (nativeOnKeyChar), remocoes viram backspace
+                 * (nativeOnKey 67) — o buffer do ImGui fica igual ao do
+                 * EditText.
+                 */
+                String cur = s.toString();
+                String prev = lastSentText.toString();
+
+                int p = 0;
+                int maxP = Math.min(prev.length(), cur.length());
+                while (p < maxP && prev.charAt(p) == cur.charAt(p)) p++;
+
+                int eP = prev.length(), eC = cur.length();
+                while (eP > p && eC > p && prev.charAt(eP - 1) == cur.charAt(eC - 1)) {
+                    eP--;
+                    eC--;
+                }
+
+                int deletions = eP - p;
+                for (int i = 0; i < deletions; i++) {
+                    nativeOnKey(67, true);
+                    nativeOnKey(67, false);
+                }
+
+                for (int i = p; i < eC; i++) {
+                    int cp = cur.codePointAt(i);
+                    if (Character.charCount(cp) == 2) i++;
+                    nativeOnKeyChar(cp);
+                }
+
+                lastSentText.setLength(0);
+                lastSentText.append(cur);
+            }
+        });
+
+        ((FrameLayout) touchView).addView(imguiEdit);
+    }
+
+    /*
+     * (V9.3) TECLADO — poll (16 ms): quando o painel ImGui reporta
+     * io.WantTextInput (um InputText ficou ativo — ex: busca do
+     * SkinChanger), torna a janela de toque FOCUSABLE, foca o EditText
+     * invisivel e abre o IME. Quando o campo sai, fecha o teclado e
+     * restaura as flags.
+     */
+    private boolean lastWantKeyboard = false;
+    private boolean keyboardInit = false;
+    private boolean kbNativeOk = true;      // libclient sem os simbolos novos? so desliga o teclado
+    private boolean editingProgrammatic = false;
+    private final StringBuilder lastSentText = new StringBuilder();
+    private EditText imguiEdit;             // (V9.3) campo invisivel que recebe o IME
+
+    private void syncKeyboardFromNative() {
+        if (!kbNativeOk) return;
+
+        try {
+            boolean want = nativeWantsTextInput();
+
+            if (keyboardInit && want == lastWantKeyboard) return;
+
+            keyboardInit = true;
+            lastWantKeyboard = want;
+
+            if (touchView == null || touchParams == null || windowManager == null) return;
+
+            InputMethodManager imm =
+                    (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm == null) return;
+
+            if (want && imguiEdit != null) {
+                int f = touchParams.flags & ~(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+
+                if (f != touchParams.flags) {
+                    touchParams.flags = f;
+                    windowManager.updateViewLayout(touchView, touchParams);
+                }
+
+                imguiEdit.requestFocus();
+
+                boolean shown = imm.showSoftInput(imguiEdit, InputMethodManager.SHOW_FORCED);
+                if (!shown) imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+
+                Log.i(TAG, "Teclado: SHOW (campo de texto ImGui ativo)");
+            } else {
+                if (imguiEdit != null && imguiEdit.hasFocus()) {
+                    imm.hideSoftInputFromWindow(imguiEdit.getWindowToken(), 0);
+                }
+
+                int f = touchParams.flags | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                if (f != touchParams.flags) {
+                    touchParams.flags = f;
+                    windowManager.updateViewLayout(touchView, touchParams);
+                }
+
+                if (imguiEdit != null) {
+                    editingProgrammatic = true;
+                    imguiEdit.setText("");
+                    editingProgrammatic = false;
+                    lastSentText.setLength(0);
+                }
+
+                Log.i(TAG, "Teclado: HIDE");
+            }
+        } catch (Throwable e) {
+            kbNativeOk = false;
+            Log.w(TAG, "syncKeyboardFromNative indisponivel: " + e.getMessage());
+        }
     }
 
     private void syncPanelBoundsFromNative() {
@@ -760,4 +913,9 @@ public class OverlayService extends Service implements SurfaceHolder.Callback {
     public native void nativeFloatingKeyTouch(int vk, boolean down);
     public native void nativeFloatingKeyDrag(int vk);
     public native void nativeFloatingKeyMove(int vk, float dx, float dy);
+
+    // TECLADO (V9.3) — InputText do ImGui via EditText invisivel
+    public native boolean nativeWantsTextInput();
+    public native void nativeOnKeyChar(int codepoint);
+    public native void nativeOnKey(int keyCode, boolean down);
 }

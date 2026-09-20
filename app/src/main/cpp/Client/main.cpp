@@ -156,4 +156,54 @@ Java_com_stormcheats_OverlayService_nativeOnTouch(JNIEnv* env, jobject thiz,
         FloatingKeys::MoveBy((int)vk, (float)dx, (float)dy);
     }
 
+    // ============================================================
+    //  TECLADO (V9.3) — InputText do ImGui (busca do SkinChanger).
+    //
+    //  nativeWantsTextInput(): o painel responde io.WantTextInput —
+    //  true enquanto um campo de texto ImGui esta ATIVO. O Java faz
+    //  poll (16 ms) e abre/fecha o teclado via EditText invisivel.
+    //
+    //  nativeOnKeyChar(): cada codepoint digitado no IME entra na
+    //  fila de caracteres do ImGui (AddInputCharacter, UTF-32).
+    //
+    //  nativeOnKey(): teclas de controle (Enter/Backspace/Escape)
+    //  mapeadas pro ImGuiKey correspondente.
+    // ============================================================
+    JNIEXPORT jboolean JNICALL
+    Java_com_stormcheats_OverlayService_nativeWantsTextInput(JNIEnv* env, jobject thiz) {
+        if (ImGui::GetCurrentContext() == nullptr)
+            return JNI_FALSE;
+        return ImGui::GetIO().WantTextInput ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeOnKeyChar(JNIEnv* env, jobject thiz,
+        jint codepoint) {
+        if (ImGui::GetCurrentContext() == nullptr || codepoint <= 0)
+            return;
+        ImGui::GetIO().AddInputCharacter((unsigned int)codepoint);
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_stormcheats_OverlayService_nativeOnKey(JNIEnv* env, jobject thiz,
+        jint keyCode, jboolean down) {
+        if (ImGui::GetCurrentContext() == nullptr)
+            return;
+
+        ImGuiKey k = ImGuiKey_None;
+
+        // AKEYCODE_ENTER=66, AKEYCODE_DEL(backspace)=67,
+        // AKEYCODE_SPACE=62, AKEYCODE_ESCAPE=111
+        switch (keyCode) {
+            case 66:  k = ImGuiKey_Enter;     break;
+            case 67:  k = ImGuiKey_Backspace; break;
+            case 62:  k = ImGuiKey_Space;     break;
+            case 111: k = ImGuiKey_Escape;    break;
+            default:  break;
+        }
+
+        if (k != ImGuiKey_None)
+            ImGui::GetIO().AddKeyEvent(k, down == JNI_TRUE);
+    }
+
 }
