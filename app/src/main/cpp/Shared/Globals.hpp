@@ -82,10 +82,10 @@ namespace Cheat {
         {
             struct ESP
             {
-                bool Enabled = false;
+                bool Enabled = true;
                 bool ShowTeam = false;
                 int RenderDistance = 240;
-                float Thickness = 1.0f;
+                float Thickness = 1.5f;
                 float TextSize = 15.0f;
                 bool Watermark = false;
                 float WatermarkColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };

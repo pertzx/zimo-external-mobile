@@ -1,0 +1,90 @@
+============================================================================
+ V8A-PROBE — medir o layout REAL do il2cpp v8a (AccessClass + campos)
+ StormMemory / zimo-external-mobile
+============================================================================
+
+1) POR QUE "JA USA 0xB8" NAO FECHA A CONTA
+----------------------------------------------------------------------------
+O 0xB8 no perfil é um PALPITE baseado no il2cpp 29 padrão (Unity
+2021.2+), não uma MEDIDA da sua build. E o il2cpp do Free Fire é
+modificado — a prova está no próprio v7a: ele usa static_fields em
+0x5C, enquanto no il2cpp 24.x padrão o valor seria 0x54. Ou seja, a
+Garena mexe na struct. O valor certo no v8a só se sabe medindo.
+
+Além disso, o AccessClass é só o SEGUNDO elo da cadeia:
+
+    klass       = ReadPtr(Lib + GameFacade_TypeInfo)     // OK (dumper provou)
+    statics     = ReadPtr(klass + AccessClass)           // elo 2 (0xB8?)
+    MatchGame   = ReadPtr(statics + CurrentMatchGame)    // elo 3 — valor v8a?
+    Match       = ReadPtr(MatchGame + m_Match)           // elo 4 — valor v8a?
+    state       = Read<int>(Match + m_State)             // elo 5 — valor v8a?
+
+Mesmo com AccessClass correto, se CurrentMatchGame / m_Match / m_State
+do perfil v8a vieram do dump v7a (ou de dump antigo do v8a), a cadeia
+quebra no elo seguinte do mesmo jeito. Pergunta-chave: de onde vieram
+os offsets de CAMPO do seu perfil v8a? Offsets de campo estático NÃO
+são os mesmos entre 32-bit e 64-bit (alinhamento muda).
+
+2) O QUE ESTE PROBE FAZ
+----------------------------------------------------------------------------
+Roda dentro do offsetdumper (in-process) e mede TUDO de uma vez, sem
+risco de derrubar o jogo (toda desreferência é validada contra os
+ranges legíveis de /proc/self/maps antes):
+
+  a. offsetof(Il2CppClass, static_fields) DESTA build:
+       - via System.String.Empty: a classe String já nasce inicializada,
+         então funciona ATÉ NO LOBBY (não precisa de partida);
+       - via GameFacade.CurrentMatchGame → objeto → *(obj) == klass do
+         MatchGame: confirmação forte, precisa estar EM PARTIDA.
+  b. Offsets REAIS dos campos da cadeia, static e instance:
+       GameFacade.CurrentMatchGame, MatchGame.m_Match, Match.m_State,
+       Match.m_LocalPlayer / m_LocalObserver / m_AttackableEntities,
+       os 7 statics do GameVarDef, CameraControllerManager.m_Camera,
+       Camera.m_CachedPtr.
+  c. A classe é localizada por NOME + CAMPO ESPERADO (não quebra com
+     colisão de nomes ofuscados) e o tipo de cada campo é impresso
+     (bool/float/class/string...).
+
+3) INSTALAÇÃO (paste-in no offsetdumper)
+----------------------------------------------------------------------------
+  PASSO 1 — copie V8AFullProbe.cpp para a pasta do offsetdumper
+     (C:\zimo-external-mobile\offsetdumper\).
+
+  PASSO 2 — no arquivo principal do dumper, junto dos includes:
+        #include "V8AFullProbe.cpp"
+
+  PASSO 3 — dentro do loop de rescan (a função que loga "rodada X/40"),
+  uma chamada por rodada:
+        v8aprobe::RunV8AFullProbe();
+
+  PASSO 4 — rode o jogo e:
+        adb logcat -v time OffsetDumper:* *:S
+
+4) COMO LER O RESULTADO
+----------------------------------------------------------------------------
+  • "==== V8A PROBE: offsets reais da cadeia ====" — lista campo por
+    campo no formato `Classe.campo = 0xN; // STATIC (float)`.
+    Compare com o seu perfil v8a. Qualquer valor diferente = achou o
+    elo quebrado.
+  • "SFOFF[n] = 0x??? (validado via String.Empty)" — o AccessClass
+    MEDIDO da build. Se sair mais de um candidato, a validação via
+    GameFacade (em partida) desempata. O que aparecer nas DUAS vias é
+    o definitivo.
+  • "SFOFF ainda nao validado ... Re-roda em partida" — normal no
+    lobby (CurrentMatchGame é null fora de partida); a via String.Empty
+    já resolve mesmo assim. Se NENHUMA via validar nem em partida,
+    me mande o log completo do probe.
+
+5) O QUE ME MANDAR DE VOLTA
+----------------------------------------------------------------------------
+  1. O bloco completo do logcat do probe (da linha "==== V8A PROBE"
+     até o SFOFF).
+  2. Se tiver fácil: as linhas [diag]/[CHAIN] do StormDiag do seu app
+     em partida (elas mostram onde a cadeia do app para hoje).
+  3. De onde vieram os offsets de campo do seu perfil v8a (dump.cs do
+     Il2CppDumper v8a? copiados do v7a?).
+
+Com esses 3 dados eu fecho o diagnóstico de vez — e se for só valor
+errado no perfil, o próprio log do probe já te entrega o número certo
+pronto para colar.
+============================================================================

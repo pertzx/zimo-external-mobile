@@ -161,189 +161,6 @@ static void ChainOkLog(int entities, int matchState, bool isObserving)
                 entities, matchState, isObserving ? 1 : 0);
 }
 
-// =====================================================================
-//  (V9.4 SLOTFIX) RESOLUCAO DO SLOT GameFacade_TypeInfo
-//
-//  COMO O OFFSETDUMPER TRABALHA (offsetdumper/jni/module.cpp, Zygisk):
-//  ele chama il2cpp_class_from_name() pra pegar o ponteiro do klass e
-//  varre as paginas mapeadas da libil2cpp.so procurando slots cujo
-//  valor seja IGUAL a esse ponteiro — ou seja, ele so enxerga slots que
-//  ja estavam RESOLVIDOS no momento do scan (~25-30s apos abrir o jogo).
-//
-//  No il2cpp novo do v8a os slots sao LAZY: cada um guarda um TOKEN
-//  encoded (ex 0x2001B431) ate o jogo rodar o codigo que referencia
-//  aquele slot — so entao o token vira o ponteiro do klass NO LUGAR.
-//  Consequencias:
-//   * o RVA do dump pode apontar pro slot certo de UMA build e ficar
-//     token pra sempre em outra (lib mudou = tabela desloca);
-//   * slot resolvido NUNCA volta a ser token (resolucao monotona) —
-//     entao token eterno = RVA errado pra esta build, e nao "espera".
-//
-//  FIX (sem scanner, sem resolver, cadeia dura): o cliente tenta o RVA
-//  principal (Offsets.cpp) e depois ate 3 RVAs alternativos do config
-//  ([Chain.Fix] TypeInfoAlt1..3, colados de uma corrida NOVA do
-//  offsetdumper). Validacao so de FORMATO (ponteiro de heap, fora da
-//  lib) — igual ao LooksLikeIl2CppClassPtr do propio offsetdumper.
-//  O daemon continua sendo so ponte de read/write.
-// =====================================================================
-namespace GfSlot
-{
-    enum Status : int { Ok = 0, AllZero, AllToken, TransportFail };
-
-    struct Result { Status status; uintptr_t klass; uintptr_t rva; int idx; };
-
-    // snapshot da ultima rodada (pra diag formatar todos os slots)
-    uintptr_t s_LastRvas[4] = { 0, 0, 0, 0 };
-    uintptr_t s_LastVals[4] = { 0, 0, 0, 0 };
-
-    static const char* SlotName(int i)
-    {
-        switch (i)
-        {
-            case 0:  return "principal";
-            case 1:  return "alt1";
-            case 2:  return "alt2";
-            case 3:  return "alt3";
-        }
-        return "?";
-    }
-
-    static uintptr_t SlotRva(int i)
-    {
-        switch (i)
-        {
-            case 0:  return Offsets::GameFacade::GameFacade_TypeInfo;
-            case 1:  return (uintptr_t)(uint32_t)g_Globals.General.TypeInfoAlt1;
-            case 2:  return (uintptr_t)(uint32_t)g_Globals.General.TypeInfoAlt2;
-            case 3:  return (uintptr_t)(uint32_t)g_Globals.General.TypeInfoAlt3;
-        }
-        return 0;
-    }
-
-    static bool AnySlotConfigured()
-    {
-        return SlotRva(0) != 0 || SlotRva(1) != 0 ||
-               SlotRva(2) != 0 || SlotRva(3) != 0;
-    }
-
-    // Mesma forma de validacao do LooksLikeIl2CppClassPtr do offsetdumper.
-    // (V9.4b) NAO rejeita mais "dentro da lib + 4GB": o heap do Android pode
-    // ficar colado na lib (ex: lib 0x70B5..., heap 0x70C0...) e rejeitar
-    // klass real quebraria o fix. O filtro que importa e o token (< 4GB):
-    // slot de usage so guarda TOKEN ou ponteiro de klass resolvido.
-    static bool ShapeValid(uintptr_t v, bool n32)
-    {
-        if (v == 0)   return false;
-        if (n32)      return v >= 0x1000;          // 32-bit: klass de heap
-        if (v < 0x100000000ULL) return false;      // 64-bit: token encoded
-        if (v >= 0x0000800000000000ULL) return false; // acima do espaco de usuario arm64 = lixo
-        return true;
-    }
-
-    static bool IsTokenShaped(uintptr_t v)
-    {
-        if (v == 0 || v >= 0x100000000ULL) return false;
-        const uintptr_t tipo = v >> 29;            // kIl2CppMetadataUsage* 1..6
-        return tipo >= 1 && tipo <= 6;
-    }
-
-    /*
-     * Tenta o slot em cache (vencedor anterior); se ele deixou de valer,
-     * varre principal -> alt1 -> alt2 -> alt3 e usa o primeiro valido.
-     */
-    static Result Resolve(bool n32)
-    {
-        static int s_Winner = -1;                  // indice do slot que resolveu
-
-        Result r; r.status = AllZero; r.klass = 0; r.rva = 0; r.idx = -1;
-
-        bool anyReadOk = false, anyToken = false;
-
-        // (1) vencedor em cache: le so ele enquanto continuar valido
-        if (s_Winner >= 0)
-        {
-            const uintptr_t rva = SlotRva(s_Winner);
-            if (rva != 0)
-            {
-                uintptr_t v = 0;
-                bool ok = false;
-
-                if (n32)
-                {
-                    uint32_t lo = 0;
-                    ok = g_FreeFireMemory.Read<uint32_t>(Offsets::LibIl2Cpp + rva, lo);
-                    v = lo;
-                }
-                else
-                {
-                    uint64_t hi = 0;
-                    ok = g_FreeFireMemory.Read<uint64_t>(Offsets::LibIl2Cpp + rva, hi);
-                    v = (uintptr_t)hi;
-                }
-
-                if (ok && ShapeValid(v, n32))
-                {
-                    r.status = Ok; r.klass = v; r.rva = rva; r.idx = s_Winner;
-                    s_LastRvas[s_Winner] = rva; s_LastVals[s_Winner] = v;
-                    return r;
-                }
-            }
-            s_Winner = -1;                         // deixou de valer — reavalia
-        }
-
-        // (2) varre os candidatos em ordem
-        for (int i = 0; i < 4; ++i)
-        {
-            const uintptr_t rva = SlotRva(i);
-            s_LastRvas[i] = rva;
-            s_LastVals[i] = 0;
-
-            if (rva == 0)
-                continue;
-
-            uintptr_t v = 0;
-            bool ok = false;
-
-            if (n32)
-            {
-                uint32_t lo = 0;
-                ok = g_FreeFireMemory.Read<uint32_t>(Offsets::LibIl2Cpp + rva, lo);
-                v = lo;
-            }
-            else
-            {
-                uint64_t hi = 0;
-                ok = g_FreeFireMemory.Read<uint64_t>(Offsets::LibIl2Cpp + rva, hi);
-                v = (uintptr_t)hi;
-            }
-
-            if (!ok)
-                continue;
-
-            anyReadOk = true;
-            s_LastVals[i] = v;
-
-            if (ShapeValid(v, n32))
-            {
-                s_Winner = i;
-                r.status = Ok; r.klass = v; r.rva = rva; r.idx = i;
-                ChainLogRaw("[CHAIN] SLOTFIX: slot %s (lib+0x%lX) virou klass 0x%lX — cadeia segue por ele",
-                            SlotName(i), (unsigned long)rva, (unsigned long)v);
-                return r;
-            }
-
-            if (IsTokenShaped(v))
-                anyToken = true;
-        }
-
-        // (3) nenhum valido: classifica o estado
-        if (!anyReadOk)          r.status = TransportFail;
-        else if (anyToken)       r.status = AllToken;
-        else                     r.status = AllZero;
-        return r;
-    }
-}
-
 bool Data::m_ThreadN32 = false;
 bool Data::m_ThreadV31 = false;
 
@@ -915,108 +732,109 @@ void Data::ReadLoop( )
                                 return true;
                         };
 
-                        /*
-                         * (V9.4 SLOTFIX) Guarda de offset zerado so dispara
-                         * se NENHUM candidato existir (principal + alts).
-                         */
-                        if ( !GfSlot::AnySlotConfigured() &&
-                             OffsetZeroGuard( Offsets::GameFacade::GameFacade_TypeInfo, ReadChain::GameFacade, "GameFacade_TypeInfo" ) )
+                        if ( OffsetZeroGuard( Offsets::GameFacade::GameFacade_TypeInfo, ReadChain::GameFacade, "GameFacade_TypeInfo" ) )
                                 break;
 
-                        GfSlot::Result gfRes = GfSlot::Resolve( N32 );
+                        bool gfOk = false;
+                        uintptr_t GameFacade = ReadPtrChk( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo, ReadChain::GameFacade, "GameFacade_TypeInfo", gfOk );
+                        if ( !gfOk )
+                                break;
 
-                        /* (PONTEFIX-V6) transporte OK = alvo vivo (mesmo com
-                         * token/zero — a leitura em si funcionou) */
-                        if ( gfRes.status != GfSlot::TransportFail )
-                                m_LastHeadOkTick.store( ( int64_t )GetTickCount64( ) );
-
-                        if ( gfRes.status == GfSlot::TransportFail )
+                        if ( GameFacade == 0 )
                         {
-                                ChainFailLog( ReadChain::GameFacade,
-                                              "leitura do slot falhou no transporte (ponte?) — principal lib+0x%lX",
-                                              ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
-                                break;
+                                /* (PONTEFIX-V6) Chegou AQUI com transporte OK (status da
+                                 * ponte = OK): o zero veio DE VERDADE do /proc/pid/mem — o
+                                 * caminho de dados nao fabrica zero. Antes de desistir, 3
+                                 * re-leituras imediatas: se for janela transitoria de zero
+                                 * na pagina (jogo descarta/reescreve), a re-leitura devolve
+                                 * o valor e a cadeia SEGUE; se todas vierem 0, o estado real
+                                 * do jogo agora e 0 (lobby/limpeza do proprio jogo). */
+                                const uintptr_t gfAddr =
+                                        Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo;
+
+                                for ( int probe = 0; probe < 3 && GameFacade == 0; ++probe )
+                                {
+                                        uintptr_t reLido = ReadPtr( gfAddr );
+
+                                        if ( reLido != 0 )
+                                                GameFacade = reLido;
+                                }
+
+                                if ( GameFacade == 0 )
+                                {
+                                        // Nulo aqui = estamos no lobby OU o offset GameFacade_TypeInfo
+                                        // nao serve para esta versao do jogo (cai sempre neste break).
+                                        ChainFailLog( ReadChain::GameFacade,
+                                                      "GameFacade nulo (lib+0x%lX) — lobby ou offset TypeInfo errado para esta versao",
+                                                      ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
+                                        break;
+                                }
+
+                                static LONGLONG s_LastGfRecover = 0;
+
+                                if ( GetTickCount64( ) - s_LastGfRecover > 5000 )
+                                {
+                                        s_LastGfRecover = GetTickCount64( );
+                                        DiagLog( "[CHAIN] GameFacade 0 -> 0x%lX na re-leitura (janela de zero na pagina — cadeia segue)",
+                                                 ( unsigned long )GameFacade );
+                                }
                         }
 
-                        if ( gfRes.status == GfSlot::AllToken )
+                        /* (PONTEFIX-V6) cabeca da cadeia leu OK = alvo vivo */
+                        m_LastHeadOkTick.store( ( int64_t )GetTickCount64( ) );
+                        static LONGLONG s_LastGfLog = 0;
+                        if ( GetTickCount64( ) - s_LastGfLog > 10000 )
                         {
-                                /*
-                                 * (V8A-LAZY/V9.4) Em 64-bit o il2cpp novo guarda
-                                 * TOKEN encoded nos slots de TypeInfo e so resolve
-                                 * (in-place) quando o codigo que referencia aquele
-                                 * slot roda. Token eterno (nunca vira 0x7xxx...) =
-                                 * o RVA aponta pro slot de OUTRA classe nesta build
-                                 * (a lib mudou desde a corrida do offsetdumper) —
-                                 * NAO e leitura errada nem falta de esperar: a
-                                 * resolucao e monotona, slot resolvido nao volta a
-                                 * ser token.
-                                 */
+                                s_LastGfLog = GetTickCount64( );
+                                DiagLog( "[CHAIN] GameFacade=0x%lX (lido em lib+0x%lX)",
+                                         ( unsigned long )GameFacade,
+                                         ( unsigned long )Offsets::GameFacade::GameFacade_TypeInfo );
+                        }
+
+                        /*
+                         * (V8A-LAZY) Em 64-bit o il2cpp novo inicializa os
+                         * slots de TypeInfo DE FORMA LAZY: o slot guarda um
+                         * TOKEN encoded (ex: 0x2001B431 = (1<<29)|0x1B431 =
+                         * TypeInfo, idx 111921) ate o jogo usar a classe pela
+                         * primeira vez — ai o slot vira o ponteiro real
+                         * (0x7xxxxxxxxx) NO MESMO lugar. O v7a nunca mostra
+                         * isso porque o il2cpp velho resolve tudo no start.
+                         *
+                         * Token aqui NAO e erro de leitura: a largura vem SO
+                         * da config (GameProfile v8a => N32=false => Read de
+                         * 8 bytes, comprovado no log). E estado do jogo.
+                         * Restart nao apressa o jogo, scan/resolver foi
+                         * REMOVIDO (daemon = so ponte de read/write). Loga o
+                         * estado (1x/30s) + janela hex (1x/sessao) e tenta de
+                         * novo no proximo ciclo.
+                         */
+                        if ( !N32 && GameFacade != 0 && GameFacade < 0x100000000ULL )
+                        {
                                 static LONGLONG s_LastLazyLog = 0;
                                 const LONGLONG nowLazy = GetTickCount64( );
 
                                 if ( nowLazy - s_LastLazyLog > 30000 )
                                 {
                                         s_LastLazyLog = nowLazy;
-
-                                        /* 1x por sessao: ELF magic na base — prova
-                                         * que LibIl2Cpp aponta pro inicio do ELF (a
-                                         * mesma referencia que o offsetdumper usa
-                                         * pra calcular os offsets). Se NAO for
-                                         * 0x464C457F, a base da ponte esta errada. */
-                                        static bool s_ElfChecked = false;
-
-                                        if ( !s_ElfChecked )
-                                        {
-                                                s_ElfChecked = true;
-
-                                                uint32_t magic = 0;
-
-                                                if ( g_FreeFireMemory.Read<uint32_t>( Offsets::LibIl2Cpp, magic ) )
-                                                        DiagLog( "[CHAIN] base check: ELF magic @lib = 0x%08X (0x464C457F = base correta, igual a referencia do offsetdumper)",
-                                                                 magic );
-                                        }
-
-                                        /* Estado de TODOS os slots tentados */
-                                        char b0[96], b1[96], b2[96], b3[96];
-
-                                        auto fmtSlot = []( char* buf, size_t cap, uintptr_t rva, uintptr_t val )
-                                        {
-                                                if ( rva == 0 ) { snprintf( buf, cap, "off" ); return; }
-                                                if ( val == 0 ) { snprintf( buf, cap, "lib+0x%lX=0", ( unsigned long )rva ); return; }
-                                                if ( val < 0x100000000ULL )
-                                                        snprintf( buf, cap, "lib+0x%lX=0x%lX(TOKEN)", ( unsigned long )rva, ( unsigned long )val );
-                                                else
-                                                        snprintf( buf, cap, "lib+0x%lX=0x%lX", ( unsigned long )rva, ( unsigned long )val );
-                                        };
-
-                                        fmtSlot( b0, sizeof(b0), GfSlot::s_LastRvas[0], GfSlot::s_LastVals[0] );
-                                        fmtSlot( b1, sizeof(b1), GfSlot::s_LastRvas[1], GfSlot::s_LastVals[1] );
-                                        fmtSlot( b2, sizeof(b2), GfSlot::s_LastRvas[2], GfSlot::s_LastVals[2] );
-                                        fmtSlot( b3, sizeof(b3), GfSlot::s_LastRvas[3], GfSlot::s_LastVals[3] );
-
-                                        DiagLog( "[CHAIN] v8a SLOTFIX: nenhum slot virou ponteiro — %s | %s | %s | %s",
-                                                 b0, b1, b2, b3 );
-
-                                        const uintptr_t tk = GfSlot::s_LastVals[0];
-
-                                        if ( tk != 0 && tk < 0x100000000ULL )
-                                                DiagLog( "[CHAIN] token 0x%lX = TypeInfo idx %u (sem tag) / %u (com tag) — rode o offsetdumper DE NOVO nesta build (versao de hoje) e cole os novos RVAs no config [Chain.Fix] TypeInfoAlt1..3",
-                                                         ( unsigned long )tk,
-                                                         ( unsigned )( tk & 0x1FFFFFFFu ),
-                                                         ( unsigned )( ( tk >> 1 ) & 0x0FFFFFFFu ) );
+                                        DiagLog( "[CHAIN] v8a: slot GameFacade_TypeInfo = 0x%lX (< 4GB) = token encoded do il2cpp ((%u<<29)|%u) — slot LAZY: o jogo resolve ao usar a classe; aguardando (sem restart/scan)",
+                                                 ( unsigned long )GameFacade,
+                                                 ( unsigned )( GameFacade >> 29 ),
+                                                 ( unsigned )( GameFacade & 0x1FFFFFFFu ) );
                                 }
 
                                 /*
-                                 * Janela hex a cada 60s (9 qwords): vizinhos
-                                 * 0x7xxxxxxxxx = regiao viva (so este slot e frio);
-                                 * vizinhos token/0 = regiao morta ou deslocada da
-                                 * .data (RVA de outra build — trocar no [Chain.Fix]).
+                                 * Janela hex a cada 3 min enquanto o slot
+                                 * estiver em token (9 qwords): se os vizinhos
+                                 * forem 0x7xxxxxxxxx = o RVA esta certo (so
+                                 * esperando o jogo resolver); se a vizinhanca
+                                 * for token geral/lixo = o RVA caiu na regiao
+                                 * errada da .data (ajustar no perfil).
                                  */
-                                static LONGLONG s_LastWindow = 0;
+                                static LONGLONG s_LastLazyWindow = 0;
 
-                                if ( nowLazy - s_LastWindow > 60000 )
+                                if ( nowLazy - s_LastLazyWindow > 180000 )
                                 {
-                                        s_LastWindow = nowLazy;
+                                        s_LastLazyWindow = nowLazy;
 
                                         const uintptr_t slotAddr =
                                                 Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo;
@@ -1037,50 +855,6 @@ void Data::ReadLoop( )
                                 }
 
                                 break;
-                        }
-
-                        uintptr_t GameFacade = gfRes.klass;
-
-                        if ( GameFacade == 0 )
-                        {
-                                /* (PONTEFIX-V6/V9.4) Zero de verdade da memoria
-                                 * (lobby/limpeza do jogo): 3 re-resolucoes
-                                 * imediatas — se for janela transitoria de zero
-                                 * na pagina, a re-leitura devolve o klass e a
-                                 * cadeia SEGUE. */
-                                for ( int probe = 0; probe < 3 && GameFacade == 0; ++probe )
-                                {
-                                        const GfSlot::Result gfRetry = GfSlot::Resolve( N32 );
-
-                                        if ( gfRetry.status == GfSlot::Ok )
-                                                GameFacade = gfRetry.klass;
-                                }
-
-                                if ( GameFacade == 0 )
-                                {
-                                        ChainFailLog( ReadChain::GameFacade,
-                                                      "GameFacade nulo em todos os slots configurados — lobby (normal) ou RVA de outra build" );
-                                        break;
-                                }
-
-                                static LONGLONG s_LastGfRecover = 0;
-
-                                if ( GetTickCount64( ) - s_LastGfRecover > 5000 )
-                                {
-                                        s_LastGfRecover = GetTickCount64( );
-                                        DiagLog( "[CHAIN] GameFacade 0 -> 0x%lX na re-leitura (janela de zero na pagina — cadeia segue)",
-                                                 ( unsigned long )GameFacade );
-                                }
-                        }
-
-                        static LONGLONG s_LastGfLog = 0;
-                        if ( GetTickCount64( ) - s_LastGfLog > 10000 )
-                        {
-                                s_LastGfLog = GetTickCount64( );
-                                DiagLog( "[CHAIN] GameFacade=0x%lX (slot %s, lib+0x%lX)",
-                                         ( unsigned long )GameFacade,
-                                         GfSlot::SlotName( gfRes.idx >= 0 ? gfRes.idx : 0 ),
-                                         ( unsigned long )( gfRes.rva != 0 ? gfRes.rva : Offsets::GameFacade::GameFacade_TypeInfo ) );
                         }
 
                         if ( OffsetZeroGuard( Offsets::AccessClass, ReadChain::AccessClass, "AccessClass" ) )
@@ -2650,17 +2424,32 @@ static inline uintptr_t ModsReadPtr( uintptr_t addr, bool n32 )
 }
 
 /*
- * Resolve o endereço da MATRIX do root (hip node) de qualquer Player
- * (local ou inimigo). Mesma cadeia do Magnet: m_HipNode -> transObj ->
- * transObj -> matrix. O offset de escrita/leitura de posição dentro da
- * matrix é 0x80 (32-bit) / 0xB0 (64-bit) — igual ao magnet.
+ * (V9.3) PORT CERTO DO BR MOD (Death Engine) — cadeia de WRITE de
+ * posicao: Player + Root -> +transObj -> +transObj -> +matrix = objeto
+ * de transform; a posicao cacheada fica em objeto+0x60 (Down/TeleKill/
+ * TeleMark) ou objeto+0x80 (Up/Fly).
+ *
+ * O port antigo entrava pelo m_HipNode (no do QUADRIL) e escrevia so no
+ * 0x80: movia o osso do quadril com o resto do corpo pra tras = modelo
+ * ESTICANDO. O root (m_RootNode = 0x46C no v7a75 = Bones::Root do
+ * BR MOD) move o corpo inteiro. Entrada: m_RootNode, fallback m_HipNode.
  */
 static uintptr_t ModsResolveRootMatrix( uintptr_t entity, bool n32 )
 {
         if ( entity == 0 )
                 return 0;
 
-        const uintptr_t node = ModsReadPtr( entity + Offsets::Player::m_HipNode, n32 );
+        uintptr_t node = 0;
+
+        /*
+         * (V9.3) m_RootNode (0x46C no v7a75) = o MESMO campo do
+         * Bones::Root do BR MOD (Death Engine). Fallback: m_HipNode.
+         */
+        if ( Offsets::Player::m_RootNode != 0 )
+                node = ModsReadPtr( entity + Offsets::Player::m_RootNode, n32 );
+
+        if ( node == 0 && Offsets::Player::m_HipNode != 0 )
+                node = ModsReadPtr( entity + Offsets::Player::m_HipNode, n32 );
 
         if ( node == 0 )
                 return 0;
@@ -2675,7 +2464,47 @@ static uintptr_t ModsResolveRootMatrix( uintptr_t entity, bool n32 )
         if ( t2 == 0 )
                 return 0;
 
-        return ModsReadPtr( t2 + Offsets::GetPosWorld::matrix, n32 );
+        const uintptr_t obj = ModsReadPtr( t2 + Offsets::GetPosWorld::matrix, n32 );
+
+        if ( obj == 0 )
+                return 0;
+
+        /*
+         * (V9.3) Validacao do objeto ANTES de escrever: 0x60 e 0x80 sao os
+         * dois caches de posicao do MESMO root no BR MOD (Down usa 0x60,
+         * Up usa 0x80 — mesma cadeia). Se os dois forem posições validas e
+         * divergirem > 5 m, este objeto NAO e o root do entity (no errado /
+         * build nova) — aborta em vez de esticar o modelo.
+         */
+        {
+                Vector3 p60 = Vector3::Zero( );
+                Vector3 p80 = Vector3::Zero( );
+
+                const bool ok60 = g_FreeFireMemory.Read<Vector3>( obj + 0x60, p60 );
+                const bool ok80 = g_FreeFireMemory.Read<Vector3>( obj + 0x80, p80 );
+
+                if ( ok60 && ok80 && p60 != Vector3::Zero( ) && p80 != Vector3::Zero( ) )
+                {
+                        const float dx = p60.X - p80.X;
+                        const float dy = p60.Y - p80.Y;
+                        const float dz = p60.Z - p80.Z;
+
+                        if ( dx * dx + dy * dy + dz * dz > 25.0f )
+                        {
+                                static LONGLONG s_LastWarn = 0;
+
+                                if ( GetTickCount64( ) - s_LastWarn > 10000 )
+                                {
+                                        s_LastWarn = GetTickCount64( );
+                                        DiagLog( "[MODS] root transform INVALIDO (caches 0x60/0x80 divergem > 5 m) — write abortado (Root/HipNode errado pro build?)" );
+                                }
+
+                                return 0;
+                        }
+                }
+        }
+
+        return obj;
 }
 
 /*
@@ -2738,7 +2567,14 @@ static void ModsTick(
         if ( tick50 )
                 s_LastTick = now;
 
-        const uintptr_t posOff = n32 ? 0x80 : 0xB0;
+        /*
+         * (V9.3) Slots de posicao do BR MOD (Death Engine, cadeia root):
+         * 0x60 = cache usado por DownPlayer/TeleKill/TeleportMark,
+         * 0x80 = cache usado por UpPlayer/Fly. Sao campos de dados do
+         * objeto (nao ponteiros) — iguais em 32 e 64-bit.
+         */
+        const uintptr_t posOffA = 0x60;   // Down/TeleKill/TeleMark
+        const uintptr_t posOffB = 0x80;   // Up/Fly
 
         /*
          * ------------------------------------------------------------
@@ -2752,23 +2588,26 @@ static void ModsTick(
         if ( tick50 &&
              ( now - s_LastStaticResolve > 250 || s_BaseGame == 0 ) &&
              Offsets::LibIl2Cpp != 0 &&
-             GfSlot::AnySlotConfigured() &&
+             Offsets::GameFacade::GameFacade_TypeInfo != 0 &&
              Offsets::AccessClass != 0 )
         {
                 s_LastStaticResolve = now;
 
-                /*
-                 * (V9.4 SLOTFIX) Mesma resolucao da cadeia principal:
-                 * principal (Offsets.cpp) -> [Chain.Fix] TypeInfoAlt1..3.
-                 * Token encoded (< 4GB em 64-bit) = slot ainda nao
-                 * resolvido — ignora ate virar ponteiro real (evita ler
-                 * statics em endereco baixo invalido).
-                 */
-                const GfSlot::Result gfRes = GfSlot::Resolve( n32 );
+                const uintptr_t klassRaw =
+                        ModsReadPtr( Offsets::LibIl2Cpp + Offsets::GameFacade::GameFacade_TypeInfo, n32 );
 
-                if ( gfRes.status == GfSlot::Ok && gfRes.klass != 0 )
+                /*
+                 * (V8A-LAZY) Token encoded (< 4GB em 64-bit) = slot ainda
+                 * nao resolvido pelo jogo — ignora ate virar ponteiro real
+                 * (evita ler statics em endereco baixo invalido).
+                 */
+                const uintptr_t klass =
+                        ( !n32 && klassRaw != 0 && klassRaw < 0x100000000ULL )
+                                ? 0
+                                : klassRaw;
+
+                if ( klass != 0 )
                 {
-                        const uintptr_t klass = gfRes.klass;
                         const uintptr_t statics =
                                 ModsReadPtr( klass + Offsets::AccessClass, n32 );
 
@@ -2945,7 +2784,7 @@ static void ModsTick(
                         {
                                 Vector3 p = s_MarkPos;
                                 p.Y += 5.0f;
-                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                                g_FreeFireMemory.Write<Vector3>( mtx + posOffA, p );
                         }
                         else if ( s_Phase == 1 && now - s_PhaseStart >= 1000 )
                         {
@@ -2954,7 +2793,7 @@ static void ModsTick(
                         }
                         else if ( s_Phase == 2 && now - s_PhaseStart < 500 )
                         {
-                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, s_MarkPos );
+                                g_FreeFireMemory.Write<Vector3>( mtx + posOffA, s_MarkPos );
                         }
                         else
                         {
@@ -2995,7 +2834,7 @@ static void ModsTick(
                         const uintptr_t localMtx = LocalRootMatrix( );
 
                         if ( localMtx != 0 )
-                                g_FreeFireMemory.Read<Vector3>( localMtx + posOff, localPos );
+                                g_FreeFireMemory.Read<Vector3>( localMtx + posOffA, localPos );
 
                         if ( localPos != Vector3::Zero( ) )
                         {
@@ -3039,7 +2878,7 @@ static void ModsTick(
                                                 dst.Z = localPos.Z + dir.Z * keep;
                                                 dst.Y = enemyPos.Y;
 
-                                                g_FreeFireMemory.Write<Vector3>( enemyMtx + posOff, dst );
+                                                g_FreeFireMemory.Write<Vector3>( enemyMtx + posOffA, dst );
                                         }
                                 }
                         }
@@ -3048,8 +2887,14 @@ static void ModsTick(
 
         /*
          * ============================================================
-         * UP PLAYER (hold) — levanta o inimigo mais próximo +2.5 m
-         * enquanto o botão flutuante está pressionado.
+         * UP PLAYER (hold) — levanta o inimigo mais proximo +2.5 m
+         * enquanto o botao flutuante esta pressionado.
+         *
+         * (V9.3) POSICAO TRAVADA: o original trava a posicao do alvo UMA
+         * vez (map por player) e escreve SEMPRE o mesmo ponto. O port
+         * antigo somava +2.5 por cima do valor JA levantado = inimigo
+         * subia ate o ceo. Um alvo por vez (o mais proximo no inicio do
+         * hold); soltar a tecla reseta.
          * ============================================================
          */
         {
@@ -3058,40 +2903,63 @@ static void ModsTick(
                                 ? AndroidInput::IsKeyPressed( M.UpPlayerKey )
                                 : M.UpPlayer;
 
-                static LONGLONG s_LastUp = 0;
+                static bool s_WasHolding = false;
+                static uintptr_t s_LockEntity = 0;
+                static Vector3 s_LockPos = Vector3::Zero( );
 
-                if ( holding && tick50 && !IsObserving && now - s_LastUp >= 50 )
+                if ( !holding )
+                {
+                        s_WasHolding = false;
+                        s_LockEntity = 0;
+                        s_LockPos = Vector3::Zero( );
+                }
+                else if ( tick50 && !IsObserving )
                 {
                         Vector3 localPos = Vector3::Zero( );
                         const uintptr_t localMtx = LocalRootMatrix( );
 
                         if ( localMtx != 0 )
-                                g_FreeFireMemory.Read<Vector3>( localMtx + posOff, localPos );
+                                g_FreeFireMemory.Read<Vector3>( localMtx + posOffA, localPos );
 
                         if ( localPos != Vector3::Zero( ) )
                         {
-                                const uintptr_t enemy = ModsNearestEnemy( localPos, 30.0f, nullptr );
-
-                                if ( enemy != 0 )
+                                if ( !s_WasHolding || s_LockEntity == 0 )
                                 {
-                                        const uintptr_t enemyMtx =
-                                                ModsResolveRootMatrix( enemy, n32 );
+                                        const uintptr_t enemy =
+                                                ModsNearestEnemy( localPos, 30.0f, nullptr );
 
-                                        if ( enemyMtx != 0 )
+                                        if ( enemy != 0 )
                                         {
-                                                Vector3 p = Vector3::Zero( );
+                                                const uintptr_t enemyMtx =
+                                                        ModsResolveRootMatrix( enemy, n32 );
 
-                                                if ( g_FreeFireMemory.Read<Vector3>( enemyMtx + posOff, p ) &&
-                                                     p != Vector3::Zero( ) )
+                                                if ( enemyMtx != 0 )
                                                 {
-                                                        p.Y += 2.5f;
-                                                        g_FreeFireMemory.Write<Vector3>( enemyMtx + posOff, p );
+                                                        Vector3 p = Vector3::Zero( );
+
+                                                        if ( g_FreeFireMemory.Read<Vector3>( enemyMtx + posOffB, p ) &&
+                                                             p != Vector3::Zero( ) )
+                                                        {
+                                                                s_LockEntity = enemy;
+                                                                s_LockPos = p;
+                                                                s_LockPos.Y += 2.5f;
+                                                                s_WasHolding = true;
+
+                                                                DiagLog( "[MODS] UpPlayer: alvo=0x%lX travado em Y=%.1f", ( unsigned long )enemy, s_LockPos.Y );
+                                                        }
                                                 }
                                         }
                                 }
-                        }
 
-                        s_LastUp = now;
+                                if ( s_WasHolding && s_LockEntity != 0 )
+                                {
+                                        const uintptr_t mtx =
+                                                ModsResolveRootMatrix( s_LockEntity, n32 );
+
+                                        if ( mtx != 0 )
+                                                g_FreeFireMemory.Write<Vector3>( mtx + posOffB, s_LockPos );
+                                }
+                        }
                 }
         }
 
@@ -3128,7 +2996,7 @@ static void ModsTick(
                         {
                                 if ( !s_HasOriginal )
                                 {
-                                        g_FreeFireMemory.Read<Vector3>( mtx + posOff, s_Original );
+                                        g_FreeFireMemory.Read<Vector3>( mtx + posOffA, s_Original );
                                         s_HasOriginal = true;
                                 }
 
@@ -3136,7 +3004,7 @@ static void ModsTick(
                                 {
                                         Vector3 p = s_Original;
                                         p.Y -= 0.9f;
-                                        g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                                        g_FreeFireMemory.Write<Vector3>( mtx + posOffA, p );
                                 }
                         }
                 }
@@ -3147,7 +3015,7 @@ static void ModsTick(
                         if ( mtx != 0 )
                         {
                                 for ( int i = 0; i < 5; ++i )
-                                        g_FreeFireMemory.Write<Vector3>( mtx + posOff, s_Original );
+                                        g_FreeFireMemory.Write<Vector3>( mtx + posOffA, s_Original );
                         }
 
                         s_HasOriginal = false;
@@ -3172,7 +3040,7 @@ static void ModsTick(
                         {
                                 Vector3 p = Vector3::Zero( );
 
-                                if ( g_FreeFireMemory.Read<Vector3>( mtx + posOff, p ) &&
+                                if ( g_FreeFireMemory.Read<Vector3>( mtx + posOffB, p ) &&
                                      p != Vector3::Zero( ) )
                                 {
                                         const bool up =
@@ -3191,7 +3059,7 @@ static void ModsTick(
                                                         dy = -dy;
 
                                                 p.Y += dy;
-                                                g_FreeFireMemory.Write<Vector3>( mtx + posOff, p );
+                                                g_FreeFireMemory.Write<Vector3>( mtx + posOffB, p );
                                         }
                                 }
                         }
@@ -3216,6 +3084,19 @@ static void ModsTick(
                         const uintptr_t followCam =
                                 ModsReadPtr( localPlayer + Offsets::Player::m_FollowCamera, n32 );
 
+                        if ( followCam == 0 )
+                        {
+                                static LONGLONG s_LastVhWarn = 0;
+
+                                if ( GetTickCount64( ) - s_LastVhWarn > 10000 )
+                                {
+                                        s_LastVhWarn = GetTickCount64( );
+                                        DiagLog( "[MODS] VisionHack: followCam=0 (localPlayer=%s? offset m_FollowCamera=0x%lX errado pro build?)",
+                                                 ( localPlayer != 0 ) ? "ok" : "ZERO",
+                                                 ( unsigned long )Offsets::Player::m_FollowCamera );
+                                }
+                        }
+
                         if ( followCam != 0 && tick50 )
                         {
                                 if ( !s_HasOriginal )
@@ -3225,6 +3106,11 @@ static void ModsTick(
                                                 s_OriginalFov );
 
                                         s_HasOriginal = true;
+
+                                        DiagLog( "[MODS] VisionHack ON: followCam=0x%lX fovOrig=%.2f -> %.2f (slot 0x%lX)",
+                                                 ( unsigned long )followCam, s_OriginalFov,
+                                                 M.VisionFov,
+                                                 ( unsigned long )Offsets::FollowCamera::FOVOffset );
                                 }
 
                                 g_FreeFireMemory.Write<float>(
@@ -3238,9 +3124,13 @@ static void ModsTick(
                                 ModsReadPtr( localPlayer + Offsets::Player::m_FollowCamera, n32 );
 
                         if ( followCam != 0 )
+                        {
                                 g_FreeFireMemory.Write<float>(
                                         followCam + Offsets::FollowCamera::FOVOffset,
                                         s_OriginalFov );
+
+                                DiagLog( "[MODS] VisionHack OFF: fov restaurado pra %.2f", s_OriginalFov );
+                        }
 
                         s_HasOriginal = false;
                 }
