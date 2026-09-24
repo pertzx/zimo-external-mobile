@@ -294,6 +294,29 @@ namespace Cheat {
 
             /*
              * ============================================================
+             * (V10 KERNEL) READ/WRITE VIA DRIVER DE KERNEL (RTmodules.h
+             * dentro do stormdaemon).
+             *
+             *   false = caminho padrao (syscall direta pread64/pwrite64)
+             *   true  = daemon usa SOMENTE o driver de kernel: todo
+             *           READ/WRITE sai por ioctl (OP_CMD_READ/WRITE),
+             *           sem abrir /proc/pid/mem, sem pread64 — mais
+             *           seguro e indetectavel pra leitura/escrita.
+             *
+             * Requer o modulo .ko do fornecedor CARREGADO no aparelho
+             * (o daemon faz probe: /dev/RTmodules, $RT_DEV e varredura
+             * de /proc/misc com self-test). Se o driver nao existir o
+             * daemon RECUSA o toggle e o painel mostra INDISPONIVEL.
+             *
+             * Aplicado NA HORA (sem Apply+Restart) via BRIDGE_CMD_KERNEL_SET;
+             * sobrevive a restart do daemon (client re-aplica sozinho) e
+             * fica salvo na config ([General] KernelRW).
+             * ============================================================
+             */
+            bool KernelRW = false;
+
+            /*
+             * ============================================================
              * GameProfile — O TIPO DO JOGO, escolhido na aba Settings.
              * E a UNICA configuracao de jogo que existe agora. Essa escolha
              * define TUDO automaticamente:

@@ -217,10 +217,53 @@ namespace BridgeClient
         uint32_t WritesOn      = 0;
         uint32_t VmFallbackOn  = 0;
 
+        /* (V10 KERNEL) contadores do modo kernel no daemon */
+        uint64_t KReads        = 0;
+        uint64_t KWrites       = 0;
+        uint64_t KErrs         = 0;
+        uint32_t KActive       = 0;
+        uint32_t KAvail        = 0;
+
         bool Ok = false;       /* conseguiu falar com o daemon?          */
     };
 
     RemoteStats GetRemoteStats();
+
+    /*
+     * (V10 KERNEL) MODO KERNEL DO DAEMON — leitura/escrita via driver.
+     *
+     * GetKernelStatus(): consulta o estado no daemon (disponibilidade do
+     * device, modo ativo, self-test de escrita, contadores e caminho do
+     * device). Sem cache — o painel que decide o intervalo (usa 1x/s).
+     *
+     * SetKernelMode(true): liga o modo kernel NO DAEMON — todo
+     * READ/WRITE da ponte passa a sair por ioctl do driver (sem
+     * pread64/pwrite64, sem /proc/pid/mem). Retorna true quando o
+     * daemon CONFIRMO ativacao (device encontrado). false = daemon
+     * offline ou driver ausente — o estado fica pendente e E
+     * RE-APLICADO automaticamente na proxima reconexao.
+     *
+     * SetKernelMode(false): desliga o modo kernel (sempre responde true
+     * se o daemon ack). O toggle fica salvo na config (KernelRW).
+     */
+    struct KernelInfo
+    {
+        bool Ok = false;         /* conseguiu falar com o daemon            */
+        bool Supported = false;  /* daemon compilado com RTmodules.h        */
+        bool Available = false;  /* device aberto + self-test de leitura ok */
+        bool Active = false;     /* modo kernel LIGADO agora                */
+        bool WriteOk = false;    /* self-test de escrita passou             */
+
+        uint64_t Reads = 0;
+        uint64_t Writes = 0;
+        uint64_t Errs = 0;
+
+        char DevPath[64] = {0};  /* ex: "/dev/RTmodules"                    */
+    };
+
+    KernelInfo GetKernelStatus();
+
+    bool SetKernelMode(bool enable);
 
     /*
      * Caminho do socket (pode ser sobrescrito pela env

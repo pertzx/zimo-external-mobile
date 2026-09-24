@@ -196,6 +196,7 @@ namespace Cheat {
             wInt(ofs, "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
             wBool(ofs, "StealthRead", g_Globals.General.StealthRead);
             wBool(ofs, "ShowPerfOverlay", g_Globals.General.ShowPerfOverlay);   // (V8.7)
+            wBool(ofs, "KernelRW", g_Globals.General.KernelRW);   // (V10 KERNEL)
             ofs << "\n";
 
                 return true;
@@ -362,6 +363,7 @@ namespace Cheat {
             gInt("General", "ReadIntervalMs", g_Globals.General.ReadIntervalMs);
             gBool("General", "StealthRead", g_Globals.General.StealthRead);
             gBool("General", "ShowPerfOverlay", g_Globals.General.ShowPerfOverlay);   // (V8.7)
+            gBool("General", "KernelRW", g_Globals.General.KernelRW);   // (V10 KERNEL)
 
             // ---------- [Chain.Fix] (V9.4 SLOTFIX) — RVAs alternativos do slot TypeInfo ----------
             gRva("Chain.Fix", "TypeInfoAlt1", g_Globals.General.TypeInfoAlt1);

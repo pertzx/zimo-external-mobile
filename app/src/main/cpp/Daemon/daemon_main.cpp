@@ -25,6 +25,7 @@
 
 #include <Shared/Bridge/BridgeProtocol.hpp>
 #include <Shared/Bridge/StormSysRW.hpp>
+#include <Daemon/RTmodules.h>
 
 #include <android/log.h>
 
@@ -119,6 +120,24 @@ static long long NowMsDaemon()
     return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
 }
 static std::atomic<uint64_t> g_TotalConnections{ 0 };
+
+/*
+ * ============================================================================
+ * (V10 KERNEL) MODO KERNEL — READ/WRITE VIA DRIVER (RTmodules.h)
+ * ============================================================================
+ * Quando o usuario liga o toggle "Kernel RW" no painel (BRIDGE_CMD_KERNEL_SET),
+ * TODO READ/WRITE da ponte passa a sair por ioctl do driver de kernel — sem
+ * pread64/pwrite64, sem abrir /proc/pid/mem (nada de handles no /proc, nada
+ * que anti-cheat enumere). O toggle e estado RUNTIME: o client re-aplica
+ * sozinho apos qualquer reconexao do daemon.
+ * ============================================================================
+ */
+static std::atomic<int> g_KernelMode{ 0 };
+static std::atomic<uint64_t> g_KernelReads{ 0 };
+static std::atomic<uint64_t> g_KernelWrites{ 0 };
+static std::atomic<uint64_t> g_KernelErrors{ 0 };
+static std::atomic<long long> g_KernelLastFbLogMs{ -1000000 };
+static std::atomic<long long> g_KernelLastReprobeMs{ -1000000 };
 
 /*
  * Log em arquivo (append). Cada linha é gravada com um único write()
@@ -224,6 +243,78 @@ namespace
      */
 
     /*
+     * ============================================================================
+     * (V10 KERNEL) WRAPPERS DE MEMORIA VIA DRIVER DE KERNEL (RTmodules.h)
+     * ============================================================================
+     * RT::KernelRead/KernelWrite com pid EXPLICITO por chamada — o daemon
+     * atende varios clientes em threads separadas, e o ioctl e a unica
+     * parte "stateful". Contadores alimentam STATS/KERNEL_STATUS.
+     * ============================================================================
+     */
+
+    bool KernelReadMem(
+        pid_t pid,
+        uint64_t address,
+        void* buffer,
+        size_t size
+    )
+    {
+        if (RT::KernelRead(pid, (uintptr_t)address, buffer, size))
+        {
+            g_KernelReads++;
+            return true;
+        }
+
+        g_KernelErrors++;
+        return false;
+    }
+
+    bool KernelWriteMem(
+        pid_t pid,
+        uint64_t address,
+        const void* buffer,
+        size_t size
+    )
+    {
+        if (RT::KernelWrite(pid, (uintptr_t)address, buffer, size))
+        {
+            g_KernelWrites++;
+            return true;
+        }
+
+        g_KernelErrors++;
+        return false;
+    }
+
+    /*
+     * Contingencia (V10 KERNEL): toggle LIGADO mas device sumiu na sessao
+     * (driver descarregado / device removido). Cai pro caminho pread64
+     * pra o client NAO MORRER junto, com LOG CLARO 1x/10s. Aproveita pra
+     * re-probe 1x/15s (o usuario pode ter re-carregado o modulo).
+     */
+    void LogKernelFallbackOnce()
+    {
+        const long long now = NowMsDaemon();
+
+        long long last = g_KernelLastFbLogMs.load();
+
+        if (now - last >= 10000 &&
+            g_KernelLastFbLogMs.compare_exchange_strong(last, now))
+        {
+            LOGW("[KERNEL] toggle LIGADO mas device INDISPONIVEL — usando pread64/pwrite64 de contingencia (re-probe automatico)");
+            FileLog("kernel fallback: device ausente, caminho syscall em uso");
+        }
+
+        long long lastRe = g_KernelLastReprobeMs.load();
+
+        if (now - lastRe >= 15000 &&
+            g_KernelLastReprobeMs.compare_exchange_strong(lastRe, now))
+        {
+            RT::Probe();  /* rate-limit interno: 1x/3s no maximo */
+        }
+    }
+
+    /*
      * PONTE READ: syscall direta __NR_pread64 + cache de blocos.
      */
     bool BridgeReadMem(
@@ -233,6 +324,20 @@ namespace
         size_t size
     )
     {
+        /*
+         * (V10 KERNEL) toggle LIGADO + device VIVO -> SOMENTE kernel.
+         * NAO existe fallback silencioso no modo kernel: falha de ioctl
+         * e erro REAL devolvido pro client (mesmo contrato do pread64),
+         * com errno logado na tag RTKernel.
+         */
+        if (g_KernelMode.load(std::memory_order_relaxed))
+        {
+            if (RT::IsAvailable())
+                return KernelReadMem(pid, address, buffer, size);
+
+            LogKernelFallbackOnce();
+        }
+
         return StormRW::ReadMem(pid, address, buffer, size);
     }
 
@@ -246,6 +351,15 @@ namespace
         size_t size
     )
     {
+        /* (V10 KERNEL) mesmo contrato do READ: kernel SO quando ligado. */
+        if (g_KernelMode.load(std::memory_order_relaxed))
+        {
+            if (RT::IsAvailable())
+                return KernelWriteMem(pid, address, buffer, size);
+
+            LogKernelFallbackOnce();
+        }
+
         return StormRW::WriteMem(pid, address, buffer, size);
     }
 
@@ -1671,6 +1785,75 @@ namespace
                 payloadOut.assign(totalBytes, 0);
 
                 /*
+                 * (V10 KERNEL) toggle kernel LIGADO: o lote roda item a item
+                 * pelo driver (ioctl OP_CMD_READ por item — o driver nao tem
+                 * op em lote). Item falho vem ZERADO, igual ao caminho
+                 * pread64 — mesmo contrato pro client. Device morto ->
+                 * contingencia pread64 com log (LogKernelFallbackOnce).
+                 */
+                if (g_KernelMode.load(std::memory_order_relaxed))
+                {
+                    if (RT::IsAvailable())
+                    {
+                        size_t kFailed = 0;
+                        size_t kOffset = 0;
+
+                        for (size_t i = 0; i < itemCount; i++)
+                        {
+                            uint64_t kAddr;
+                            uint32_t kSz;
+
+                            memcpy(&kAddr, in + i * 12, sizeof(kAddr));
+                            memcpy(&kSz, in + i * 12 + 8, sizeof(kSz));
+
+                            if (kSz == 0)
+                                continue;
+
+                            if (!KernelReadMem(
+                                    static_cast<pid_t>(req.Pid),
+                                    kAddr,
+                                    payloadOut.data() + kOffset,
+                                    kSz))
+                            {
+                                memset(payloadOut.data() + kOffset, 0, kSz);
+                                kFailed++;
+                            }
+
+                            kOffset += kSz;
+                        }
+
+                        resp.PayloadSize =
+                            static_cast<uint32_t>(totalBytes);
+
+                        resp.Status =
+                            (kFailed == 0) ? BRIDGE_OK : BRIDGE_ERR_PARTIAL;
+
+                        g_TotalReads += (uint64_t)itemCount;
+
+                        if (kFailed != 0)
+                        {
+                            static std::atomic<uint64_t> s_KBatchErrTotal{ 0 };
+
+                            const uint64_t kBatchErr =
+                                s_KBatchErrTotal.fetch_add(1) + 1;
+
+                            if (kBatchErr <= 8 || (kBatchErr % 100) == 0)
+                            {
+                                LOGE(
+                                    "[KERNEL][READBATCH] pid=%u itens=%zu falhas=%zu total=%zu (ocorrencias=%llu)",
+                                    req.Pid, itemCount, kFailed, totalBytes,
+                                    (unsigned long long)kBatchErr
+                                );
+                            }
+                        }
+
+                        break;
+                    }
+
+                    LogKernelFallbackOnce();
+                }
+
+                /*
                  * (V8.6-PERF) UM openat/close pra o lote inteiro. Antes:
                  * BridgeReadMem por item = open+pread+close POR ITEM que
                  * der miss no cache de 256 B — com ~100 itens por onda e
@@ -1740,41 +1923,48 @@ namespace
                  * (fallback process_vm — 0 = bypass 100% pread64).
                  */
                 static_assert(
-                    sizeof(BridgeStatsPayload) == 160,
+                    sizeof(BridgeStatsPayloadV2) == 192,
                     "payload de stats mudou — atualize o cliente junto"
                 );
 
                 const StormRW::Stats rs = StormRW::GetStats();
 
-                BridgeStatsPayload sp{};
+                BridgeStatsPayloadV2 sp{};
 
-                sp.bridgeReads       = g_TotalReads.load();
-                sp.bridgeWrites      = g_TotalWrites.load();
-                sp.bridgeErrors      = g_TotalErrors.load();
-                sp.uptimeSec         = (uint64_t)((NowMsDaemon() - g_StartMs) / 1000LL);
+                sp.base.bridgeReads       = g_TotalReads.load();
+                sp.base.bridgeWrites      = g_TotalWrites.load();
+                sp.base.bridgeErrors      = g_TotalErrors.load();
+                sp.base.uptimeSec         = (uint64_t)((NowMsDaemon() - g_StartMs) / 1000LL);
 
-                sp.cacheHits         = rs.hits;
-                sp.cacheNegHits      = rs.negHits;
-                sp.cacheMisses       = rs.misses;
-                sp.syscalls          = rs.syscalls;
-                sp.retries           = rs.retries;
+                sp.base.cacheHits         = rs.hits;
+                sp.base.cacheNegHits      = rs.negHits;
+                sp.base.cacheMisses       = rs.misses;
+                sp.base.syscalls          = rs.syscalls;
+                sp.base.retries           = rs.retries;
 
-                sp.directReads       = rs.directReads;
-                sp.exactFb           = rs.exactFb;
-                sp.vmFbReads         = rs.vmFbReads;
+                sp.base.directReads       = rs.directReads;
+                sp.base.exactFb           = rs.exactFb;
+                sp.base.vmFbReads         = rs.vmFbReads;
 
-                sp.directWrites      = rs.directWrites;
-                sp.vmFbWrites        = rs.vmFbWrites;
+                sp.base.directWrites      = rs.directWrites;
+                sp.base.vmFbWrites        = rs.vmFbWrites;
 
-                sp.negCreated        = rs.negCreated;
-                sp.openFails         = rs.openFails;
-                sp.wrRefused         = rs.wrRefused;
-                sp.wrKilled          = rs.wrKilled;
+                sp.base.negCreated        = rs.negCreated;
+                sp.base.openFails         = rs.openFails;
+                sp.base.wrRefused         = rs.wrRefused;
+                sp.base.wrKilled          = rs.wrKilled;
 
-                sp.writesOn          = rs.writesOn;
-                sp.vmFallbackOn      = (uint32_t)STORM_VM_FALLBACK;
-                sp.daemonProtoVersion = BRIDGE_PROTO_VERSION;
-                sp.reserved0         = 0;
+                sp.base.writesOn          = rs.writesOn;
+                sp.base.vmFallbackOn      = (uint32_t)STORM_VM_FALLBACK;
+                sp.base.daemonProtoVersion = BRIDGE_PROTO_VERSION;
+                sp.base.reserved0         = 0;
+
+                /* (V10 KERNEL) contadores do modo kernel (fim do struct) */
+                sp.kernel.kReads     = g_KernelReads.load();
+                sp.kernel.kWrites    = g_KernelWrites.load();
+                sp.kernel.kErrs      = g_KernelErrors.load();
+                sp.kernel.kActive    = (uint32_t)g_KernelMode.load();
+                sp.kernel.kAvail     = RT::IsAvailable() ? 1u : 0u;
 
                 payloadOut.assign(
                     sizeof(sp),
@@ -1874,6 +2064,126 @@ namespace
                 break;
             }
 
+            case BRIDGE_CMD_KERNEL_SET:
+            {
+                /*
+                 * (V10 KERNEL) Payload do pedido: uint32 enable.
+                 *   1 = ativa modo kernel SO (device precisa existir)
+                 *   0 = desativa (volta pro pread64/pwrite64 direto)
+                 * Resposta: Value=1 modo ativo; Status=NOTFOUND se o
+                 * driver nao estiver carregado (o toggle no painel
+                 * mostra o motivo via KERNEL_STATUS).
+                 */
+                uint32_t enable = 0;
+
+                if (payloadIn.size() >= sizeof(uint32_t))
+                    memcpy(&enable, payloadIn.data(), sizeof(uint32_t));
+
+                if (enable)
+                {
+                    /*
+                     * Re-probe antes de decidir: o usuario pode ter
+                     * carregado o modulo AGORA (Probe tem rate-limit
+                     * interno de 1x/3s, entao e barato).
+                     */
+                    if (!RT::IsAvailable())
+                        RT::Probe();
+
+                    if (RT::IsAvailable())
+                    {
+                        g_KernelMode = 1;
+
+                        /* kernel ON = logs RTKernel ON (opt-in do user) */
+                        RT::SetLogVerbose(true);
+
+                        resp.Value = 1;
+                        resp.Status = BRIDGE_OK;
+
+                        LOGI(
+                            "[KERNEL] ATIVADO via client — device=%s | READ/WRITE agora SOMENTE via driver (leitura %s, escrita %s)",
+                            RT::DevicePath(),
+                            "OK",
+                            RT::WriteSelfTestOk() ? "OK" : "FALHOU"
+                        );
+
+                        FileLog(
+                            "KERNEL ativado device=%s writeOk=%d",
+                            RT::DevicePath(),
+                            RT::WriteSelfTestOk() ? 1 : 0
+                        );
+                    }
+                    else
+                    {
+                        g_KernelMode = 0;
+
+                        resp.Value = 0;
+                        resp.Status = BRIDGE_ERR_NOTFOUND;
+
+                        LOGW(
+                            "[KERNEL] client pediu ATIVAR mas nenhum driver foi encontrado — modulo .ko nao carregado?"
+                        );
+
+                        FileLog("KERNEL recusado: driver ausente");
+                    }
+                }
+                else
+                {
+                    g_KernelMode = 0;
+
+                    /* logs de kernel voltam a seguir o --verbose */
+                    RT::SetLogVerbose(g_Verbose.load() ? true : false);
+
+                    resp.Value = 0;
+                    resp.Status = BRIDGE_OK;
+
+                    LOGI(
+                        "[KERNEL] DESATIVADO via client — de volta a pread64/pwrite64 direto"
+                    );
+
+                    FileLog("KERNEL desativado");
+                }
+
+                break;
+            }
+
+            case BRIDGE_CMD_KERNEL_STATUS:
+            {
+                /*
+                 * (V10 KERNEL) Estado do driver pro painel. Se ainda nao
+                 * ha driver, o proprio status dispara um re-probe (com
+                 * rate-limit interno) — abrir a aba Settings ja basta
+                 * pra detectar modulo carregado agora.
+                 */
+                if (!RT::IsAvailable())
+                    RT::Probe();
+
+                KernelStatusPayload ks{};
+
+                ks.supported = 1;  /* daemon compilado com RTmodules.h */
+                ks.available = RT::IsAvailable() ? 1u : 0u;
+                ks.active    = g_KernelMode.load() ? 1u : 0u;
+                ks.writeOk   = RT::WriteSelfTestOk() ? 1u : 0u;
+
+                ks.reads  = g_KernelReads.load();
+                ks.writes = g_KernelWrites.load();
+                ks.errs   = g_KernelErrors.load();
+
+                strncpy(ks.devPath, RT::DevicePath(), sizeof(ks.devPath) - 1);
+                ks.devPath[sizeof(ks.devPath) - 1] = '\0';
+
+                payloadOut.assign(sizeof(ks), 0);
+
+                memcpy(payloadOut.data(), &ks, sizeof(ks));
+
+                resp.PayloadSize =
+                    static_cast<uint32_t>(sizeof(ks));
+
+                resp.Value = ks.active;
+                resp.Status = BRIDGE_OK;
+
+                break;
+            }
+
             case BRIDGE_CMD_FIND_PID:
             {
                 std::vector<std::string> names;
@@ -1940,8 +2250,26 @@ namespace
                     break;
                 }
 
-                uint64_t base =
-                    FindModuleBase(
+                uint64_t base = 0;
+
+                /*
+                 * (V10 KERNEL) modo kernel: base vem do DRIVER (ioctl
+                 * OP_CMD_BASE — o kernel le a lista de modulos do alvo
+                 * sem /proc/pid/maps). Sem driver ou modulo nao achado
+                 * pelo driver, cai no parser de maps de sempre.
+                 */
+                if (g_KernelMode.load(std::memory_order_relaxed) &&
+                    RT::IsAvailable())
+                {
+                    base = RT::KernelModuleBase(
+                        static_cast<pid_t>(req.Pid),
+                        moduleName.c_str(),
+                        0
+                    );
+                }
+
+                if (base == 0)
+                    base = FindModuleBase(
                         static_cast<pid_t>(req.Pid),
                         moduleName
                     );
@@ -2397,6 +2725,41 @@ int main(
         g_SocketPath.c_str()
     );
 
+    /*
+     * ============================================================================
+     * (V10 KERNEL) PROBE DO DRIVER DE KERNEL NO START
+     * ============================================================================
+     * O resultado fica guardado (RT*) e o painel consulta via
+     * BRIDGE_CMD_KERNEL_STATUS. Logs do RTKernel seguem o --verbose aqui
+     * no start; quando o usuario liga o toggle "Kernel RW" no painel,
+     * os logs do driver ligam sozinhos (opt-in).
+     * ============================================================================
+     */
+    RT::SetLogVerbose(g_Verbose.load() ? true : false);
+
+    if (RT::Probe())
+    {
+        LOGI(
+            "[KERNEL] driver de kernel DISPONIVEL em %s (self-test: leitura OK, escrita %s) — pronto pro toggle do painel",
+            RT::DevicePath(),
+            RT::WriteSelfTestOk() ? "OK" : "FALHOU"
+        );
+
+        FileLog(
+            "kernel driver disponivel: %s writeOk=%d",
+            RT::DevicePath(),
+            RT::WriteSelfTestOk() ? 1 : 0
+        );
+    }
+    else
+    {
+        LOGI(
+            "[KERNEL] driver de kernel NAO encontrado — modo kernel fica indisponivel ate o modulo .ko ser carregado"
+        );
+
+        FileLog("kernel driver: ausente no start");
+    }
+
     unlink(g_SocketPath.c_str());
 
     int serverFd =
@@ -2502,7 +2865,7 @@ int main(
 
                     const StormRW::Stats rwStats = StormRW::GetStats();
                     LOGI(
-                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms | bypass: directR=%llu exact=%llu vmfbR=%llu directW=%llu vmfbW=%llu wlock=%llu on=%d fb=%d",
+                        "[STATS] reads=%llu (+%llu) writes=%llu (+%llu) erros=%llu | cache: hit=%llu neg=%llu miss=%llu syscalls=%llu retries=%llu ttl=%lldms | bypass: directR=%llu exact=%llu vmfbR=%llu directW=%llu vmfbW=%llu wlock=%llu on=%d fb=%d | kernel: on=%d avail=%d kR=%llu kW=%llu kE=%llu",
                         (unsigned long long)reads,
                         (unsigned long long)(reads - lastReads),
                         (unsigned long long)writes,
@@ -2521,7 +2884,12 @@ int main(
                         (unsigned long long)rwStats.vmFbWrites,
                         (unsigned long long)rwStats.wrKilled,
                         (int)rwStats.writesOn,
-                        (int)STORM_VM_FALLBACK
+                        (int)STORM_VM_FALLBACK,
+                        (int)g_KernelMode.load(),
+                        RT::IsAvailable() ? 1 : 0,
+                        (unsigned long long)g_KernelReads.load(),
+                        (unsigned long long)g_KernelWrites.load(),
+                        (unsigned long long)g_KernelErrors.load()
                     );
 
                     FileLog(

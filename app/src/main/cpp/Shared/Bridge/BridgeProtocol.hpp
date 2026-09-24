@@ -129,6 +129,34 @@ enum BridgeCmd : uint32_t
      * Resultado é cacheado no daemon por (pid, lib, classe).
      */
     BRIDGE_CMD_FIND_TYPEINFO = 10,
+
+    /*
+     * (V10 KERNEL) ATIVAR/DESATIVAR O MODO KERNEL do daemon.
+     *
+     * Payload do pedido: uint32_t enable
+     *     1 = usar SOMENTE o driver de kernel (RTmodules.h, ioctl
+     *         OP_CMD_READ/OP_CMD_WRITE) para todo READ/WRITE — sem
+     *         pread64/pwrite64, sem /proc/pid/mem;
+     *     0 = voltar ao caminho padrao (syscall direta).
+     *
+     * Resposta: Value = 1 (modo ativado) ou 0 (nao ativado);
+     *           Status = BRIDGE_OK ou BRIDGE_ERR_NOTFOUND quando o
+     *           device do driver nao existe (modulo nao carregado).
+     *
+     * O toggle e estado RUNTIME do daemon: o client RE-APLICA sozinho
+     * depois de qualquer reconexao (daemon respawnou).
+     */
+    BRIDGE_CMD_KERNEL_SET = 11,
+
+    /*
+     * (V10 KERNEL) ESTADO DO DRIVER DE KERNEL (usado pelo painel).
+     *
+     * Sem payload de entrada. Payload de resposta = KernelStatusPayload
+     * (struct fixa, packed): disponibilidade do device, se o modo esta
+     * ativo, self-test de escrita, contadores e o caminho do device
+     * em uso (ex: "/dev/RTmodules").
+     */
+    BRIDGE_CMD_KERNEL_STATUS = 12,
 };
 
 enum BridgeStatus : uint32_t
@@ -220,8 +248,69 @@ struct BridgeStatsPayload
 };
 #pragma pack(pop)
 
+/*
+ * (V10 KERNEL) campos ADICIONADOS NO FIM (politica do struct fixo:
+ * versoes novas so acrescentam no fim; o cliente valida pelo Size
+ * recebido). Contadores do modo kernel:
+ *   kReads/kWrites/kErrs = ops servidas pelo driver (ioctl);
+ *   kActive = modo kernel ligado agora; kAvail = device encontrado.
+ */
+#pragma pack(push, 1)
+struct BridgeStatsPayloadKFields
+{
+    uint64_t kReads;
+    uint64_t kWrites;
+    uint64_t kErrs;
+    uint32_t kActive;
+    uint32_t kAvail;
+};
+#pragma pack(pop)
+
 static_assert(sizeof(BridgeStatsPayload) == 160,
-              "BridgeStatsPayload deve ter 160 bytes");
+              "BridgeStatsPayload (parte base) deve ter 160 bytes");
+
+static_assert(sizeof(BridgeStatsPayloadKFields) == 32,
+              "BridgeStatsPayloadKFields deve ter 32 bytes");
+
+/*
+ * Struct completa (base + campos de kernel). O daemon SEMPRE responde
+ * com ela; cliente antigo (que espera 160) continua funcionando porque
+ * ele so copia o comeco.
+ */
+#pragma pack(push, 1)
+struct BridgeStatsPayloadV2
+{
+    BridgeStatsPayload base;
+    BridgeStatsPayloadKFields kernel;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(BridgeStatsPayloadV2) == 192,
+              "BridgeStatsPayloadV2 deve ter 192 bytes");
+
+
+/*
+ * (V10 KERNEL) Payload da resposta do BRIDGE_CMD_KERNEL_STATUS.
+ * Struct FIXA (packed).
+ */
+#pragma pack(push, 1)
+struct KernelStatusPayload
+{
+    uint32_t supported;   /* daemon compilado com RTmodules.h (sempre 1)  */
+    uint32_t available;   /* device do driver aberto + self-test READ ok  */
+    uint32_t active;      /* modo kernel LIGADO neste momento             */
+    uint32_t writeOk;     /* self-test de ESCRITA passou                  */
+
+    uint64_t reads;       /* ops de leitura servidas pelo kernel          */
+    uint64_t writes;      /* ops de escrita servidas pelo kernel          */
+    uint64_t errs;        /* falhas de ioctl (endereco invalido conta)    */
+
+    char     devPath[64]; /* device em uso, ex "/dev/RTmodules" (0 = -)   */
+};
+#pragma pack(pop)
+
+static_assert(sizeof(KernelStatusPayload) == 104,
+              "KernelStatusPayload deve ter 104 bytes");
 
 /*
  * (V9) Hit de uma busca de TypeInfo (BRIDGE_CMD_FIND_TYPEINFO).

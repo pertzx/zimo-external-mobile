@@ -660,6 +660,65 @@ namespace
 
         return true;
     }
+
+    /*
+     * ============================================================================
+     * (V10 KERNEL) MODO KERNEL — ESTADO PENDENTE + RE-APLICACAO AUTOMATICA
+     * ============================================================================
+     * O toggle kernel e estado RUNTIME do daemon: se o daemon respawnar
+     * (watchdog do Java, restart, crash), o modo novo NAO sabe do toggle.
+     * s_KernelWanted guarda a vontade do usuario e ReapplyKernelOnSocket
+     * re-aplica em TODA reconexao/primeiro connect ANTES de qualquer
+     * operacao de memoria — o modo kernel sobrevive a restarts.
+     * ============================================================================
+     */
+    static std::atomic<int> s_KernelWanted{ 0 };  /* -1 nada, 0 = off, 1 = on */
+
+    static void ReapplyKernelOnSocketLocked(
+        int fd,
+        const char* reason
+    )
+    {
+        if (s_KernelWanted.load(std::memory_order_relaxed) != 1)
+            return;
+
+        uint32_t en = 1;
+
+        BridgeRequest kreq{};
+
+        kreq.Magic = BRIDGE_MAGIC;
+        kreq.Version = BRIDGE_PROTO_VERSION;
+        kreq.Cmd = BRIDGE_CMD_KERNEL_SET;
+        kreq.Seq = ++g_Seq;
+        kreq.PayloadSize = sizeof(en);
+
+        BridgeResponse kresp{};
+        std::vector<uint8_t> kout;
+
+        if (RequestOnSocket(
+                fd,
+                kreq,
+                (const uint8_t*)&en,
+                sizeof(en),
+                kresp,
+                kout
+            ) &&
+            kresp.Status == BRIDGE_OK)
+        {
+            LOGI(
+                "modo kernel re-aplicado no daemon (%s): ativo=%llu",
+                reason,
+                (unsigned long long)kresp.Value
+            );
+        }
+        else
+        {
+            LOGW(
+                "modo kernel NAO re-aplicado no daemon (%s): driver ausente ou falha de transporte",
+                reason
+            );
+        }
+    }
 }
 
 namespace BridgeClient
@@ -683,6 +742,12 @@ bool EnsureConnected()
 
     if (!ConnectLocked())
         return false;
+
+    /*
+     * (V10 KERNEL) toggle pendente: primeira conexao depois do app
+     * abrir (config salva KernelRW=true) — aplica ANTES do ping log.
+     */
+    ReapplyKernelOnSocketLocked(g_Socket, "primeira conexao");
 
     /*
      * Handshake: garante que é realmente a nossa ponte.
@@ -815,6 +880,13 @@ bool Request(
                 return false;
 
             g_StatsReconnects++;
+
+            /*
+             * (V10 KERNEL) daemon respawnou: re-aplica o toggle kernel
+             * no socket NOVO antes do pedido real (sem isso, um restart
+             * do daemon desligaria o modo kernel silenciosamente).
+             */
+            ReapplyKernelOnSocketLocked(g_Socket, "reconexao");
         }
 
         if (RequestOnSocket(
@@ -1414,9 +1486,9 @@ RemoteStats GetRemoteStats()
             payload
         ) &&
         resp.Status == BRIDGE_OK &&
-        payload.size() >= sizeof(BridgeStatsPayload))
+        payload.size() >= sizeof(BridgeStatsPayloadV2))
     {
-        BridgeStatsPayload sp{};
+        BridgeStatsPayloadV2 sp{};
 
         memcpy(
             &sp,
@@ -1424,31 +1496,43 @@ RemoteStats GetRemoteStats()
             sizeof(sp)
         );
 
-        out.BridgeReads  = sp.bridgeReads;
-        out.BridgeWrites = sp.bridgeWrites;
-        out.BridgeErrors = sp.bridgeErrors;
-        out.UptimeSec    = sp.uptimeSec;
+        out.BridgeReads  = sp.base.bridgeReads;
+        out.BridgeWrites = sp.base.bridgeWrites;
+        out.BridgeErrors = sp.base.bridgeErrors;
+        out.UptimeSec    = sp.base.uptimeSec;
 
-        out.CacheHits    = sp.cacheHits;
-        out.CacheNegHits = sp.cacheNegHits;
-        out.CacheMisses  = sp.cacheMisses;
-        out.Syscalls     = sp.syscalls;
-        out.Retries      = sp.retries;
+        out.CacheHits    = sp.base.cacheHits;
+        out.CacheNegHits = sp.base.cacheNegHits;
+        out.CacheMisses  = sp.base.cacheMisses;
+        out.Syscalls     = sp.base.syscalls;
+        out.Retries      = sp.base.retries;
 
-        out.DirectReads  = sp.directReads;
-        out.ExactFb      = sp.exactFb;
-        out.VmFbReads    = sp.vmFbReads;
+        out.DirectReads  = sp.base.directReads;
+        out.ExactFb      = sp.base.exactFb;
+        out.VmFbReads    = sp.base.vmFbReads;
 
-        out.DirectWrites = sp.directWrites;
-        out.VmFbWrites   = sp.vmFbWrites;
+        out.DirectWrites = sp.base.directWrites;
+        out.VmFbWrites   = sp.base.vmFbWrites;
 
-        out.NegCreated   = sp.negCreated;
-        out.OpenFails    = sp.openFails;
-        out.WrRefused    = sp.wrRefused;
-        out.WrKilled     = sp.wrKilled;
+        out.NegCreated   = sp.base.negCreated;
+        out.OpenFails    = sp.base.openFails;
+        out.WrRefused    = sp.base.wrRefused;
+        out.WrKilled     = sp.base.wrKilled;
 
-        out.WritesOn     = sp.writesOn;
-        out.VmFallbackOn = sp.vmFallbackOn;
+        out.WritesOn     = sp.base.writesOn;
+        out.VmFallbackOn = sp.base.vmFallbackOn;
+
+        /*
+         * (V10 KERNEL) contadores do modo kernel. O daemon SEMPRE
+         * responde o struct V2 (184); se algum daemon velho responder
+         * o struct de 160 bytes, o sizeof check de cima ja falhou e
+         * nem chegamos aqui — comportamento seguro.
+         */
+        out.KReads       = sp.kernel.kReads;
+        out.KWrites      = sp.kernel.kWrites;
+        out.KErrs        = sp.kernel.kErrs;
+        out.KActive      = sp.kernel.kActive;
+        out.KAvail       = sp.kernel.kAvail;
 
         out.Ok = true;
 
@@ -1469,6 +1553,115 @@ const char* GetSocketPath()
 void InvalidateSocketPath()
 {
     InvalidateResolvedSocketPath();
+}
+
+/*
+ * ============================================================================
+ * (V10 KERNEL) MODO KERNEL — API PRO PAINEL
+ * ============================================================================
+ */
+
+KernelInfo GetKernelStatus()
+{
+    KernelInfo out{};
+
+    BridgeRequest req{};
+
+    req.Cmd =
+        BRIDGE_CMD_KERNEL_STATUS;
+
+    BridgeResponse resp{};
+    std::vector<uint8_t> payload;
+
+    if (Request(
+            req,
+            nullptr,
+            0,
+            resp,
+            payload
+        ) &&
+        resp.Status == BRIDGE_OK &&
+        payload.size() >= sizeof(KernelStatusPayload))
+    {
+        KernelStatusPayload ks{};
+
+        memcpy(
+            &ks,
+            payload.data(),
+            sizeof(ks)
+        );
+
+        out.Ok        = true;
+        out.Supported = (ks.supported != 0);
+        out.Available = (ks.available != 0);
+        out.Active    = (ks.active != 0);
+        out.WriteOk   = (ks.writeOk != 0);
+
+        out.Reads  = ks.reads;
+        out.Writes = ks.writes;
+        out.Errs   = ks.errs;
+
+        memcpy(out.DevPath, ks.devPath, sizeof(out.DevPath) - 1);
+        out.DevPath[sizeof(out.DevPath) - 1] = '\0';
+    }
+
+    return out;
+}
+
+bool SetKernelMode(bool enable)
+{
+    /*
+     * Guarda a vontade do usuario ANTES de falar com o daemon: se a
+     * ponte ainda nao existe (daemon subindo), o estado pendente e
+     * re-aplicado automaticamente na primeira conexao/reconexao.
+     */
+    s_KernelWanted.store(enable ? 1 : 0);
+
+    uint32_t en = enable ? 1u : 0u;
+
+    BridgeRequest req{};
+
+    req.Cmd =
+        BRIDGE_CMD_KERNEL_SET;
+
+    BridgeResponse resp{};
+
+    std::vector<uint8_t> payloadIn(sizeof(en));
+
+    memcpy(payloadIn.data(), &en, sizeof(en));
+
+    std::vector<uint8_t> payloadOut;
+
+    if (!Request(
+            req,
+            payloadIn.data(),
+            static_cast<uint32_t>(payloadIn.size()),
+            resp,
+            payloadOut
+        ))
+    {
+        LOGW(
+            "KERNEL_SET enable=%d nao chegou ao daemon (sem ponte) — fica pendente pra proxima conexao",
+            enable ? 1 : 0
+        );
+
+        return false;
+    }
+
+    LOGI(
+        "KERNEL_SET enable=%d -> status=%s ativado=%llu",
+        enable ? 1 : 0,
+        DecodeStatus(resp.Status),
+        (unsigned long long)resp.Value
+    );
+
+    if (enable)
+    {
+        /* ativo SO se o daemon confirmou (device encontrado) */
+        return (resp.Status == BRIDGE_OK && resp.Value == 1);
+    }
+
+    return (resp.Status == BRIDGE_OK);
 }
 
 } // namespace BridgeClient

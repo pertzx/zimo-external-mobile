@@ -1781,6 +1781,77 @@ lastFrameHoveredId = gc.HoveredId;
 
                                                         ImGui::Dummy(ImVec2(0, 8));
 
+                                                        /*
+                                                         * (V10 KERNEL) READ/WRITE VIA DRIVER DE KERNEL —
+                                                         * quando ligado, o daemon usa SOMENTE ioctl do driver
+                                                         * (RTmodules.h) pra ler/gravar no jogo: nada de
+                                                         * pread64/pwrite64, nada de abrir /proc/pid/mem.
+                                                         * Requer o modulo .ko do fornecedor carregado no
+                                                         * aparelho; o daemon recusa se nao achar o device.
+                                                         * Aplica NA HORA (sem Apply+Restart).
+                                                         */
+                                                        Custom::Checkbox(XorStr("Kernel RW (somente kernel)"), &g_Globals.General.KernelRW);
+
+                                                        static bool s_KernelUIPrev = false;
+                                                        static BridgeClient::KernelInfo s_KernelUIInfo{};
+
+                                                        if (g_Globals.General.KernelRW != s_KernelUIPrev)
+                                                        {
+                                                                s_KernelUIPrev = g_Globals.General.KernelRW;
+                                                                const bool kOn = s_KernelUIPrev;
+
+                                                                std::thread([kOn]{
+                                                                        const bool ok = BridgeClient::SetKernelMode(kOn);
+
+                                                                        if (!kOn)
+                                                                                NotifyManager::Send(XorStr("Kernel desativado — de volta ao pread64/pwrite64"), 3500);
+                                                                        else if (ok)
+                                                                                NotifyManager::Send(XorStr("Kernel ATIVADO — read/write somente via driver"), 4000);
+                                                                        else
+                                                                                NotifyManager::Send(XorStr("Kernel RECUSADO — driver ausente (veja status abaixo)"), 5000);
+                                                                }).detach();
+                                                        }
+
+                                                        /* Status ao vivo: consulta o daemon no maximo 1x por segundo. */
+                                                        {
+                                                                static float s_KernelUINextQuery = 0.0f;
+                                                                const float nowS = (float)ImGui::GetTime();
+
+                                                                if (nowS >= s_KernelUINextQuery)
+                                                                {
+                                                                        s_KernelUINextQuery = nowS + 1.0f;
+                                                                        s_KernelUIInfo = BridgeClient::GetKernelStatus();
+                                                                }
+
+                                                                if (!s_KernelUIInfo.Ok)
+                                                                {
+                                                                        ImGui::TextColored(ImVec4(0.90f, 0.65f, 0.25f, 1.0f), "%s",
+                                                                                XorStr("Kernel: daemon offline (estado pendente)"));
+                                                                }
+                                                                else if (!s_KernelUIInfo.Available)
+                                                                {
+                                                                        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s",
+                                                                                XorStr("Kernel: INDISPONIVEL — carregue o modulo kernel"));
+                                                                }
+                                                                else if (s_KernelUIInfo.Active)
+                                                                {
+                                                                        ImGui::TextColored(ImVec4(0.35f, 0.90f, 0.45f, 1.0f), "Kernel: ATIVO %s%s",
+                                                                                s_KernelUIInfo.DevPath,
+                                                                                s_KernelUIInfo.WriteOk ? "" : " (escrita self-test FALHOU)");
+                                                                        ImGui::Text("kR=%llu kW=%llu kE=%llu",
+                                                                                (unsigned long long)s_KernelUIInfo.Reads,
+                                                                                (unsigned long long)s_KernelUIInfo.Writes,
+                                                                                (unsigned long long)s_KernelUIInfo.Errs);
+                                                                }
+                                                                else
+                                                                {
+                                                                        ImGui::TextColored(ImVec4(0.40f, 0.80f, 0.95f, 1.0f), "Kernel: disponivel %s — ligue o toggle",
+                                                                                s_KernelUIInfo.DevPath);
+                                                                }
+                                                        }
+
+                                                        ImGui::Dummy(ImVec2(0, 8));
+
                                                         Custom::Checkbox(XorStr("Web Remote"), &g_Globals.General.WebRemote);
                                                         if (g_Globals.General.WebRemote)
                                                         {
